@@ -6,7 +6,7 @@ Interface elements come from [Watermelon UI](https://ui.watermelon.sh/) (navigat
 
 ## Live
 
-https://0xdmicheal.github.io/ediinzasag/
+https://michealbuilds.site/ediinzasag/
 
 ## Run
 
