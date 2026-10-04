@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480">
+  <rect width="800" height="480" fill="#172033"/>
+  <circle cx="640" cy="120" r="70" fill="#1d4ed8"/>
+  <text x="48" y="140" fill="#eff6ff" font-family="Georgia, serif" font-size="28">ЕВРО БҮС</text>
+  <text x="48" y="260" fill="#eff6ff" font-family="Georgia, serif" font-size="92">3.8%</text>
+  <text x="48" y="320" fill="#bfdbfe" font-family="Georgia, serif" font-size="24">есдүгээр сар</text>
+</svg>
