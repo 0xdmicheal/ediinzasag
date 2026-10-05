@@ -8,7 +8,7 @@ import {
   FaYoutube,
 } from "react-icons/fa6"
 
-import { channels } from "@/content/channels"
+import { channels, openSubstackSubscribe } from "@/content/channels"
 import { Footer12 } from "@/components/ui/footer-12"
 import { Navigation1 } from "@/components/ui/navigation-1"
 
@@ -52,17 +52,34 @@ const footerColumns = [
   },
 ]
 
+const THEME_KEY = "ediinzasag-theme"
+
+function initialTheme(): "light" | "dark" {
+  try {
+    const saved = localStorage.getItem(THEME_KEY)
+    if (saved === "dark" || saved === "light") return saved
+  } catch {
+    // Storage blocked; fall through to the system setting.
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+}
+
 export function Layout() {
   const location = useLocation()
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    const saved = localStorage.getItem("ediinzasag-theme")
-    return saved === "dark" ? "dark" : "light"
-  })
+  const [theme, setTheme] = useState<"light" | "dark">(initialTheme)
 
   useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark")
-    localStorage.setItem("ediinzasag-theme", theme)
   }, [theme])
+
+  function changeTheme(next: "light" | "dark") {
+    setTheme(next)
+    try {
+      localStorage.setItem(THEME_KEY, next)
+    } catch {
+      // Storage blocked; the choice lasts for this visit only.
+    }
+  }
 
   useLayoutEffect(() => {
     if (location.hash) {
@@ -76,24 +93,22 @@ export function Layout() {
   }, [location.pathname, location.hash])
 
   return (
-    <div className="bg-background text-foreground min-h-svh">
+    <div className="bg-background text-foreground flex min-h-svh flex-col">
       <a
         href="#content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2"
       >
         Агуулга руу
       </a>
-      <Navigation1 theme={theme} onThemeChange={setTheme} />
-      <main id="content">
+      <Navigation1 theme={theme} onThemeChange={changeTheme} />
+      <main id="content" className="flex-1">
         <Outlet />
       </main>
       <Footer12
-        newsletterTitle="Долоо хоногийн тойм Substack дээр. Эдийн засаг is easy."
+        newsletterTitle="Долоо хоногийн тойм Substack дээр."
         inputPlaceholder="И-мэйл хаяг"
         subscribeText="Subscribe"
-        onSubscribe={() => {
-          window.open(channels.substackSubscribe, "_blank", "noopener,noreferrer")
-        }}
+        onSubscribe={openSubstackSubscribe}
         columns={footerColumns}
         brandName="ЭДИЙН ЗАСАГ"
         copyright="© 2026 EZ Эдийн засаг. ediinzasag.mn"

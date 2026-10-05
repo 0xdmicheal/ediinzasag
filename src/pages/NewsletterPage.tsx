@@ -4,13 +4,13 @@ import { Link } from "react-router-dom"
 import { SubstackShelf } from "@/components/site/SubstackShelf"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { channels, episodes } from "@/content/channels"
+import { channels, episodes, openSubstackSubscribe } from "@/content/channels"
 import { substackPosts } from "@/content/substack.posts"
 
 export function NewsletterPage() {
   function subscribe(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    window.open(channels.substackSubscribe, "_blank", "noopener,noreferrer")
+    openSubstackSubscribe(String(new FormData(event.currentTarget).get("email") ?? ""))
   }
 
   return (
@@ -23,7 +23,7 @@ export function NewsletterPage() {
             Захидлууд энэ хуудсан дээр уншигдана. Захиалга Substack дээр баталгаажна.
           </p>
         </div>
-        <form onSubmit={subscribe} className="border p-6">
+        <form onSubmit={subscribe} className="rounded-lg border p-6">
           <label htmlFor="email" className="text-sm font-medium">
             И-мэйл
           </label>
@@ -37,7 +37,7 @@ export function NewsletterPage() {
         </form>
       </section>
 
-      <section className="mt-14 border p-6">
+      <section className="mt-14 rounded-lg border p-6">
         <p className="text-muted-foreground text-[11px] tracking-[0.18em] uppercase">EZ Talk · {episodes[0].date}</p>
         <h2 className="font-news mt-2 text-3xl leading-tight">{episodes[0].title}</h2>
         <Button asChild className="mt-5 w-fit">

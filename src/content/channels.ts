@@ -10,6 +10,14 @@ export const channels = {
   linktree: "https://linktr.ee/ediinzasag",
 } as const
 
+export function openSubstackSubscribe(email = "") {
+  const address = email.trim()
+  const url = address
+    ? `${channels.substackSubscribe}?email=${encodeURIComponent(address)}`
+    : channels.substackSubscribe
+  window.open(url, "_blank", "noopener,noreferrer")
+}
+
 export type Episode = {
   n: number | null
   title: string

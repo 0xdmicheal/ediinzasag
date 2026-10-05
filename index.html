@@ -27,6 +27,13 @@
     />
     <meta name="twitter:image" content="https://michealbuilds.site/ediinzasag/og.png" />
     <title>EZ Эдийн засаг · ediinzasag.mn</title>
+    <script>
+      try {
+        var saved = localStorage.getItem("ediinzasag-theme")
+        var dark = saved ? saved === "dark" : matchMedia("(prefers-color-scheme: dark)").matches
+        if (dark) document.documentElement.classList.add("dark")
+      } catch (error) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
