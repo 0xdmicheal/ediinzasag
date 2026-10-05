@@ -8,21 +8,30 @@ import { defineConfig } from "vite"
 const root = fileURLToPath(new URL(".", import.meta.url))
 
 function pullSubstack() {
-  const result = spawnSync("python", ["scripts/pull_substack.py"], {
-    cwd: root,
-    encoding: "utf8",
-    timeout: 20000,
-    windowsHide: true,
-  })
-  if (result.status !== 0) {
-    const detail = (result.stderr || result.stdout || result.error?.message || "unknown").trim()
-    console.warn(`[substack] RSS pull skipped (${detail}). Using the last generated file.`)
+  let detail = "no python found"
+  for (const python of ["python", "python3"]) {
+    const result = spawnSync(python, ["scripts/pull_substack.py"], {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 40000,
+      windowsHide: true,
+    })
+    if (result.status === 0) {
+      console.log(`[substack] ${result.stdout.trim()}`)
+      return
+    }
+    // ENOENT means this interpreter name is missing; try the next one.
+    if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") continue
+    detail = (result.stderr || result.stdout || result.error?.message || "unknown").trim()
+    break
   }
+  console.warn(`[substack] RSS pull skipped (${detail}). Using the last generated file.`)
 }
 
 function substackRss() {
   return {
     name: "substack-rss",
+    apply: "build" as const,
     buildStart() {
       pullSubstack()
     },

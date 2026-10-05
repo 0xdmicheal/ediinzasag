@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 480">
-  <rect width="800" height="480" fill="#14231c"/>
-  <rect x="48" y="80" width="16" height="320" fill="#86efac"/>
-  <text x="96" y="140" fill="#f0fdf4" font-family="Georgia, serif" font-size="28">ХЯТАД</text>
-  <text x="96" y="250" fill="#f0fdf4" font-family="Georgia, serif" font-size="72">93%</text>
-  <text x="96" y="320" fill="#bbf7d0" font-family="Georgia, serif" font-size="24">экспортын хувь</text>
-</svg>

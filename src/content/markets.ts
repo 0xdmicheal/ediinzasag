@@ -1,20 +1,30 @@
 /** Friday 2 October 2026 closes. Sunday 4 October the exchanges were shut. */
 
+export type Currency = "MNT" | "USD"
+
+/** What a number is measured in. Every quote says this explicitly so ₮ and $ never get mixed up. */
+export type Denomination =
+  | { kind: "money"; currency: Currency; per?: string; scale?: string }
+  | { kind: "index" }
+  | { kind: "fx"; base: string; quote: string }
+  | { kind: "percent" }
+
 export interface Quote {
   id: string
   label: string
   price: string
   move: string
   pct: number
+  denom: Denomination
   asOf: string
   source: string
   href?: string
-  unit?: string
 }
 
 export interface CloseRow {
   symbol: string
   name: string
+  currency: Currency
   price: string
   move: string
   pct: number
@@ -51,6 +61,7 @@ export const top20 = {
 export const mongoliaIndices: Quote[] = [
   {
     id: "mse-a",
+    denom: { kind: "index" },
     label: "MSE A",
     price: "26,294.73",
     move: "+0.37%",
@@ -61,6 +72,7 @@ export const mongoliaIndices: Quote[] = [
   },
   {
     id: "mse-b",
+    denom: { kind: "index" },
     label: "MSE B",
     price: "15,342.78",
     move: "+0.34%",
@@ -71,6 +83,7 @@ export const mongoliaIndices: Quote[] = [
   },
   {
     id: "fti",
+    denom: { kind: "index" },
     label: "FTI индекс",
     price: "1,053.00",
     move: "+0.31%",
@@ -81,9 +94,9 @@ export const mongoliaIndices: Quote[] = [
   },
   {
     id: "cap",
+    denom: { kind: "money", currency: "MNT", scale: "их наяд" },
     label: "Үнэлгээ",
     price: "16.73",
-    unit: "их наяд ₮",
     move: "10.02 хаалт",
     pct: 0,
     asOf: "2026.10.02",
@@ -103,6 +116,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "LEND",
     name: "ЛэндМН",
+    currency: "MNT",
     price: "176.39",
     move: "+11.08",
     pct: 6.7,
@@ -112,6 +126,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "TUM",
     name: "Түмэн шувуут",
+    currency: "MNT",
     price: "467.42",
     move: "+16.54",
     pct: 3.67,
@@ -121,6 +136,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "BODI",
     name: "Бодь даатгал",
+    currency: "MNT",
     price: "102.85",
     move: "+2.87",
     pct: 2.87,
@@ -130,6 +146,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "AIC",
     name: "Ард даатгал",
+    currency: "MNT",
     price: "630.99",
     move: "−25.92",
     pct: -3.95,
@@ -139,6 +156,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "MFC",
     name: "Монос хүнс",
+    currency: "MNT",
     price: "78.57",
     move: "−1.43",
     pct: -1.79,
@@ -148,6 +166,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "ADB",
     name: "Ард кредит",
+    currency: "MNT",
     price: "129.40",
     move: "−2.31",
     pct: -1.75,
@@ -157,6 +176,7 @@ export const fridayCloses: CloseRow[] = [
   {
     symbol: "ALTT",
     name: "Gold Trust ETF",
+    currency: "MNT",
     price: "4,730.00",
     move: "−545.00",
     pct: -10.33,
@@ -206,6 +226,7 @@ export const fridayFlow: FlowRow[] = [
 export const worldIndices: Quote[] = [
   {
     id: "dow",
+    denom: { kind: "index" },
     label: "Dow",
     price: "51,176.96",
     move: "+250.40",
@@ -216,6 +237,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "spx",
+    denom: { kind: "index" },
     label: "S&P 500",
     price: "7,722.72",
     move: "+56.27",
@@ -226,6 +248,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "nasdaq",
+    denom: { kind: "index" },
     label: "Nasdaq",
     price: "27,190.86",
     move: "+319.26",
@@ -236,6 +259,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "nikkei",
+    denom: { kind: "index" },
     label: "Nikkei",
     price: "68,309",
     move: "−647",
@@ -246,6 +270,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "hsi",
+    denom: { kind: "index" },
     label: "Hang Seng",
     price: "23,972.29",
     move: "−640.98",
@@ -256,6 +281,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "dax",
+    denom: { kind: "index" },
     label: "DAX",
     price: "25,231.20",
     move: "+291.85",
@@ -266,6 +292,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "ftse",
+    denom: { kind: "index" },
     label: "FTSE 100",
     price: "10,461.95",
     move: "+33.68",
@@ -276,6 +303,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "cac",
+    denom: { kind: "index" },
     label: "CAC 40",
     price: "7,897.19",
     move: "+61.88",
@@ -286,6 +314,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "asx",
+    denom: { kind: "index" },
     label: "ASX 200",
     price: "8,682",
     move: "+0.79%",
@@ -296,6 +325,7 @@ export const worldIndices: Quote[] = [
   },
   {
     id: "shanghai",
+    denom: { kind: "index" },
     label: "Шанхай",
     price: "3,842.19",
     move: "+0.31%",
@@ -309,9 +339,9 @@ export const worldIndices: Quote[] = [
 export const commodities: Quote[] = [
   {
     id: "brent",
+    denom: { kind: "money", currency: "USD", per: "баррель" },
     label: "Brent",
     price: "102.25",
-    unit: "ам.доллар",
     move: "−0.06",
     pct: -0.06,
     asOf: "2026.10.03",
@@ -320,9 +350,9 @@ export const commodities: Quote[] = [
   },
   {
     id: "wti",
+    denom: { kind: "money", currency: "USD", per: "баррель" },
     label: "WTI",
     price: "91.11",
-    unit: "ам.доллар",
     move: "−1.76",
     pct: -1.9,
     asOf: "2026.10.03",
@@ -331,9 +361,9 @@ export const commodities: Quote[] = [
   },
   {
     id: "gold",
+    denom: { kind: "money", currency: "USD", per: "унц" },
     label: "Алт",
     price: "4,162.30",
-    unit: "ам.доллар/унц",
     move: "−52.60",
     pct: -1.25,
     asOf: "2026.10.03",
@@ -342,9 +372,9 @@ export const commodities: Quote[] = [
   },
   {
     id: "copper",
+    denom: { kind: "money", currency: "USD", per: "фунт" },
     label: "Зэс",
     price: "6.4920",
-    unit: "ам.доллар/фунт",
     move: "+0.15%",
     pct: 0.15,
     asOf: "2026.10.02",
@@ -353,9 +383,9 @@ export const commodities: Quote[] = [
   },
   {
     id: "coal",
-    label: "Нүүрс",
+    denom: { kind: "money", currency: "USD", per: "тонн" },
+    label: "Нүүрс · Ньюкасл",
     price: "148.95",
-    unit: "Ньюкасл, ам.доллар",
     move: "−0.23%",
     pct: -0.23,
     asOf: "2026.10.02",
@@ -367,6 +397,7 @@ export const commodities: Quote[] = [
 export const fx: Quote[] = [
   {
     id: "eur",
+    denom: { kind: "fx", base: "EUR", quote: "USD" },
     label: "Евро/ам.доллар",
     price: "1.1255",
     move: "+0.0003",
@@ -377,6 +408,7 @@ export const fx: Quote[] = [
   },
   {
     id: "jpy",
+    denom: { kind: "fx", base: "USD", quote: "JPY" },
     label: "Ам.доллар/иен",
     price: "157.85",
     move: "0.00",
@@ -387,6 +419,7 @@ export const fx: Quote[] = [
   },
   {
     id: "cny",
+    denom: { kind: "fx", base: "USD", quote: "CNY" },
     label: "Ам.доллар/юань",
     price: "6.7064",
     move: "0.00",
@@ -397,6 +430,7 @@ export const fx: Quote[] = [
   },
   {
     id: "ust",
+    denom: { kind: "percent" },
     label: "АНУ 10 жил",
     price: "5.283%",
     move: "өндөр хэвээр",
@@ -411,6 +445,7 @@ export const miners: CloseRow[] = [
   {
     symbol: "SCCO",
     name: "Southern Copper",
+    currency: "USD",
     price: "205.54",
     move: "+3.17%",
     pct: 3.17,
@@ -420,6 +455,7 @@ export const miners: CloseRow[] = [
   {
     symbol: "FCX",
     name: "Freeport-McMoRan",
+    currency: "USD",
     price: "72.04",
     move: "+3.98%",
     pct: 3.98,

@@ -37,7 +37,7 @@ export function DeskPage({ desk }: { desk: Desk }) {
               <img
                 src={storyArt(story.slug).src}
                 alt=""
-                className="aspect-[16/10] w-full object-cover"
+                className="aspect-[16/10] w-full rounded-md object-cover"
               />
               <p className="text-muted-foreground text-sm">{formatStoryDate(story.date)}</p>
               <div>
@@ -62,7 +62,7 @@ function DeskHero({ lead, sides }: { lead: Story; sides: Story[] }) {
     <div className="mt-8 grid gap-4 lg:h-[28rem] lg:grid-cols-12">
       <Link
         to={`/story/${lead.slug}`}
-        className="flex flex-col overflow-hidden border bg-card lg:col-span-7 lg:h-full"
+        className="flex flex-col overflow-hidden rounded-lg border bg-card lg:col-span-7 lg:h-full"
       >
         <img src={art.src} alt={art.alt} className="h-52 w-full object-cover lg:min-h-0 lg:flex-1" />
         <div className="shrink-0 p-5">
@@ -80,7 +80,7 @@ function DeskHero({ lead, sides }: { lead: Story; sides: Story[] }) {
             <Link
               key={story.slug}
               to={`/story/${story.slug}`}
-              className="grid h-36 grid-cols-[9rem_1fr] overflow-hidden border bg-card lg:h-full"
+              className="grid h-36 grid-cols-[9rem_1fr] overflow-hidden rounded-lg border bg-card lg:h-full"
             >
               <img src={side.src} alt={side.alt} className="h-full w-full object-cover" />
               <div className="min-w-0 p-4">

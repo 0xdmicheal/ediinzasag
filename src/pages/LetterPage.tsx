@@ -35,11 +35,11 @@ export function LetterPage() {
         {/^\d{4}-\d{2}-\d{2}$/.test(post.date) ? formatStoryDate(post.date) : post.date}
       </p>
       {post.image ? (
-        <img src={post.image} alt="" className="mt-8 aspect-[16/9] w-full object-cover" referrerPolicy="no-referrer" />
+        <img src={post.image} alt="" className="mt-8 aspect-[16/9] w-full rounded-lg object-cover" referrerPolicy="no-referrer" />
       ) : null}
       {post.html ? (
         <div
-          className="mt-8 text-[1.05rem] leading-8 [&_a]:underline [&_h3]:font-news [&_h3]:mt-8 [&_h3]:text-2xl [&_img]:my-6 [&_img]:w-full [&_li]:ml-5 [&_ol]:my-4 [&_ol]:list-decimal [&_p]:mt-4 [&_ul]:my-4 [&_ul]:list-disc"
+          className="mt-8 text-[1.05rem] leading-8 [&_a]:underline [&_h3]:font-news [&_h3]:mt-8 [&_h3]:text-2xl [&_img]:my-6 [&_img]:w-full [&_img]:rounded-lg [&_li]:ml-5 [&_ol]:my-4 [&_ol]:list-decimal [&_p]:mt-4 [&_ul]:my-4 [&_ul]:list-disc"
           dangerouslySetInnerHTML={{ __html: post.html }}
         />
       ) : null}

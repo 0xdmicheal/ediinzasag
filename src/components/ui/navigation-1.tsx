@@ -48,7 +48,7 @@ const primary = [
 ]
 
 const linkClass =
-  "bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 transition-colors hover:bg-transparent hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
+  "bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
 
 function Brand() {
   return (
@@ -71,9 +71,9 @@ export function Navigation1({
   const world = storiesByDesk("world").slice(0, 3)
 
   return (
-    <header className="sticky top-0 z-40 text-neutral-950 dark:text-white">
-      <div className="pointer-events-none absolute inset-0 border-y border-black/10 bg-background/80 backdrop-blur-md dark:border-white/10 dark:bg-black/75" />
-      <div className="relative flex h-14 w-full items-center justify-between px-6 lg:px-40">
+    <header className="sticky top-0 z-40 text-foreground">
+      <div className="pointer-events-none absolute inset-0 border-y border-border bg-background/85 backdrop-blur-md" />
+      <div className="relative mx-auto flex h-14 w-full max-w-[1520px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center">
           <Brand />
         </div>
@@ -88,10 +88,10 @@ export function Navigation1({
                   </NavigationMenuItem>
                 ))}
                 <NavigationMenuItem value="toim">
-                  <NavigationMenuTrigger className="h-auto bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-neutral-600 hover:bg-transparent hover:text-neutral-950 data-open:bg-transparent data-open:text-neutral-950 dark:text-neutral-300 dark:hover:text-white dark:data-open:text-white">
+                  <NavigationMenuTrigger className="h-auto bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground data-open:bg-transparent data-open:text-foreground">
                     Тойм
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent className="left-1/2 w-max -translate-x-1/2 rounded-none! border! border-black/10! bg-background/55! p-0! shadow-none! ring-0! backdrop-blur-xl! dark:border-white/10! dark:bg-black/55!">
+                  <NavigationMenuContent className="left-1/2 w-max -translate-x-1/2 rounded-lg! border! border-border! bg-background/90! p-0! shadow-none! ring-0! backdrop-blur-xl!">
                     <div className="grid grid-cols-[10.5rem_10.5rem_8.5rem_13rem] gap-5 p-5">
                       <StoryColumn title="Монгол" stories={mongolia} />
                       <StoryColumn title="Дэлхий" stories={world} />
@@ -99,25 +99,25 @@ export function Navigation1({
                         <h4 className="text-muted-foreground mb-3 text-xs tracking-wide uppercase">
                           Сувгууд
                         </h4>
-                        <div className="flex flex-col gap-2 text-sm text-neutral-700 dark:text-neutral-300">
-                          <a className="hover:text-neutral-950 dark:hover:text-white" href={channels.youtube}>
+                        <div className="flex flex-col gap-2 text-sm text-foreground/80">
+                          <a className="hover:text-foreground" href={channels.youtube}>
                             YouTube
                           </a>
-                          <a className="hover:text-neutral-950 dark:hover:text-white" href={channels.substack}>
+                          <a className="hover:text-foreground" href={channels.substack}>
                             Substack
                           </a>
-                          <a className="hover:text-neutral-950 dark:hover:text-white" href={channels.telegram}>
+                          <a className="hover:text-foreground" href={channels.telegram}>
                             Telegram
                           </a>
-                          <NavLink className="hover:text-neutral-950 dark:hover:text-white" to="/markets">
+                          <NavLink className="hover:text-foreground" to="/markets">
                             Ханш
                           </NavLink>
-                          <NavLink className="hover:text-neutral-950 dark:hover:text-white" to="/ez-talk">
+                          <NavLink className="hover:text-foreground" to="/ez-talk">
                             EZ Talk
                           </NavLink>
                         </div>
                       </div>
-                      <div className="border-l border-black/10 pl-6 dark:border-white/10">
+                      <div className="border-l border-border pl-6">
                         <Badge variant="secondary" className="mb-3">
                           {deskLabel[lead.desk]}
                         </Badge>
@@ -125,7 +125,7 @@ export function Navigation1({
                           {lead.title}
                         </p>
                         <p className="text-muted-foreground mt-2 line-clamp-3 text-sm">{lead.dek}</p>
-                        <Button asChild className="mt-4 bg-neutral-950 text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200" size="sm">
+                        <Button asChild className="mt-4" size="sm">
                           <NavLink to={`/story/${lead.slug}`}>
                             Унших
                             <ArrowUpRight />
@@ -147,14 +147,14 @@ export function Navigation1({
           </div>
 
         <div className="hidden flex-1 items-center justify-end gap-2 lg:flex">
-          <a href={channels.youtube} className="text-[13px] font-medium text-neutral-600 transition-colors hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white">
+          <a href={channels.youtube} className="text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground">
             YouTube
           </a>
           <button
             type="button"
             aria-label={theme === "dark" ? "Гэрэл горим" : "Харанхуй горим"}
             onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
-            className="flex size-8 items-center justify-center text-neutral-600 transition-colors hover:text-neutral-950 dark:text-neutral-300 dark:hover:text-white"
+            className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
@@ -162,14 +162,14 @@ export function Navigation1({
             href={channels.substackSubscribe}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-neutral-950/20 px-3 text-[13px] font-medium text-neutral-950 transition-colors hover:bg-neutral-950 hover:text-white dark:border-white/30 dark:text-white dark:hover:bg-white dark:hover:text-black"
+            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-foreground/20 px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-foreground hover:text-background"
           >
             <Mail className="size-3.5" />
             Subscribe
           </a>
           <NavLink
             to="/newsletter"
-            className="inline-flex h-8 items-center rounded-full bg-neutral-950 px-3.5 text-[13px] font-medium text-white transition-colors hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200"
+            className="inline-flex h-8 items-center rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/85"
           >
             Нийтлэл
           </NavLink>
@@ -178,7 +178,7 @@ export function Navigation1({
         <div className="shrink-0 lg:hidden">
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Цэс нээх" className="text-neutral-950 hover:bg-black/5 hover:text-neutral-950 dark:text-white dark:hover:bg-white/10 dark:hover:text-white">
+              <Button variant="ghost" size="icon" aria-label="Цэс нээх" className="text-foreground hover:bg-foreground/5 hover:text-foreground">
                 <Menu />
               </Button>
             </SheetTrigger>
@@ -255,7 +255,7 @@ function StoryColumn({
             <span className="text-muted-foreground text-xs">
               {formatStoryDate(story.date)}
             </span>
-            <span className="line-clamp-3 block text-sm leading-snug font-medium text-neutral-800 group-hover:text-neutral-950 dark:text-neutral-200 dark:group-hover:text-white">
+            <span className="line-clamp-3 block text-sm leading-snug font-medium text-foreground/85 group-hover:text-foreground">
               {story.title}
             </span>
           </NavLink>

@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom"
 
+import { signedPct, toneClass } from "@/components/site/market-marks"
+import { formatMove, formatValue, money, moneyMove } from "@/components/site/money"
+
 import {
   commodities,
   fridayCloses,
@@ -18,19 +21,19 @@ interface Tick {
 }
 
 const ticks: Tick[] = [
-  { id: "top20", label: "ТОП-20", price: top20.price, move: "+0.49%", pct: top20.pct },
+  { id: "top20", label: "ТОП-20", price: top20.price, move: signedPct(top20.pct), pct: top20.pct },
   ...mongoliaIndices.filter((quote) => quote.id !== "cap").map((quote) => ({
     id: quote.id,
     label: quote.label,
-    price: quote.price,
+    price: formatValue(quote.price, quote.denom),
     move: quote.move,
     pct: quote.pct,
   })),
   ...fridayCloses.map((row) => ({
     id: row.symbol.toLowerCase(),
     label: row.symbol,
-    price: row.price,
-    move: row.move,
+    price: money(row.price, row.currency),
+    move: moneyMove(row.move, row.currency),
     pct: row.pct,
   })),
   ...worldIndices.map((quote) => ({
@@ -43,24 +46,18 @@ const ticks: Tick[] = [
   ...commodities.map((quote) => ({
     id: quote.id,
     label: quote.label,
-    price: quote.price,
-    move: quote.move,
+    price: formatValue(quote.price, quote.denom),
+    move: formatMove(quote.move, quote.denom),
     pct: quote.pct,
   })),
   ...miners.map((row) => ({
     id: row.symbol.toLowerCase(),
     label: row.symbol,
-    price: row.price,
-    move: row.move,
+    price: money(row.price, row.currency),
+    move: moneyMove(row.move, row.currency),
     pct: row.pct,
   })),
 ]
-
-function tone(pct: number) {
-  if (pct > 0) return "text-emerald-700 dark:text-emerald-400"
-  if (pct < 0) return "text-red-700 dark:text-red-400"
-  return "text-muted-foreground"
-}
 
 export function MarketStrip() {
   const loop = [...ticks, ...ticks]
@@ -84,7 +81,7 @@ export function MarketStrip() {
               >
                 <span className="text-muted-foreground tracking-wide uppercase">{item.label}</span>
                 <span className="font-news text-sm leading-none">{item.price}</span>
-                <span className={tone(item.pct)}>{item.move}</span>
+                <span className={toneClass(item.pct)}>{item.move}</span>
               </Link>
             ))}
           </div>

@@ -45,7 +45,7 @@ export function StoryPage() {
         <img
           src={storyArt(story.slug).src}
           alt={storyArt(story.slug).alt}
-          className="aspect-[16/9] w-full object-cover"
+          className="aspect-[16/9] w-full rounded-lg object-cover"
         />
         <figcaption className="text-muted-foreground mt-2 text-xs tracking-wide">Зураглал</figcaption>
       </figure>
@@ -55,7 +55,7 @@ export function StoryPage() {
           <p key={paragraph}>{paragraph}</p>
         ))}
       </div>
-      <aside className="bg-muted/60 mt-10 p-5">
+      <aside className="bg-muted/60 mt-10 rounded-lg p-5">
         <h2 className="text-sm font-semibold tracking-wide uppercase">Эх сурвалж</h2>
         <ul className="mt-3 space-y-2 text-sm">
           {story.sources.map((source) => (
@@ -83,7 +83,7 @@ export function StoryPage() {
               return (
                 <li key={item.slug} className="py-4">
                   <Link to={`/story/${item.slug}`} className="grid grid-cols-[7.5rem_1fr] gap-4">
-                    <img src={art.src} alt={art.alt} className="h-[7.5rem] w-[7.5rem] object-cover" />
+                    <img src={art.src} alt={art.alt} className="h-[7.5rem] w-[7.5rem] rounded-md object-cover" />
                     <div className="min-w-0">
                       <p className="text-muted-foreground text-xs tracking-wide uppercase">
                         {deskLabel[item.desk]} · {formatStoryDate(item.date)}

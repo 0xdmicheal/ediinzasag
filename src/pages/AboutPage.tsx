@@ -42,7 +42,7 @@ export function AboutPage() {
       </div>
 
       <div className="mt-10 grid gap-4 lg:grid-cols-2">
-        <section id="contact" className="scroll-mt-24 flex flex-col justify-between border p-6 sm:p-8">
+        <section id="contact" className="scroll-mt-24 flex flex-col justify-between rounded-lg border p-6 sm:p-8">
           <div>
             <p className="text-[11px] tracking-[0.18em] uppercase">Холбоо барих</p>
             <h2 className="font-news mt-3 text-4xl leading-tight">Шууд шугам Telegram.</h2>
@@ -60,25 +60,25 @@ export function AboutPage() {
 
         <section
           id="partner"
-          className="scroll-mt-24 flex flex-col justify-between border bg-neutral-950 p-6 text-white sm:p-8 dark:bg-[#f4f1ea] dark:text-neutral-950"
+          className="scroll-mt-24 flex flex-col justify-between rounded-lg border bg-ink p-6 text-ink-foreground sm:p-8"
         >
           <div>
             <p className="text-[11px] tracking-[0.18em] uppercase">Хамтрах</p>
             <h2 className="font-news mt-3 text-4xl leading-tight">Зочин, брэнд, судалгаа.</h2>
             <ul className="mt-5 flex flex-wrap gap-2">
               {partnerTopics.map((topic) => (
-                <li key={topic} className="border border-white/25 px-3 py-1 text-xs tracking-wide dark:border-neutral-950/20">
+                <li key={topic} className="rounded-md border border-ink-foreground/25 px-3 py-1 text-xs tracking-wide">
                   {topic}
                 </li>
               ))}
             </ul>
-            <p className="mt-4 max-w-md text-sm leading-relaxed text-white/75 dark:text-neutral-950/70">
+            <p className="mt-4 max-w-md text-sm leading-relaxed text-ink-foreground/75">
               Нөхцөл, үнийг энд бичдэггүй. Хамтрах саналаа Telegram дээр ярина.
             </p>
           </div>
           <Button
             asChild
-            className="mt-8 w-fit bg-white text-neutral-950 hover:bg-white/90 dark:bg-neutral-950 dark:text-white dark:hover:bg-neutral-950/90"
+            className="mt-8 w-fit bg-brand text-brand-foreground hover:bg-brand/90"
           >
             <a href={channels.telegram} target="_blank" rel="noreferrer">
               Хамтрах санал
@@ -87,7 +87,7 @@ export function AboutPage() {
         </section>
       </div>
 
-      <dl className="mt-4 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <dl className="mt-4 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4">
         {facts.map(([title, body]) => (
           <div key={title} className="bg-background p-5">
             <dt className="text-[11px] tracking-[0.18em] uppercase">{title}</dt>
@@ -96,7 +96,7 @@ export function AboutPage() {
         ))}
       </dl>
 
-      <ul className="mt-4 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <ul className="mt-4 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4">
         {channelsList.map((item) => {
           const Icon = "icon" in item ? item.icon : null
           const className = "flex h-full items-center justify-between gap-3 bg-background px-5 py-4 text-sm hover:bg-muted/60"
