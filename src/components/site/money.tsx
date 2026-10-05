@@ -59,18 +59,18 @@ const chipBase =
   "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[10px] leading-none font-semibold tracking-wide whitespace-nowrap"
 
 /**
- * Colour-coded tag: amber for tugrik, blue for dollars, neutral for points / rates / %.
+ * Colour-coded tag: cobalt tint for tugrik, outlined for dollars, neutral for points / rates / %.
  * `onInk` is for the inverted --ink surface, which is dark in light mode and light in dark mode.
  */
 export function UnitChip({ denom, onInk = false }: { denom: Denomination; onInk?: boolean }) {
   if (denom.kind === "money") {
     return denom.currency === "MNT" ? (
-      <span className={`${chipBase} bg-brand/20 text-brand-strong`} title={currencyName.MNT}>
+      <span className={`${chipBase} bg-brand-soft text-brand-strong`} title={currencyName.MNT}>
         ₮ MNT
       </span>
     ) : (
       <span
-        className={`${chipBase} ${onInk ? "bg-sky-500/20 text-sky-300 dark:text-sky-700" : "bg-sky-500/15 text-sky-700 dark:text-sky-300"}`}
+        className={`${chipBase} border ${onInk ? "border-ink-foreground/30 text-ink-foreground" : "border-foreground/25 text-foreground"}`}
         title={currencyName.USD}
       >
         $ USD

@@ -197,7 +197,7 @@ function Top20() {
 
   return (
     <section id="top20" className="bg-card scroll-mt-28 rounded-lg border">
-      <div className="grid lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] [&>*]:min-w-0">
         <div className="p-5 sm:p-7">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -207,7 +207,7 @@ function Top20() {
             <UnitChip denom={{ kind: "index" }} />
           </div>
           <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2">
-            <p className="text-5xl font-semibold tracking-tight sm:text-6xl">
+            <p className="text-[2.75rem] font-semibold tracking-tight sm:text-6xl">
               {top20.price}
               <span className="text-muted-foreground ml-2 text-base font-normal tracking-normal">оноо</span>
             </p>
@@ -229,8 +229,8 @@ function Top20() {
                 <dt className="text-muted-foreground text-[11px]">{label}</dt>
                 <dd
                   className={cn(
-                    "mt-1 text-lg font-semibold",
-                    (pct as number) >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400",
+                    "mt-1 text-[15px] font-semibold whitespace-nowrap sm:text-lg",
+                    (pct as number) >= 0 ? "text-[var(--up)]" : "text-[var(--down)]",
                   )}
                 >
                   {(pct as number) >= 0 ? "▲" : "▼"} {signedPct(pct as number).replace("-", "−")}
@@ -408,7 +408,7 @@ function Commodities() {
             <span key={row.symbol}>
               {index > 0 ? " · " : ""}
               {row.name} <span className="font-semibold tabular-nums">{money(row.price, row.currency)}</span>{" "}
-              <span className={row.pct >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400"}>
+              <span className={row.pct >= 0 ? "text-[var(--up)]" : "text-[var(--down)]"}>
                 {row.pct >= 0 ? "▲" : "▼"} {row.move.replace("-", "−")}
               </span>
             </span>

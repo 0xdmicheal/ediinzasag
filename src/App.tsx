@@ -2,6 +2,7 @@ import { BrowserRouter, Link, Route, Routes } from "react-router-dom"
 
 import { Layout } from "@/components/site/Layout"
 import { AboutPage } from "@/pages/AboutPage"
+import { DesignPage } from "@/pages/DesignPage"
 import { DeskPage } from "@/pages/DeskPage"
 import { HomePage } from "@/pages/HomePage"
 import { LetterPage } from "@/pages/LetterPage"
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="newsletter" element={<NewsletterPage />} />
           <Route path="letter/:slug" element={<LetterPage />} />
           <Route path="about" element={<AboutPage />} />
+          <Route path="design" element={<DesignPage />} />
           <Route path="*" element={<DeskMissing />} />
         </Route>
       </Routes>

@@ -1,12 +1,41 @@
+import { useMemo } from "react"
 import { Link, useParams } from "react-router-dom"
 
+import { ArticleLayout, excerpt, proseClass, type TocItem } from "@/components/site/article"
 import { SubstackShelf } from "@/components/site/SubstackShelf"
+import { articleAd } from "@/content/ads"
 import { formatStoryDate } from "@/content/stories"
 import { substackPosts } from "@/content/substack.posts"
+
+/**
+ * Gives the letter's headings ids for "on this page". Letters with fewer than
+ * two headings list their paragraphs' opening words instead. The HTML was
+ * sanitised to an allowlist when it was pulled from the feed.
+ */
+function prepareLetter(html: string): { html: string; toc: TocItem[] } {
+  const doc = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html")
+  const root = doc.body.firstElementChild as HTMLElement
+  const headings = Array.from(root.querySelectorAll("h2, h3")).filter((node) => node.textContent?.trim())
+  let toc: TocItem[]
+  if (headings.length >= 2) {
+    toc = headings.map((node, index) => {
+      node.id = `section-${index}`
+      return { id: node.id, label: node.textContent!.trim() }
+    })
+  } else {
+    const paragraphs = Array.from(root.querySelectorAll("p")).filter((node) => (node.textContent ?? "").trim().length > 40)
+    toc = paragraphs.slice(0, 8).map((node, index) => {
+      node.id = `p-${index}`
+      return { id: node.id, label: excerpt(node.textContent ?? "") }
+    })
+  }
+  return { html: root.innerHTML, toc }
+}
 
 export function LetterPage() {
   const { slug = "" } = useParams()
   const post = substackPosts.find((item) => item.slug === slug)
+  const prepared = useMemo(() => (post?.html ? prepareLetter(post.html) : { html: "", toc: [] }), [post])
 
   if (!post) {
     return (
@@ -20,37 +49,56 @@ export function LetterPage() {
   }
 
   const more = substackPosts.filter((item) => item.slug !== post.slug).slice(0, 3)
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(post.date) ? formatStoryDate(post.date) : post.date
+  const toc: TocItem[] = [...prepared.toc, ...(more.length > 0 ? [{ id: "more", label: "Бусад захидал" }] : [])]
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <p className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
-        <Link to="/newsletter" className="hover:text-foreground">
-          Нийтлэл
-        </Link>
-        {post.author ? ` · ${post.author}` : ""}
+    <ArticleLayout
+      back={{ to: "/newsletter", label: "Нийтлэл рүү буцах" }}
+      tags={["Нийтлэл", "Substack"]}
+      date={date}
+      title={post.title}
+      dek={post.excerpt}
+      image={post.image ? { src: post.image, alt: "", referrer: true } : undefined}
+      author={{
+        name: post.author || "EZ Эдийн засаг",
+        role: "Захидлын зохиогч",
+        avatar: (
+          <span className="bg-brand text-brand-foreground grid size-9 shrink-0 place-items-center rounded-full text-sm font-semibold">
+            {(post.author || "E").slice(0, 1).toUpperCase()}
+          </span>
+        ),
+      }}
+      toc={toc}
+      ad={articleAd}
+      after={
+        more.length > 0 ? (
+          <section id="more" className="scroll-mt-24">
+            <h2 className="font-news text-2xl">Бусад захидал</h2>
+            <div className="mt-6">
+              <SubstackShelf posts={more} layout="list" />
+            </div>
+          </section>
+        ) : null
+      }
+    >
+      {prepared.html ? (
+        <div className={proseClass} dangerouslySetInnerHTML={{ __html: prepared.html }} />
+      ) : (
+        <p className="text-muted-foreground">
+          Энэ захидлын бүтэн эх{" "}
+          <a href={post.link} target="_blank" rel="noreferrer" className="text-brand-strong underline">
+            Substack дээр
+          </a>{" "}
+          байна.
+        </p>
+      )}
+      <p className="text-muted-foreground mt-12 text-[13px]">
+        Эх хувь:{" "}
+        <a href={post.link} target="_blank" rel="noreferrer" className="text-brand-strong underline underline-offset-2">
+          niots.substack.com
+        </a>
       </p>
-      <h1 className="font-news mt-3 text-4xl leading-tight sm:text-5xl">{post.title}</h1>
-      {post.excerpt ? <p className="mt-4 text-xl leading-relaxed">{post.excerpt}</p> : null}
-      <p className="text-muted-foreground mt-4 text-sm">
-        {/^\d{4}-\d{2}-\d{2}$/.test(post.date) ? formatStoryDate(post.date) : post.date}
-      </p>
-      {post.image ? (
-        <img src={post.image} alt="" className="mt-8 aspect-[16/9] w-full rounded-lg object-cover" referrerPolicy="no-referrer" />
-      ) : null}
-      {post.html ? (
-        <div
-          className="mt-8 text-[1.05rem] leading-8 [&_a]:underline [&_h3]:font-news [&_h3]:mt-8 [&_h3]:text-2xl [&_img]:my-6 [&_img]:w-full [&_img]:rounded-lg [&_li]:ml-5 [&_ol]:my-4 [&_ol]:list-decimal [&_p]:mt-4 [&_ul]:my-4 [&_ul]:list-disc"
-          dangerouslySetInnerHTML={{ __html: post.html }}
-        />
-      ) : null}
-      {more.length > 0 ? (
-        <section className="mt-14">
-          <h2 className="font-news text-2xl">Бусад захидал</h2>
-          <div className="mt-4">
-            <SubstackShelf posts={more} layout="list" />
-          </div>
-        </section>
-      ) : null}
-    </article>
+    </ArticleLayout>
   )
 }

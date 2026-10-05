@@ -1,6 +1,8 @@
 import { Link, useParams } from "react-router-dom"
 
-import { Separator } from "@/components/ui/separator"
+import { ArticleLayout, excerpt, proseClass, type TocItem } from "@/components/site/article"
+import { articleAd } from "@/content/ads"
+import { storyOutlines } from "@/content/story-outlines"
 import {
   deskLabel,
   formatStoryDate,
@@ -9,6 +11,27 @@ import {
   storyBySlug,
   topicLabel,
 } from "@/content/stories"
+
+type Block = { kind: "heading" | "paragraph"; id: string; text: string }
+
+/**
+ * Builds the article body. Headings come from the story's outline (one label
+ * per paragraph, see story-outlines.ts) or from paragraphs written as "## ...".
+ * A story with neither lists its paragraph openings in the contents box.
+ */
+function storyBlocks(paragraphs: string[], outline?: string[]): Block[] {
+  if (outline && outline.length === paragraphs.length) {
+    return paragraphs.flatMap((text, index) => [
+      { kind: "heading" as const, id: `section-${index}`, text: outline[index] },
+      { kind: "paragraph" as const, id: `p-${index}`, text },
+    ])
+  }
+  return paragraphs.map((text, index) =>
+    text.startsWith("## ")
+      ? { kind: "heading" as const, id: `section-${index}`, text: text.slice(3).trim() }
+      : { kind: "paragraph" as const, id: `p-${index}`, text },
+  )
+}
 
 export function StoryPage() {
   const { slug = "" } = useParams()
@@ -25,43 +48,82 @@ export function StoryPage() {
     )
   }
 
+  const art = storyArt(story.slug)
   const related = relatedStories(story)
+  const blocks = storyBlocks(story.paragraphs, storyOutlines[story.slug])
+  const headings = blocks.filter((block) => block.kind === "heading")
+  const toc: TocItem[] = [
+    ...(headings.length > 0
+      ? headings.map((block) => ({ id: block.id, label: block.text }))
+      : blocks.map((block) => ({ id: block.id, label: excerpt(block.text) }))),
+    { id: "sources", label: "Эх сурвалж" },
+    ...(related.length > 0 ? [{ id: "related", label: "Дараа нь" }] : []),
+  ]
 
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10 sm:px-6">
-      <p className="text-muted-foreground text-xs tracking-[0.18em] uppercase">
-        <Link to={story.desk === "mongolia" ? "/mongolia" : "/world"} className="hover:text-foreground">
-          {deskLabel[story.desk]}
-        </Link>
-        {" · "}
-        {topicLabel[story.topic]}
-      </p>
-      <h1 className="font-news mt-3 text-4xl leading-tight sm:text-5xl">{story.title}</h1>
-      <p className="mt-4 text-xl leading-relaxed">{story.dek}</p>
-      <p className="text-muted-foreground mt-4 text-sm">
-        {formatStoryDate(story.date)} · EZ тойм · {story.readMinutes} мин уншина
-      </p>
-      <figure className="mt-8">
-        <img
-          src={storyArt(story.slug).src}
-          alt={storyArt(story.slug).alt}
-          className="aspect-[16/9] w-full rounded-lg object-cover"
-        />
-        <figcaption className="text-muted-foreground mt-2 text-xs tracking-wide">Зураглал</figcaption>
-      </figure>
-      <Separator className="my-8" />
-      <div className="space-y-5 text-[1.05rem] leading-8">
-        {story.paragraphs.map((paragraph) => (
-          <p key={paragraph}>{paragraph}</p>
-        ))}
+    <ArticleLayout
+      back={{ to: story.desk === "mongolia" ? "/mongolia" : "/world", label: `${deskLabel[story.desk]} руу буцах` }}
+      tags={[deskLabel[story.desk], topicLabel[story.topic], `${story.readMinutes} мин`]}
+      date={formatStoryDate(story.date)}
+      title={story.title}
+      dek={story.dek}
+      image={{ src: art.src, alt: art.alt, caption: `${art.alt} · Зураглал` }}
+      author={{ name: "EZ тойм", role: "Эдийн засаг редакц" }}
+      toc={toc}
+      ad={articleAd}
+      after={
+        related.length > 0 ? (
+          <section id="related" className="scroll-mt-24">
+            <h2 className="font-news text-2xl">Дараа нь</h2>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-3">
+              {related.map((item) => {
+                const itemArt = storyArt(item.slug)
+                return (
+                  <li key={item.slug}>
+                    <Link to={`/story/${item.slug}`} className="group block">
+                      <span className="block overflow-hidden rounded-lg border">
+                        <img
+                          src={itemArt.src}
+                          alt={itemArt.alt}
+                          className="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                        />
+                      </span>
+                      <span className="text-muted-foreground mt-3 block text-[12px]">
+                        {deskLabel[item.desk]} · {formatStoryDate(item.date)}
+                      </span>
+                      <span className="font-news mt-1 line-clamp-2 block text-[17px] leading-snug group-hover:underline">
+                        {item.title}
+                      </span>
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ) : null
+      }
+    >
+      <div className={proseClass}>
+        {blocks.map((block) =>
+          block.kind === "heading" ? (
+            <h2 key={block.id} id={block.id}>
+              {block.text}
+            </h2>
+          ) : (
+            <p key={block.id} id={block.id}>
+              {block.text}
+            </p>
+          ),
+        )}
       </div>
-      <aside className="bg-muted/60 mt-10 rounded-lg p-5">
-        <h2 className="text-sm font-semibold tracking-wide uppercase">Эх сурвалж</h2>
-        <ul className="mt-3 space-y-2 text-sm">
+
+      <section id="sources" className="bg-muted/60 mt-12 scroll-mt-24 rounded-lg border p-5">
+        <h2 className="text-ds-label font-semibold">Эх сурвалж</h2>
+        <ul className="mt-3 space-y-2 text-[14px]">
           {story.sources.map((source) => (
             <li key={source.label}>
               {source.href ? (
-                <a href={source.href} target="_blank" rel="noreferrer" className="underline">
+                <a href={source.href} target="_blank" rel="noreferrer" className="text-brand-strong underline underline-offset-2">
                   {source.label}
                 </a>
               ) : (
@@ -70,34 +132,10 @@ export function StoryPage() {
             </li>
           ))}
         </ul>
-        <p className="text-muted-foreground mt-3 text-xs">
+        <p className="text-muted-foreground mt-3 text-[12px]">
           Энэ хуудас нийтийн мэдэгдэл, тоймыг нэгтгэсэн. Ишлэл, гэрээний нарийн тоог зохиогоогүй.
         </p>
-      </aside>
-      {related.length > 0 ? (
-        <section className="mt-12">
-          <h2 className="font-news text-2xl">Дараа нь</h2>
-          <ul className="mt-4 divide-y border-y">
-            {related.map((item) => {
-              const art = storyArt(item.slug)
-              return (
-                <li key={item.slug} className="py-4">
-                  <Link to={`/story/${item.slug}`} className="grid grid-cols-[7.5rem_1fr] gap-4">
-                    <img src={art.src} alt={art.alt} className="h-[7.5rem] w-[7.5rem] rounded-md object-cover" />
-                    <div className="min-w-0">
-                      <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                        {deskLabel[item.desk]} · {formatStoryDate(item.date)}
-                      </p>
-                      <h3 className="font-news mt-1 line-clamp-2 text-lg leading-snug">{item.title}</h3>
-                      <p className="text-muted-foreground mt-1 line-clamp-3 text-sm leading-relaxed">{item.dek}</p>
-                    </div>
-                  </Link>
-                </li>
-              )
-            })}
-          </ul>
-        </section>
-      ) : null}
-    </article>
+      </section>
+    </ArticleLayout>
   )
 }
