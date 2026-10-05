@@ -87,7 +87,10 @@ export function AboutPage() {
         </section>
       </div>
 
-      <dl className="mt-4 grid gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4">
+      <dl
+        id="standards"
+        className="mt-4 grid scroll-mt-24 gap-px overflow-hidden rounded-lg border bg-border sm:grid-cols-2 lg:grid-cols-4"
+      >
         {facts.map(([title, body]) => (
           <div key={title} className="bg-background p-5">
             <dt className="text-[11px] tracking-[0.18em] uppercase">{title}</dt>

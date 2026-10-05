@@ -12,8 +12,8 @@ const pulseIds = ["gold", "brent", "copper"]
 
 /** Tones for text on the --ink surface, which inverts per theme. */
 function inkTone(pct: number) {
-  if (pct > 0) return "text-emerald-400 dark:text-emerald-700"
-  if (pct < 0) return "text-red-400 dark:text-red-700"
+  if (pct > 0) return "text-[var(--up-on-ink)]"
+  if (pct < 0) return "text-[var(--down-on-ink)]"
   return "text-ink-foreground/60"
 }
 
@@ -125,7 +125,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
 
         {/* Counter */}
         <p
-          className={`font-news absolute top-12 right-5 z-10 text-base tabular-nums sm:top-14 sm:right-8 lg:top-16 lg:right-12 ${isPartner ? "text-brand-foreground/70" : "text-photo-foreground/75"}`}
+          className={`absolute top-12 right-5 z-10 font-mono text-sm sm:top-14 sm:right-8 lg:top-16 lg:right-12 ${isPartner ? "text-brand-foreground/70" : "text-photo-foreground/75"}`}
         >
           {String(index + 1).padStart(2, "0")}
           <span className="mx-1 opacity-50">/</span>
@@ -139,7 +139,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
           aria-live={paused ? "polite" : "off"}
         >
           <p
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] tracking-[0.16em] uppercase backdrop-blur-sm ${isPartner ? "bg-brand-foreground/10" : "bg-black/30"}`}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[12px] tracking-[0.04em] uppercase backdrop-blur-sm ${isPartner ? "bg-brand-foreground/10" : "bg-black/30"}`}
           >
             <span className={`size-1.5 rounded-full ${isPartner ? "bg-brand-foreground" : "bg-brand"}`} />
             {slide.kicker}
@@ -352,7 +352,7 @@ function MarketPulse() {
       className="bg-ink text-ink-foreground group block rounded-xl p-5 transition-transform xl:p-6 hover:-translate-y-0.5"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-ink-foreground/60 text-[10px] tracking-[0.16em] uppercase">ТОП-20 · {sessionLabel.split(" · ")[0]}</p>
+        <p className="text-ink-foreground/60 font-mono text-[11px] uppercase">ТОП-20 · {sessionLabel.split(" · ")[0]}</p>
         <span className="text-ink-foreground/60 group-hover:text-ink-foreground inline-flex items-center gap-1 text-[11px]">
           Ханш
           <ArrowUpRight className="size-3.5" />

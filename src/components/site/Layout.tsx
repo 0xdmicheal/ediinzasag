@@ -9,48 +9,54 @@ import {
 } from "react-icons/fa6"
 
 import { channels, openSubstackSubscribe } from "@/content/channels"
+import { sessionLabel } from "@/content/markets"
+import { AmbientBackground } from "@/components/site/AmbientBackground"
 import { Footer12 } from "@/components/ui/footer-12"
 import { Navigation1 } from "@/components/ui/navigation-1"
 
 const footerColumns = [
   {
-    title: "Редакц",
+    title: "Тойм",
     links: [
       { label: "Нүүр", href: "/" },
       { label: "Монгол", href: "/mongolia" },
       { label: "Дэлхий", href: "/world" },
       { label: "Ханш", href: "/markets" },
-      { label: "Бид", href: "/about" },
     ],
   },
   {
-    title: "Сонсох",
+    title: "Редакц",
     links: [
-      { label: "YouTube", href: channels.youtube },
-      { label: "EZ Talk", href: "/ez-talk" },
-      { label: "Telegram", href: channels.telegram },
-    ],
-  },
-  {
-    title: "Унших",
-    links: [
-      { label: "Substack", href: channels.substack },
-      { label: "Нийтлэл", href: "/newsletter" },
-      { label: "Facebook", href: channels.facebook },
-      { label: "Instagram", href: channels.instagram },
-    ],
-  },
-  {
-    title: "Холбоо",
-    links: [
+      { label: "Бидний тухай", href: "/about" },
+      { label: "Редакцын зарчим", href: "/about#standards" },
       { label: "Холбоо барих", href: "/about#contact" },
-      { label: "Хамтрах", href: "/about#partner" },
-      { label: "Linktree", href: channels.linktree },
-      { label: "X", href: channels.x },
-      { label: channels.domain, href: "/" },
+      { label: "Хамтран ажиллах", href: "/about#partner" },
+    ],
+  },
+  {
+    title: "Бүтээгдэхүүн",
+    links: [
+      { label: "EZ Talk", href: "/ez-talk", description: "Nio, Ulemj нарын видео подкаст" },
+      { label: "Нийтлэл", href: "/newsletter", description: "Долоо хоногийн захидал" },
+      { label: "YouTube", href: channels.youtube, description: "Бүх дугаар" },
+      { label: "Substack", href: channels.substack, description: "И-мэйл захиалга" },
+      { label: "Telegram", href: channels.telegram, description: "Шууд шугам" },
     ],
   },
 ]
+
+const footerNotices = [
+  {
+    title: "Ханшийн мэдээлэл",
+    body: `${sessionLabel}. Шууд ханш биш. Тоо бүрт огноо, нэрлэсэн эх сурвалж.`,
+  },
+  {
+    title: "Анхааруулга",
+    body: "Нийтийн эх сурвалжид тулгуурласан тойм. Хөрөнгө оруулалтын зөвлөгөө биш.",
+  },
+]
+
+const footerCopyright = `© ${new Date().getFullYear()} EZ Эдийн засаг · ${channels.domain}. Бүх эрх хуулиар хамгаалагдсан.`
 
 const THEME_KEY = "ediinzasag-theme"
 
@@ -93,7 +99,8 @@ export function Layout() {
   }, [location.pathname, location.hash])
 
   return (
-    <div className="bg-background text-foreground flex min-h-svh flex-col">
+    <div className="bg-background text-foreground relative isolate flex min-h-svh flex-col">
+      <AmbientBackground />
       <a
         href="#content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2"
@@ -105,13 +112,12 @@ export function Layout() {
         <Outlet />
       </main>
       <Footer12
-        newsletterTitle="Долоо хоногийн тойм Substack дээр."
-        inputPlaceholder="И-мэйл хаяг"
-        subscribeText="Subscribe"
+        brandName="ЭДИЙН ЗАСАГ"
+        description="EZ Эдийн засаг Монголын эдийн засаг, дэлхийн зах зээлийн тоймыг нэг ширээн дээр тавьдаг."
         onSubscribe={openSubstackSubscribe}
         columns={footerColumns}
-        brandName="ЭДИЙН ЗАСАГ"
-        copyright="© 2026 EZ Эдийн засаг. ediinzasag.mn"
+        notices={footerNotices}
+        copyright={footerCopyright}
         socialLinks={[
           { label: "YouTube", href: channels.youtube, icon: <FaYoutube /> },
           { label: "Facebook", href: channels.facebook, icon: <FaFacebookF /> },

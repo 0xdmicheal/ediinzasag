@@ -47,9 +47,9 @@ export function SectionHeader({
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b pb-4">
       <div>
-        <p className="text-muted-foreground flex items-center gap-2.5 text-[11px] tracking-[0.2em] uppercase">
-          <span className="font-news text-brand-strong text-sm tracking-normal">{index}</span>
-          <span className="bg-foreground/25 h-px w-6" />
+        <p className="text-brand-strong flex items-center gap-2.5 font-mono text-[12px] tracking-[0.04em] uppercase">
+          <span>{index}</span>
+          <span aria-hidden>—</span>
           {kicker}
         </p>
         <h2 className="font-news mt-1.5 text-3xl leading-none sm:text-4xl">{title}</h2>
@@ -137,7 +137,7 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
     <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 lg:grid-rows-2">
       <Link
         to={`/letter/${feature.slug}`}
-        className="group ez-lift relative isolate flex min-h-[22rem] flex-col justify-end overflow-hidden rounded-lg md:col-span-2 lg:row-span-2"
+        className="group ez-lift relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden rounded-lg sm:min-h-[22rem] md:col-span-2 lg:row-span-2"
       >
         <Cover src={feature.image} className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/90 via-black/45 to-black/5" />
@@ -170,12 +170,13 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
         <Link
           key={post.slug}
           to={`/letter/${post.slug}`}
-          className="group ez-lift bg-card flex flex-col overflow-hidden rounded-lg border"
+          // Phones: a compact row (thumbnail beside the title). Tablet up: a card.
+          className="group ez-lift bg-card flex flex-row overflow-hidden rounded-lg border md:flex-col"
         >
-          <div className="relative aspect-[2/1] overflow-hidden">
+          <div className="relative w-28 shrink-0 overflow-hidden sm:w-36 md:aspect-[2/1] md:w-auto">
             <Cover src={post.image} className={`h-full w-full ${zoom}`} />
           </div>
-          <div className="flex flex-1 flex-col p-3.5">
+          <div className="flex min-w-0 flex-1 flex-col p-3 md:p-3.5">
             <p className="text-muted-foreground text-[10px] tracking-[0.12em] uppercase">{letterDate(post.date)}</p>
             <h3 className="font-news mt-1.5 line-clamp-2 text-[17px] leading-snug">
               <span className="ez-underline">{post.title}</span>

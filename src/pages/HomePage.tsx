@@ -43,11 +43,12 @@ export function HomePage() {
       <div className={`${container} pt-5`}>
         <HeroShowcase slides={heroSlides()} />
       </div>
-      <div className="mt-8">
+      {/* The ticker sits with equal space above and below: hero → 40px → ticker → 40px → Нийтлэл. */}
+      <div className="mt-8 sm:mt-10">
         <MarketStrip />
       </div>
 
-      <div className={`${sectionContainer} flex flex-col gap-16 py-16 sm:gap-20 sm:py-20`}>
+      <div className={`${sectionContainer} flex flex-col gap-16 pt-8 pb-16 sm:gap-20 sm:pt-10 sm:pb-20`}>
         <section>
           <SectionHeader index="01" kicker="Substack" title="Нийтлэл">
             <HeaderLink to="/newsletter">Бүх нийтлэл</HeaderLink>

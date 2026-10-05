@@ -5,6 +5,7 @@ import {
   Menu,
   Moon,
   Sun,
+  X,
 } from "lucide-react"
 
 import { channels } from "@/content/channels"
@@ -182,27 +183,70 @@ export function Navigation1({
                 <Menu />
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[min(100%,22rem)] overflow-y-auto p-6">
-              <SheetTitle className="font-news text-left text-xl">Эдийн засаг</SheetTitle>
-              <div className="mt-6 flex flex-col gap-1">
-                {primary.map((item) => (
+            {/* Same glass, type and pills as the header bar. */}
+            <SheetContent
+              side="right"
+              showCloseButton={false}
+              // Opening with a tap should not paint a focus ring on the first button.
+              onOpenAutoFocus={(event) => event.preventDefault()}
+              className="border-border w-[min(100%,22rem)] gap-0 overflow-y-auto bg-background/85 p-0 shadow-none backdrop-blur-xl"
+            >
+              <div className="border-border flex h-14 shrink-0 items-center justify-between border-b px-4">
+                <SheetClose asChild>
+                  <NavLink to="/" className="flex items-center" aria-label="Эдийн засаг">
+                    <img src={publicUrl("brand/logo-black.png")} alt="" className="h-7 w-auto dark:hidden" />
+                    <img src={publicUrl("brand/logo-white.png")} alt="" className="hidden h-7 w-auto dark:block" />
+                  </NavLink>
+                </SheetClose>
+                <SheetTitle className="sr-only">Цэс</SheetTitle>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    aria-label={theme === "dark" ? "Гэрэл горим" : "Харанхуй горим"}
+                    onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
+                    className="text-muted-foreground hover:text-foreground flex size-9 items-center justify-center transition-colors"
+                  >
+                    {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                  </button>
+                  <SheetClose asChild>
+                    <button
+                      type="button"
+                      aria-label="Цэс хаах"
+                      className="text-muted-foreground hover:text-foreground flex size-9 items-center justify-center transition-colors"
+                    >
+                      <X className="size-5" />
+                    </button>
+                  </SheetClose>
+                </div>
+              </div>
+
+              <nav aria-label="Үндсэн цэс" className="flex flex-col px-2 py-3">
+                {[{ to: "/", label: "Нүүр" }, ...primary, { to: "/newsletter", label: "Нийтлэл" }].map((item) => (
                   <SheetClose asChild key={item.to}>
                     <NavLink
                       to={item.to}
-                      className="py-2 text-base font-medium"
+                      end={item.to === "/"}
+                      className={({ isActive }) =>
+                        `flex h-11 items-center justify-between rounded-md px-3 text-[15px] font-medium transition-colors ${isActive ? "bg-foreground/5 text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"}`
+                      }
                     >
                       {item.label}
                     </NavLink>
                   </SheetClose>
                 ))}
+              </nav>
+
+              <div className="border-border border-t px-2 py-3">
                 <Accordion type="single" collapsible>
-                  <AccordionItem value="latest">
-                    <AccordionTrigger>Сүүлийн тойм</AccordionTrigger>
-                    <AccordionContent className="flex flex-col gap-3">
+                  <AccordionItem value="latest" className="border-0">
+                    <AccordionTrigger className="text-muted-foreground hover:text-foreground px-3 text-[15px] hover:no-underline">
+                      Сүүлийн тойм
+                    </AccordionTrigger>
+                    <AccordionContent className="flex flex-col gap-1 px-1">
                       {byDate().slice(0, 5).map((story) => (
                         <SheetClose asChild key={story.slug}>
-                          <NavLink to={`/story/${story.slug}`} className="text-sm">
-                            <span className="text-muted-foreground block text-xs">
+                          <NavLink to={`/story/${story.slug}`} className="hover:bg-foreground/5 rounded-md px-2 py-2 text-[13px] leading-snug">
+                            <span className="text-muted-foreground block font-mono text-[11px]">
                               {deskLabel[story.desk]} · {formatStoryDate(story.date)}
                             </span>
                             {story.title}
@@ -213,20 +257,31 @@ export function Navigation1({
                   </AccordionItem>
                 </Accordion>
               </div>
-              <div className="mt-auto flex flex-col gap-2 pt-6">
-                <Button asChild variant="outline">
-                  <a href={channels.youtube}>YouTube</a>
-                </Button>
-                <Button asChild variant="outline">
-                  <a href={channels.substackSubscribe} target="_blank" rel="noreferrer">
-                    <Mail />
-                    Subscribe
-                  </a>
-                </Button>
+
+              <div className="border-border mt-auto flex flex-col gap-2 border-t p-4">
+                <a
+                  href={channels.youtube}
+                  className="text-muted-foreground hover:text-foreground inline-flex h-10 items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
+                >
+                  YouTube
+                  <ArrowUpRight className="size-3.5" />
+                </a>
+                <a
+                  href={channels.substackSubscribe}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="border-foreground/20 text-foreground hover:bg-foreground hover:text-background inline-flex h-10 items-center justify-center gap-1.5 rounded-full border text-[13px] font-medium transition-colors"
+                >
+                  <Mail className="size-3.5" />
+                  Subscribe
+                </a>
                 <SheetClose asChild>
-                  <Button asChild>
-                    <NavLink to="/newsletter">Нийтлэл</NavLink>
-                  </Button>
+                  <NavLink
+                    to="/newsletter"
+                    className="bg-primary text-primary-foreground hover:bg-primary/85 inline-flex h-10 items-center justify-center rounded-full text-[13px] font-medium transition-colors"
+                  >
+                    Нийтлэл унших
+                  </NavLink>
                 </SheetClose>
               </div>
             </SheetContent>

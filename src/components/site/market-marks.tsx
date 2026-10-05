@@ -1,6 +1,6 @@
 export function toneClass(pct: number) {
-  if (pct > 0) return "text-emerald-700 dark:text-emerald-400"
-  if (pct < 0) return "text-red-700 dark:text-red-400"
+  if (pct > 0) return "text-[var(--up)]"
+  if (pct < 0) return "text-[var(--down)]"
   return "text-muted-foreground"
 }
 

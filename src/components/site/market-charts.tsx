@@ -29,8 +29,8 @@ export function ChangePill({ pct, size = "md" }: { pct: number; size?: "md" | "l
     Math.abs(pct) < 0.1
       ? "bg-foreground/[0.07] text-muted-foreground"
       : pct > 0
-        ? "bg-emerald-500/12 text-emerald-700 dark:text-emerald-400"
-        : "bg-red-500/12 text-red-700 dark:text-red-400"
+        ? "bg-[color-mix(in_oklch,var(--up)_12%,transparent)] text-[var(--up)]"
+        : "bg-[color-mix(in_oklch,var(--down)_12%,transparent)] text-[var(--down)]"
   return (
     <span
       className={cn(
@@ -45,7 +45,8 @@ export function ChangePill({ pct, size = "md" }: { pct: number; size?: "md" | "l
   )
 }
 
-const markColor = (pct: number) => (pct >= 0 ? "bg-[var(--up)]" : "bg-[var(--down)]")
+// Brand chart rule: cobalt = up, gray = down (text keeps green/red with ▲/▼).
+const markColor = (pct: number) => (pct >= 0 ? "bg-[var(--mark-up)]" : "bg-[var(--mark-down)]")
 
 /* ------------------------------------------------------------------ */
 /* ТОП-20 checkpoints                                                  */
@@ -72,7 +73,7 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
         {/* Gridlines + y ticks */}
         {ticks.map((tick) => (
           <div key={tick} className="absolute inset-x-0 flex items-center" style={{ bottom: `${y(tick)}%` }}>
-            <span className="text-muted-foreground w-12 shrink-0 pr-2 text-right text-[10px] tabular-nums">
+            <span className="text-muted-foreground w-9 shrink-0 pr-2 text-right text-[10px] tabular-nums sm:w-12">
               {tick === 0 ? "0" : `${tick / 1000}k`}
             </span>
             <span className="bg-border h-px flex-1" />
@@ -80,7 +81,7 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
         ))}
 
         {/* All-time high reference */}
-        <div className="absolute right-0 left-12 flex items-center" style={{ bottom: `${y(high)}%` }}>
+        <div className="absolute right-0 left-9 flex items-center sm:left-12" style={{ bottom: `${y(high)}%` }}>
           <span className="bg-brand h-px flex-1" />
           <span className="bg-card text-brand-strong absolute -top-5 left-0 px-1 text-[11px] font-medium tabular-nums">
             Түүхэн дээд {grouped(high)}
@@ -88,14 +89,14 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
         </div>
 
         {/* Columns */}
-        <div className="absolute inset-y-0 right-0 left-12 flex items-end justify-around">
+        <div className="absolute inset-y-0 right-0 left-9 grid grid-cols-4 items-end sm:left-12">
           {points.map((point, index) => {
             const last = index === points.length - 1
             return (
-              <div key={point.label} className="group relative flex h-full flex-col items-center justify-end">
+              <div key={point.label} className="group relative flex h-full min-w-0 flex-col items-center justify-end">
                 <span
                   className={cn(
-                    "mb-1.5 text-xs font-semibold whitespace-nowrap tabular-nums",
+                    "mb-1.5 text-[10px] font-semibold whitespace-nowrap tabular-nums sm:text-xs",
                     last ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
@@ -116,12 +117,12 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
           })}
         </div>
       </div>
-      <div className="ml-12 flex justify-around border-t pt-2">
+      <div className="ml-9 grid grid-cols-4 border-t pt-2 sm:ml-12">
         {points.map((point, index) => (
           <span
             key={point.label}
             className={cn(
-              "w-20 text-center text-[11px] leading-tight",
+              "px-0.5 text-center text-[10px] leading-tight sm:text-[11px]",
               index === points.length - 1 ? "text-foreground font-semibold" : "text-muted-foreground",
             )}
           >
@@ -273,7 +274,7 @@ export function StockExplorer({ rows: input, reportHref }: { rows: CloseRow[]; r
               </span>
               <span className="hidden text-right sm:block">
                 <span className="block text-sm font-semibold tabular-nums">{money(item.price, item.currency)}</span>
-                <span className={cn("text-[11px] font-semibold tabular-nums", item.pct >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-400")}>
+                <span className={cn("text-[11px] font-semibold tabular-nums", item.pct >= 0 ? "text-[var(--up)]" : "text-[var(--down)]")}>
                   {item.pct >= 0 ? "▲" : "▼"} {signedPct(item.pct).replace("-", "−")}
                 </span>
               </span>

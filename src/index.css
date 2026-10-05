@@ -1,14 +1,46 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+/* Brand book v2 typefaces. All four ship cyrillic-ext, so Ө ө Ү ү render. */
+@import "@fontsource-variable/geologica";
+@import "@fontsource-variable/onest";
+@import "@fontsource-variable/literata";
+@import "@fontsource-variable/literata/wght-italic.css";
+@import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-    --font-heading: "Times New Roman", Times, serif;
-    --font-sans: "Geist Variable", "Segoe UI", sans-serif;
-    --font-news: "Times New Roman", Times, serif;
+    /* Geologica: headlines and big figures. Onest: text and UI.
+       Literata: long reads. JetBrains Mono: prices, dates, sources, kickers. */
+    --font-heading: "Geologica Variable", "Segoe UI", sans-serif;
+    --font-news: "Geologica Variable", "Segoe UI", sans-serif;
+    --font-display: "Geologica Variable", "Segoe UI", sans-serif;
+    --font-sans: "Onest Variable", "Segoe UI", sans-serif;
+    --font-body: "Onest Variable", "Segoe UI", sans-serif;
+    --font-read: "Literata Variable", Georgia, serif;
+    --font-mono: "JetBrains Mono Variable", Consolas, monospace;
+    /* Extended palette: Blue and Gray 50-900 (500 = the primary colour). */
+    --color-blue-50: #f6fcff;
+    --color-blue-100: #ddf2ff;
+    --color-blue-200: #bce2ff;
+    --color-blue-300: #8fcbff;
+    --color-blue-400: #5ca9ff;
+    --color-blue-500: #298dff;
+    --color-blue-600: #1759c4;
+    --color-blue-700: #002e6a;
+    --color-blue-800: #001129;
+    --color-blue-900: #00060f;
+    --color-gray-50: #f4f5f7;
+    --color-gray-100: #e0e2e6;
+    --color-gray-200: #c2c6cd;
+    --color-gray-300: #a1a7b2;
+    --color-gray-400: #89919f;
+    --color-gray-500: #6c7584;
+    --color-gray-600: #4b515b;
+    --color-gray-700: #343940;
+    --color-gray-800: #222529;
+    --color-gray-900: #131518;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -27,9 +59,15 @@
     --color-ink-foreground: var(--ink-foreground);
     --color-brand: var(--brand);
     --color-brand-strong: var(--brand-strong);
+    --color-brand-soft: var(--brand-soft);
     --color-brand-foreground: var(--brand-foreground);
-    --color-photo-foreground: oklch(0.96 0 0);
-    --color-studio: oklch(0.17 0 0);
+    /* Fixed surfaces that do not flip with the theme (ticker, footer, studio, photos). */
+    --color-photo-foreground: #eef0f3;
+    --color-studio: #16181c;
+    --color-desk-mongolia: var(--desk-mongolia);
+    --color-desk-world: var(--desk-world);
+    --color-desk-markets: var(--desk-markets);
+    --color-desk-talk: var(--desk-talk);
     --color-input: var(--input);
     --color-border: var(--border);
     --color-destructive: var(--destructive);
@@ -57,91 +95,147 @@
 }
 
 /*
- * Neutral near-black and soft off-white. Neither mode uses pure #000 or #fff:
- * the darkest tone is about #171717 and the lightest text about #ededed.
- * --ink is the inverted surface (footer, market card); --brand is the amber accent.
+ * Primary colours: Gray 900 #131518 (soft black), off-white #F6F7F9, Gray 500 #6C7584, Blue 500 #298DFF.
+ * Pure #000 / #FFF are avoided: text is Gray 900 on off-white, dark mode is #E8EAED on #0F1013.
+ * Accessibility: every text pairing meets WCAG AA (aim AAA). Measured ratios:
+ *   black on white 21:1 · Gray 600 on white 7.99:1 · Blue 600 on white 6.44:1
+ *   black on Blue 500 6.35:1 (buttons) · Blue 400 on black 8.57:1 (dark links)
+ * Never: white text on Blue 500 (3.31:1) or Gray 500 text on Gray 50 (4.26:1).
+ * Blue 500 on white is for graphics and large type only (3.31:1).
  */
 :root {
-    --background: oklch(0.975 0.002 90);
-    --foreground: oklch(0.2 0 0);
-    --card: oklch(0.993 0.001 90);
-    --card-foreground: oklch(0.2 0 0);
-    --popover: oklch(0.993 0.001 90);
-    --popover-foreground: oklch(0.2 0 0);
-    --primary: oklch(0.2 0 0);
-    --primary-foreground: oklch(0.975 0.002 90);
-    --secondary: oklch(0.94 0.002 90);
-    --secondary-foreground: oklch(0.2 0 0);
-    --muted: oklch(0.945 0.002 90);
-    --muted-foreground: oklch(0.48 0 0);
-    --accent: oklch(0.94 0.002 90);
-    --accent-foreground: oklch(0.2 0 0);
-    --destructive: oklch(0.56 0.2 28);
-    --border: oklch(0.89 0.002 90);
-    --input: oklch(0.87 0.002 90);
-    --ring: oklch(0.66 0.13 62);
-    --ink: oklch(0.205 0 0);
-    --ink-foreground: oklch(0.95 0 0);
-    --brand: oklch(0.74 0.15 70);
-    --brand-strong: oklch(0.56 0.13 58);
-    --brand-foreground: oklch(0.2 0 0);
-    --chart-1: oklch(0.74 0.15 70);
-    --chart-2: oklch(0.48 0 0);
-    --chart-3: oklch(0.4 0 0);
-    --chart-4: oklch(0.32 0 0);
-    --chart-5: oklch(0.25 0 0);
+    --background: #f6f7f9;
+    --foreground: #131518;
+    --card: rgb(255 255 255 / 0.58);
+    --card-foreground: #131518;
+    --popover: #ffffff;
+    --popover-foreground: #131518;
+    --primary: #131518;
+    --primary-foreground: #f6f7f9;
+    --secondary: #eef0f3;
+    --secondary-foreground: #131518;
+    --muted: #eef0f3;
+    --muted-foreground: #4b515b;
+    --accent: #f6fcff;
+    --accent-foreground: #131518;
+    --destructive: #c2380f;
+    --border: #e3e6ea;
+    --input: #d5d9df;
+    --ring: #298dff;
+    --ink: #16181c;
+    --ink-foreground: #eef0f3;
+    --brand: #298dff;
+    --brand-strong: #1759c4;
+    --brand-soft: #f6fcff;
+    --brand-foreground: #131518;
+    --chart-1: #298dff;
+    --chart-2: #8fcbff;
+    --chart-3: #002e6a;
+    --chart-4: #89919f;
+    --chart-5: #131518;
     --radius: 0.5rem;
-    --up: #059669;
-    --down: #dc2626;
-    --sidebar: oklch(0.993 0.001 90);
-    --sidebar-foreground: oklch(0.2 0 0);
-    --sidebar-primary: oklch(0.2 0 0);
-    --sidebar-primary-foreground: oklch(0.975 0.002 90);
-    --sidebar-accent: oklch(0.94 0.002 90);
-    --sidebar-accent-foreground: oklch(0.2 0 0);
-    --sidebar-border: oklch(0.89 0.002 90);
-    --sidebar-ring: oklch(0.66 0.13 62);
+    --desk-mongolia: #1759c4;
+    --desk-world: #1759c4;
+    --desk-markets: #1759c4;
+    --desk-talk: #1759c4;
+    /* Price change text (▲ ▼) and chart marks (blue up, gray down). */
+    --up: #087a4b;
+    --down: #c2380f;
+    --mark-up: #298dff;
+    --mark-down: #89919f;
+    /* On the inverted ink surface (black in light mode). */
+    --up-on-ink: #2fae74;
+    --down-on-ink: #f0643f;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #131518;
+    --sidebar-primary: #298dff;
+    --sidebar-primary-foreground: #131518;
+    --sidebar-accent: #f6fcff;
+    --sidebar-accent-foreground: #131518;
+    --sidebar-border: #e3e6ea;
+    --sidebar-ring: #298dff;
 }
 
 .dark {
-    --up: #059669;
-    --down: #ef4444;
-    --background: oklch(0.2 0 0);
-    --foreground: oklch(0.93 0 0);
-    --card: oklch(0.24 0 0);
-    --card-foreground: oklch(0.93 0 0);
-    --popover: oklch(0.24 0 0);
-    --popover-foreground: oklch(0.93 0 0);
-    --primary: oklch(0.93 0 0);
-    --primary-foreground: oklch(0.2 0 0);
-    --secondary: oklch(0.28 0 0);
-    --secondary-foreground: oklch(0.93 0 0);
-    --muted: oklch(0.27 0 0);
-    --muted-foreground: oklch(0.7 0 0);
-    --accent: oklch(0.28 0 0);
-    --accent-foreground: oklch(0.93 0 0);
-    --destructive: oklch(0.68 0.17 24);
-    --border: oklch(0.32 0 0);
-    --input: oklch(0.35 0 0);
-    --ring: oklch(0.74 0.13 70);
-    --ink: oklch(0.92 0 0);
-    --ink-foreground: oklch(0.2 0 0);
-    --brand: oklch(0.78 0.14 72);
-    --brand-strong: oklch(0.8 0.13 75);
-    --brand-foreground: oklch(0.2 0 0);
-    --chart-1: oklch(0.78 0.14 72);
-    --chart-2: oklch(0.7 0 0);
-    --chart-3: oklch(0.56 0 0);
-    --chart-4: oklch(0.44 0 0);
-    --chart-5: oklch(0.32 0 0);
-    --sidebar: oklch(0.24 0 0);
-    --sidebar-foreground: oklch(0.93 0 0);
-    --sidebar-primary: oklch(0.78 0.14 72);
-    --sidebar-primary-foreground: oklch(0.2 0 0);
-    --sidebar-accent: oklch(0.28 0 0);
-    --sidebar-accent-foreground: oklch(0.93 0 0);
-    --sidebar-border: oklch(0.32 0 0);
-    --sidebar-ring: oklch(0.74 0.13 70);
+    color-scheme: dark;
+    --background: #0a0b0d;
+    --foreground: #e8eaed;
+    --card: rgb(23 25 29 / 0.55);
+    --card-foreground: #e8eaed;
+    --popover: #17191d;
+    --popover-foreground: #e8eaed;
+    --primary: #e8eaed;
+    --primary-foreground: #0f1013;
+    --secondary: #1d2025;
+    --secondary-foreground: #e8eaed;
+    --muted: #1d2025;
+    --muted-foreground: #a1a7b2;
+    --accent: #001129;
+    --accent-foreground: #e8eaed;
+    --destructive: #f0643f;
+    --border: #262a30;
+    --input: #343940;
+    --ring: #5ca9ff;
+    --ink: #e8eaed;
+    --ink-foreground: #131518;
+    --brand: #298dff;
+    --brand-strong: #5ca9ff;
+    --brand-soft: #001129;
+    --brand-foreground: #131518;
+    --chart-1: #298dff;
+    --chart-2: #8fcbff;
+    --chart-3: #bce2ff;
+    --chart-4: #6c7584;
+    --chart-5: #e8eaed;
+    --desk-mongolia: #5ca9ff;
+    --desk-world: #5ca9ff;
+    --desk-markets: #5ca9ff;
+    --desk-talk: #5ca9ff;
+    --up: #2fae74;
+    --down: #f0643f;
+    --mark-up: #298dff;
+    --mark-down: #6c7584;
+    --up-on-ink: #087a4b;
+    --down-on-ink: #c2380f;
+    --sidebar: #17191d;
+    --sidebar-foreground: #e8eaed;
+    --sidebar-primary: #298dff;
+    --sidebar-primary-foreground: #131518;
+    --sidebar-accent: #1d2025;
+    --sidebar-accent-foreground: #e8eaed;
+    --sidebar-border: #262a30;
+    --sidebar-ring: #5ca9ff;
+}
+
+/* Brand type rules: Geologica titles at heavy weight, -2% tracking, tight leading. */
+@layer components {
+    .font-news,
+    .font-display {
+        font-weight: 750;
+        letter-spacing: -0.02em;
+    }
+    .font-mono {
+        font-variant-numeric: tabular-nums;
+    }
+}
+
+@theme {
+    --text-ds-caption: 0.75rem;
+    --text-ds-caption--line-height: 1.4;
+    --text-ds-label: 0.8125rem;
+    --text-ds-label--line-height: 1.4;
+    --text-ds-body: 1rem;
+    --text-ds-body--line-height: 1.65;
+    --text-ds-lead: 1.25rem;
+    --text-ds-lead--line-height: 1.55;
+    --text-ds-h3: 1.5rem;
+    --text-ds-h3--line-height: 1.25;
+    --text-ds-h2: 2.25rem;
+    --text-ds-h2--line-height: 1.12;
+    --text-ds-h1: 3.25rem;
+    --text-ds-h1--line-height: 1.05;
+    --text-ds-display: 4.5rem;
+    --text-ds-display--line-height: 1;
 }
 
 @layer base {
@@ -156,17 +250,22 @@
     }
 }
 
+/* Hover slows the ticker (see MarketStrip); edges fade so prices glide in and out. */
 .price-ticker {
   overflow: hidden;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 6%, black 94%, transparent);
 }
 
 .price-ticker-track {
   animation: ez-ticker 140s linear infinite;
 }
 
-.price-ticker:hover .price-ticker-track,
-.price-ticker:focus-within .price-ticker-track {
-  animation-play-state: paused;
+@media (max-width: 640px) {
+  .price-ticker {
+    -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+    mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
 }
 
 @keyframes ez-ticker {
@@ -276,4 +375,129 @@
   .ez-lift:focus-visible {
     transform: none;
   }
+}
+
+/*
+ * Ambient background: a slowly moving blue gradient, a different motion per
+ * page (AmbientBackground sets data-variant). Built from the extended Blue
+ * palette. Glass surfaces (.bg-card, nav, ticker) blur what passes behind them.
+ *
+ *   aurora  home      four fields drifting on separate paths
+ *   flow    markets   wide bands sliding sideways, like a price line
+ *   pulse   EZ Talk   a centre glow that breathes, with orbiting light
+ *   calm    articles  one soft sweep across the header, quiet for reading
+ *   orbit   other     fields circling the middle of the screen
+ */
+.ez-ambient {
+  --b1: rgb(188 226 255 / 0.70);  /* Blue 200 */
+  --b2: rgb(221 242 255 / 0.85);  /* Blue 100 */
+  --b3: rgb(143 203 255 / 0.40);  /* Blue 300 */
+  --b4: rgb(188 226 255 / 0.50);  /* Blue 200 */
+}
+
+.dark .ez-ambient {
+  --b1: rgb(52 57 64 / 0.55);     /* Gray 700 */
+  --b2: rgb(0 0 0 / 0.75);        /* Black */
+  --b3: rgb(34 37 41 / 0.70);     /* Gray 800 */
+  --b4: rgb(75 81 91 / 0.18);     /* Gray 600 */
+}
+
+.ez-ambient-stage {
+  position: absolute;
+  inset: 0;
+  filter: blur(110px) saturate(135%);
+  animation: ez-fade-in 1.2s ease both;
+}
+
+/* Lifts the page tone over the colour so text on the bare page stays crisp, with a faint frost. */
+.ez-ambient-veil {
+  position: absolute;
+  inset: 0;
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  background: linear-gradient(to bottom, transparent, color-mix(in oklch, var(--background) 30%, transparent));
+}
+
+.ez-layer {
+  position: absolute;
+  border-radius: 9999px;
+  will-change: transform;
+}
+
+@keyframes ez-fade-in {
+  from { opacity: 0; }
+}
+
+/* ---- aurora (home) ---- */
+[data-variant="aurora"] .ez-layer-1 { top: -20vh; left: -15vw; width: 60vw; height: 60vw; background: radial-gradient(circle, var(--b1), transparent 68%); animation: ez-aurora-1 34s ease-in-out infinite alternate; }
+[data-variant="aurora"] .ez-layer-2 { top: 15vh; right: -20vw; width: 55vw; height: 55vw; background: radial-gradient(circle, var(--b3), transparent 66%); animation: ez-aurora-2 42s ease-in-out infinite alternate; }
+[data-variant="aurora"] .ez-layer-3 { bottom: -25vh; left: 20vw; width: 50vw; height: 50vw; background: radial-gradient(circle, var(--b2), transparent 66%); animation: ez-aurora-3 50s ease-in-out infinite alternate; }
+[data-variant="aurora"] .ez-layer-4 { top: 50%; left: 50%; width: 140vmax; height: 140vmax; margin: -70vmax 0 0 -70vmax; background: conic-gradient(from 0deg, transparent, var(--b4), transparent 40%, var(--b4) 70%, transparent); opacity: 0.6; animation: ez-spin 90s linear infinite; }
+@keyframes ez-aurora-1 { to { transform: translate3d(22vw, 18vh, 0) scale(1.2); } }
+@keyframes ez-aurora-2 { to { transform: translate3d(-25vw, 20vh, 0) scale(0.85); } }
+@keyframes ez-aurora-3 { to { transform: translate3d(18vw, -22vh, 0) scale(1.15); } }
+
+/* ---- flow (markets) ---- */
+[data-variant="flow"] .ez-layer { border-radius: 50%; }
+[data-variant="flow"] .ez-layer-1 { top: 2vh; left: -40vw; width: 180vw; height: 36vh; background: radial-gradient(ellipse, var(--b1), transparent 70%); animation: ez-flow-a 26s ease-in-out infinite alternate; }
+[data-variant="flow"] .ez-layer-2 { top: 34vh; left: -40vw; width: 180vw; height: 30vh; background: radial-gradient(ellipse, var(--b3), transparent 70%); animation: ez-flow-b 34s ease-in-out infinite alternate; }
+[data-variant="flow"] .ez-layer-3 { top: 62vh; left: -40vw; width: 180vw; height: 34vh; background: radial-gradient(ellipse, var(--b2), transparent 70%); animation: ez-flow-a 40s ease-in-out infinite alternate-reverse; }
+[data-variant="flow"] .ez-layer-4 { top: 20vh; left: -40vw; width: 180vw; height: 20vh; background: radial-gradient(ellipse, var(--b4), transparent 70%); animation: ez-flow-b 22s ease-in-out infinite alternate-reverse; }
+@keyframes ez-flow-a { from { transform: translate3d(-18vw, 0, 0) rotate(-4deg); } to { transform: translate3d(18vw, 6vh, 0) rotate(3deg); } }
+@keyframes ez-flow-b { from { transform: translate3d(16vw, 4vh, 0) rotate(3deg); } to { transform: translate3d(-16vw, -4vh, 0) rotate(-3deg); } }
+
+/* ---- pulse (EZ Talk) ---- */
+[data-variant="pulse"] .ez-layer-1 { top: 50%; left: 50%; width: 70vw; height: 70vw; margin: -35vw 0 0 -35vw; background: radial-gradient(circle, var(--b1), transparent 65%); animation: ez-breathe 11s ease-in-out infinite; }
+[data-variant="pulse"] .ez-layer-2,
+[data-variant="pulse"] .ez-layer-3 { top: 50%; left: 50%; width: 34vw; height: 34vw; margin: -17vw 0 0 -17vw; }
+[data-variant="pulse"] .ez-layer-2 { background: radial-gradient(circle, var(--b3), transparent 65%); animation: ez-orbit-r 28s linear infinite; }
+[data-variant="pulse"] .ez-layer-3 { background: radial-gradient(circle, var(--b2), transparent 65%); animation: ez-orbit-l 36s linear infinite; }
+[data-variant="pulse"] .ez-layer-4 { top: -30vh; right: -20vw; width: 50vw; height: 50vw; background: radial-gradient(circle, var(--b4), transparent 65%); animation: ez-breathe 17s ease-in-out infinite reverse; }
+@keyframes ez-breathe { 0%, 100% { transform: scale(0.82); opacity: 0.75; } 50% { transform: scale(1.12); opacity: 1; } }
+@keyframes ez-orbit-r { from { transform: rotate(0deg) translateX(30vw) rotate(0deg); } to { transform: rotate(360deg) translateX(30vw) rotate(-360deg); } }
+@keyframes ez-orbit-l { from { transform: rotate(360deg) translateX(24vw) rotate(-360deg); } to { transform: rotate(0deg) translateX(24vw) rotate(0deg); } }
+
+/* ---- calm (stories, letters) ---- */
+[data-variant="calm"] .ez-layer-1 { top: -30vh; left: -10vw; width: 70vw; height: 60vh; border-radius: 50%; background: radial-gradient(ellipse, var(--b3), transparent 70%); animation: ez-sweep 40s ease-in-out infinite alternate; }
+[data-variant="calm"] .ez-layer-2 { top: -25vh; right: -15vw; width: 50vw; height: 50vh; border-radius: 50%; background: radial-gradient(ellipse, var(--b1), transparent 70%); opacity: 0.55; animation: ez-sweep 52s ease-in-out infinite alternate-reverse; }
+[data-variant="calm"] .ez-layer-3,
+[data-variant="calm"] .ez-layer-4 { display: none; }
+@keyframes ez-sweep { to { transform: translate3d(28vw, 4vh, 0) scale(1.1); } }
+
+/* ---- orbit (desks, about, newsletter, others) ---- */
+[data-variant="orbit"] .ez-layer { top: 50%; left: 50%; }
+[data-variant="orbit"] .ez-layer-1 { width: 48vw; height: 48vw; margin: -24vw 0 0 -24vw; background: radial-gradient(circle, var(--b1), transparent 66%); animation: ez-orbit-wide 60s linear infinite; }
+[data-variant="orbit"] .ez-layer-2 { width: 42vw; height: 42vw; margin: -21vw 0 0 -21vw; background: radial-gradient(circle, var(--b3), transparent 66%); animation: ez-orbit-wide 75s linear infinite reverse; }
+[data-variant="orbit"] .ez-layer-3 { width: 36vw; height: 36vw; margin: -18vw 0 0 -18vw; background: radial-gradient(circle, var(--b2), transparent 66%); animation: ez-orbit-tight 48s linear infinite; }
+[data-variant="orbit"] .ez-layer-4 { width: 60vw; height: 60vw; margin: -30vw 0 0 -30vw; background: radial-gradient(circle, var(--b4), transparent 66%); animation: ez-breathe 20s ease-in-out infinite; }
+@keyframes ez-orbit-wide { from { transform: rotate(0deg) translateX(32vw) rotate(0deg); } to { transform: rotate(360deg) translateX(32vw) rotate(-360deg); } }
+@keyframes ez-orbit-tight { from { transform: rotate(120deg) translateX(20vw) rotate(-120deg); } to { transform: rotate(480deg) translateX(20vw) rotate(-480deg); } }
+
+@keyframes ez-spin { to { transform: rotate(360deg); } }
+
+/* Glass surfaces: translucent fill, blur and a hairline highlight on the top edge. */
+.bg-card {
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
+}
+.dark .bg-card {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+}
+
+/* Phones: bigger fields relative to the screen, lighter blur for smooth scrolling. */
+@media (max-width: 640px) {
+  .ez-ambient-stage { filter: blur(70px) saturate(135%); }
+  [data-variant="aurora"] .ez-layer-1 { width: 110vw; height: 110vw; }
+  [data-variant="aurora"] .ez-layer-2 { width: 100vw; height: 100vw; }
+  [data-variant="aurora"] .ez-layer-3 { width: 95vw; height: 95vw; }
+  [data-variant="pulse"] .ez-layer-1 { width: 130vw; height: 130vw; margin: -65vw 0 0 -65vw; }
+  [data-variant="orbit"] .ez-layer-1 { width: 90vw; height: 90vw; margin: -45vw 0 0 -45vw; }
+  [data-variant="orbit"] .ez-layer-2 { width: 80vw; height: 80vw; margin: -40vw 0 0 -40vw; }
+  [data-variant="calm"] .ez-layer-1 { width: 130vw; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ez-layer,
+  .ez-ambient-stage { animation: none !important; }
 }
