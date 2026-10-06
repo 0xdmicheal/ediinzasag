@@ -27,6 +27,24 @@ export interface Story {
   readMinutes: number
   paragraphs: string[]
   sources: Source[]
+  /** Tag slugs. Stories written in the admin carry their own; static ones use topic + desk. */
+  tags?: string[]
+  /** Author shown on the article (admin stories). */
+  author?: string
+  /** Rich-text body (admin stories); when set it is shown instead of paragraphs. */
+  html?: string
+}
+
+/** Cover images for stories that come from the admin (static ones live in /public/stories). */
+const remoteCovers = new Map<string, { src: string; alt: string }>()
+
+export function registerCover(slug: string, cover: { src: string; alt: string }) {
+  remoteCovers.set(slug, cover)
+}
+
+/** A story's tag slugs: its own, or its topic and desk. */
+export function tagsOf(story: Story) {
+  return story.tags ?? [story.topic, story.desk]
 }
 
 export const deskLabel: Record<Desk, string> = {
@@ -500,6 +518,8 @@ const storyArtAlt: Record<string, string> = {
 }
 
 export function storyArt(slug: string) {
+  const remote = remoteCovers.get(slug)
+  if (remote) return remote
   return {
     src: publicUrl(`stories/${slug}.jpg`),
     alt: storyArtAlt[slug] ?? "Тоймны зураглал",

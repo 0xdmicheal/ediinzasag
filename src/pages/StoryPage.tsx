@@ -2,15 +2,13 @@ import { Link, useParams } from "react-router-dom"
 
 import { ArticleLayout, excerpt, proseClass, type TocItem } from "@/components/site/article"
 import { articleAd } from "@/content/ads"
+import { sortByDate, useStories, useTagLabels } from "@/content/live"
 import { storyOutlines } from "@/content/story-outlines"
-import {
-  deskLabel,
-  formatStoryDate,
-  relatedStories,
-  storyArt,
-  storyBySlug,
-  topicLabel,
-} from "@/content/stories"
+import { prepareArticle } from "@/lib/article-html"
+import { deskLabel, formatStoryDate, storyArt, tagsOf } from "@/content/stories"
+import { Comments } from "@/reader/Comments"
+import { ArticleActions, useFire } from "@/reader/ArticleActions"
+import { useMarkReadAtEnd } from "@/reader/useMarkRead"
 
 type Block = { kind: "heading" | "paragraph"; id: string; text: string }
 
@@ -35,7 +33,15 @@ function storyBlocks(paragraphs: string[], outline?: string[]): Block[] {
 
 export function StoryPage() {
   const { slug = "" } = useParams()
-  const story = storyBySlug(slug)
+  const { stories, ready } = useStories()
+  const labels = useTagLabels()
+  const story = stories.find((item) => item.slug === slug)
+  useMarkReadAtEnd(story?.slug, "sources", story ? { desk: story.desk, topic: story.topic } : undefined)
+  const fire = useFire(slug)
+
+  if (!story && !ready) {
+    return <p className="text-muted-foreground mx-auto max-w-3xl px-4 py-20 text-sm sm:px-6">Ачаалж байна…</p>
+  }
 
   if (!story) {
     return (
@@ -49,28 +55,39 @@ export function StoryPage() {
   }
 
   const art = storyArt(story.slug)
-  const related = relatedStories(story)
-  const blocks = storyBlocks(story.paragraphs, storyOutlines[story.slug])
+  const storyTags = tagsOf(story)
+  const related = sortByDate(
+    stories.filter((item) => item.slug !== story.slug && tagsOf(item).some((tag) => storyTags.includes(tag))),
+  ).slice(0, 3)
+  const rich = story.html ? prepareArticle(story.html) : null
+  const blocks = rich ? [] : storyBlocks(story.paragraphs, storyOutlines[story.slug])
   const headings = blocks.filter((block) => block.kind === "heading")
   const toc: TocItem[] = [
-    ...(headings.length > 0
-      ? headings.map((block) => ({ id: block.id, label: block.text }))
-      : blocks.map((block) => ({ id: block.id, label: excerpt(block.text) }))),
+    ...(rich
+      ? rich.toc
+      : headings.length > 0
+        ? headings.map((block) => ({ id: block.id, label: block.text }))
+        : blocks.map((block) => ({ id: block.id, label: excerpt(block.text) }))),
     { id: "sources", label: "Эх сурвалж" },
+    { id: "comments", label: "Сэтгэгдэл" },
     ...(related.length > 0 ? [{ id: "related", label: "Дараа нь" }] : []),
   ]
 
   return (
     <ArticleLayout
       back={{ to: story.desk === "mongolia" ? "/mongolia" : "/world", label: `${deskLabel[story.desk]} руу буцах` }}
-      tags={[deskLabel[story.desk], topicLabel[story.topic], `${story.readMinutes} мин`]}
+      tags={[
+        ...storyTags.map((tag) => ({ label: `#${labels.get(tag) ?? tag}`, to: `/tag/${tag}` })),
+        `${story.readMinutes} мин`,
+      ]}
       date={formatStoryDate(story.date)}
       title={story.title}
       dek={story.dek}
-      image={{ src: art.src, alt: art.alt, caption: `${art.alt} · Зураглал` }}
-      author={{ name: "EZ тойм", role: "Эдийн засаг редакц" }}
+      image={{ src: art.src, alt: art.alt, caption: story.author ? art.alt : `${art.alt} · Зураглал` }}
+      author={{ name: story.author || "EZ тойм", role: "Эдийн засаг редакц" }}
       toc={toc}
       ad={articleAd}
+      rail={(layout) => <ArticleActions slug={story.slug} fire={fire} layout={layout} />}
       after={
         related.length > 0 ? (
           <section id="related" className="scroll-mt-24">
@@ -103,7 +120,8 @@ export function StoryPage() {
         ) : null
       }
     >
-      <div className={proseClass}>
+      {rich ? <div className={proseClass} dangerouslySetInnerHTML={{ __html: rich.html }} /> : null}
+      <div className={proseClass} hidden={Boolean(rich)}>
         {blocks.map((block) =>
           block.kind === "heading" ? (
             <h2 key={block.id} id={block.id}>
@@ -136,6 +154,8 @@ export function StoryPage() {
           Энэ хуудас нийтийн мэдэгдэл, тоймыг нэгтгэсэн. Ишлэл, гэрээний нарийн тоог зохиогоогүй.
         </p>
       </section>
+
+      <Comments slug={story.slug} />
     </ArticleLayout>
   )
 }

@@ -27,6 +27,9 @@ jobs:
       - run: npm run build
         env:
           VITE_BASE: /ediinzasag/
+          # Repo → Settings → Secrets and variables → Actions → Variables. Without them the site runs in demo mode.
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
       - run: cp dist/index.html dist/404.html
       - uses: actions/upload-pages-artifact@v3
         with:

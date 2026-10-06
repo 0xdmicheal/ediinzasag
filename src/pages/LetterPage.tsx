@@ -6,6 +6,10 @@ import { SubstackShelf } from "@/components/site/SubstackShelf"
 import { articleAd } from "@/content/ads"
 import { formatStoryDate } from "@/content/stories"
 import { substackPosts } from "@/content/substack.posts"
+import { Comments } from "@/reader/Comments"
+import { letterKey } from "@/reader/library-items"
+import { ArticleActions, useFire } from "@/reader/ArticleActions"
+import { useMarkReadAtEnd } from "@/reader/useMarkRead"
 
 /**
  * Gives the letter's headings ids for "on this page". Letters with fewer than
@@ -36,6 +40,8 @@ export function LetterPage() {
   const { slug = "" } = useParams()
   const post = substackPosts.find((item) => item.slug === slug)
   const prepared = useMemo(() => (post?.html ? prepareLetter(post.html) : { html: "", toc: [] }), [post])
+  useMarkReadAtEnd(post ? letterKey(post.slug) : undefined, "letter-end")
+  const fire = useFire(letterKey(slug))
 
   if (!post) {
     return (
@@ -50,7 +56,11 @@ export function LetterPage() {
 
   const more = substackPosts.filter((item) => item.slug !== post.slug).slice(0, 3)
   const date = /^\d{4}-\d{2}-\d{2}$/.test(post.date) ? formatStoryDate(post.date) : post.date
-  const toc: TocItem[] = [...prepared.toc, ...(more.length > 0 ? [{ id: "more", label: "Бусад захидал" }] : [])]
+  const toc: TocItem[] = [
+    ...prepared.toc,
+    { id: "comments", label: "Сэтгэгдэл" },
+    ...(more.length > 0 ? [{ id: "more", label: "Бусад захидал" }] : []),
+  ]
 
   return (
     <ArticleLayout
@@ -71,6 +81,7 @@ export function LetterPage() {
       }}
       toc={toc}
       ad={articleAd}
+      rail={(layout) => <ArticleActions slug={letterKey(post.slug)} fire={fire} layout={layout} />}
       after={
         more.length > 0 ? (
           <section id="more" className="scroll-mt-24">
@@ -93,12 +104,14 @@ export function LetterPage() {
           байна.
         </p>
       )}
-      <p className="text-muted-foreground mt-12 text-[13px]">
+      <p id="letter-end" className="text-muted-foreground mt-12 text-[13px]">
         Эх хувь:{" "}
         <a href={post.link} target="_blank" rel="noreferrer" className="text-brand-strong underline underline-offset-2">
           niots.substack.com
         </a>
       </p>
+
+      <Comments slug={letterKey(post.slug)} />
     </ArticleLayout>
   )
 }
