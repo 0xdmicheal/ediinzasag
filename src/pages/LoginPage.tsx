@@ -4,9 +4,7 @@ import { ArrowRight, X } from "lucide-react"
 
 import { buttonClass, Field, inputClass, Notice } from "@/admin/ui"
 import { LoginShowcase, LoginShowcaseCompact } from "@/reader/LoginShowcase"
-import { formatPhone, normalizePhone } from "@/reader/phone"
 import { useReader } from "@/reader/session"
-import type { CodeChannel } from "@/reader/types"
 
 type Mode = "signin" | "code" | "signup" | "reset"
 
@@ -61,7 +59,7 @@ export function LoginPage() {
 }
 
 /**
- * Reader sign-in card: Google, a one-time code by e-mail or SMS, or a
+ * Reader sign-in card: Google, a one-time code by e-mail, or a
  * password. `onDone` runs once signed in; `onClose` adds a close button (popup).
  * Staff use /admin/login.
  */
@@ -79,13 +77,11 @@ export function LoginPanel({
 }) {
   const { auth } = useReader()
   const [mode, setMode] = useState<Mode>(initialMode)
-  const [channel, setChannel] = useState<CodeChannel>("email")
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
   const [password, setPassword] = useState("")
   const [code, setCode] = useState("")
-  /** Where the code went (e-mail or E.164 phone); set once it was sent, then the form asks for it. */
+  /** The e-mail the code went to; set once it was sent, then the form asks for it. */
   const [codeTarget, setCodeTarget] = useState<string | null>(null)
   const [demoCode, setDemoCode] = useState<string | null>(null)
   const [error, setError] = useState("")
@@ -105,11 +101,6 @@ export function LoginPanel({
     reset()
   }
 
-  function switchChannel(next: CodeChannel) {
-    setChannel(next)
-    reset()
-  }
-
   async function run(task: () => Promise<void>) {
     setBusy(true)
     setError("")
@@ -124,9 +115,8 @@ export function LoginPanel({
 
   async function sendCode() {
     if (!auth) return
-    const target = channel === "phone" ? normalizePhone(phone) : email.trim()
-    if (!target) throw new Error("Утасны дугаараа шалгана уу (жишээ нь 99112233)")
-    setDemoCode(await auth.requestCode(channel, target))
+    const target = email.trim()
+    setDemoCode(await auth.requestCode("email", target))
     setCodeTarget(target)
     setCode("")
   }
@@ -149,7 +139,7 @@ export function LoginPanel({
         onDone()
       } else if (mode === "code") {
         if (!codeTarget) return sendCode()
-        await auth.verifyCode(channel, codeTarget, code)
+        await auth.verifyCode("email", codeTarget, code)
         onDone()
       } else if (mode === "signup") {
         const mustConfirm = await auth.signUp(name, email, password)
@@ -172,7 +162,6 @@ export function LoginPanel({
         : mode === "signin"
           ? "Нэвтрэх"
           : titles[mode]
-  const shownTarget = codeTarget && channel === "phone" ? formatPhone(codeTarget) : codeTarget
 
   return (
     <div className="bg-background relative grid overflow-hidden rounded-2xl border shadow-[0_40px_80px_-50px_rgb(0_0_0/0.45)] lg:grid-cols-[1.05fr_1fr]">
@@ -203,7 +192,7 @@ export function LoginPanel({
         Fixed minimum height (the tallest tab: code entered, or sign-up), so
         switching tabs or steps never moves the notes and footer below.
       */}
-        <div className="min-h-[35rem]">
+        <div className="min-h-[31rem]">
           {mode !== "reset" && !sent ? (
             <>
               <button
@@ -246,28 +235,6 @@ export function LoginPanel({
             </div>
           ) : (
             <form onSubmit={submit} className="mt-4 flex flex-col gap-4">
-              {mode === "code" && !codeTarget ? (
-                <div role="radiogroup" aria-label="Код хүлээн авах" className="grid grid-cols-2 gap-2">
-                  {(
-                    [
-                      { key: "email", label: "И-мэйл" },
-                      { key: "phone", label: "Утас (SMS)" },
-                    ] as const
-                  ).map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      role="radio"
-                      aria-checked={channel === item.key}
-                      onClick={() => switchChannel(item.key)}
-                      className={`h-9 rounded-md border text-[13px] font-medium transition-colors ${channel === item.key ? "border-foreground bg-foreground/[0.04]" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-
               {mode === "signup" ? (
                 <Field label="Нэр" htmlFor="reader-name">
                   <input
@@ -281,39 +248,18 @@ export function LoginPanel({
                 </Field>
               ) : null}
 
-              {mode === "code" && channel === "phone" ? (
-                <Field
-                  label="Утасны дугаар"
-                  htmlFor="reader-phone"
-                  hint={codeTarget ? undefined : "Монгол дугаар бол 8 оронтойгоор бичихэд хангалттай"}
-                >
-                  <input
-                    id="reader-phone"
-                    type="tel"
-                    inputMode="tel"
-                    autoComplete="tel"
-                    required
-                    readOnly={Boolean(codeTarget)}
-                    placeholder="9911 2233"
-                    value={codeTarget ? formatPhone(codeTarget) : phone}
-                    onChange={(event) => setPhone(event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-              ) : (
-                <Field label="И-мэйл" htmlFor="reader-email" hint={mode === "code" && !codeTarget ? "Бүртгэлгүй бол шинээр үүснэ" : undefined}>
-                  <input
-                    id="reader-email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    readOnly={mode === "code" && Boolean(codeTarget)}
-                    value={email}
-                    onChange={(event) => setEmail(event.target.value)}
-                    className={inputClass}
-                  />
-                </Field>
-              )}
+              <Field label="И-мэйл" htmlFor="reader-email" hint={mode === "code" && !codeTarget ? "Бүртгэлгүй бол шинээр үүснэ" : undefined}>
+                <input
+                  id="reader-email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  readOnly={mode === "code" && Boolean(codeTarget)}
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className={inputClass}
+                />
+              </Field>
 
               {mode === "signin" || mode === "signup" ? (
                 <Field label="Нууц үг" htmlFor="reader-password" hint={mode === "signup" ? "Дор хаяж 8 тэмдэгт" : undefined}>
@@ -334,13 +280,12 @@ export function LoginPanel({
                 <>
                   {demoCode ? (
                     <Notice>
-                      Демо горим: {channel === "phone" ? "SMS" : "и-мэйл"} илгээгдэхгүй. Таны код{" "}
-                      <strong className="font-mono tracking-widest">{demoCode}</strong>
+                      Демо горим: и-мэйл илгээгдэхгүй. Таны код <strong className="font-mono tracking-widest">{demoCode}</strong>
                     </Notice>
                   ) : (
                     <Notice tone="success">
-                      {shownTarget} {channel === "phone" ? "дугаар руу SMS-ээр" : "хаяг руу"} 6 оронтой код илгээлээ.
-                      {channel === "email" ? " Спам хавтсаа ч шалгаарай." : ""}
+                      {codeTarget} хаяг руу 6 оронтой код илгээлээ.
+                      {" Спам хавтсаа ч шалгаарай."}
                     </Notice>
                   )}
                   <Field label="Код" htmlFor="reader-code">
@@ -368,7 +313,7 @@ export function LoginPanel({
               {mode === "code" && codeTarget ? (
                 <div className="flex justify-between">
                   <button type="button" onClick={reset} className={linkButton}>
-                    {channel === "phone" ? "Дугаар солих" : "И-мэйл солих"}
+                    И-мэйл солих
                   </button>
                   <button type="button" disabled={busy} onClick={() => run(sendCode)} className={linkButton}>
                     Код дахин илгээх
