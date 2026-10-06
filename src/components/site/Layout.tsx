@@ -13,6 +13,9 @@ import { sessionLabel } from "@/content/markets"
 import { AmbientBackground } from "@/components/site/AmbientBackground"
 import { Footer12 } from "@/components/ui/footer-12"
 import { Navigation1 } from "@/components/ui/navigation-1"
+import { CompleteProfile } from "@/reader/CompleteProfile"
+import { LoginModal } from "@/reader/LoginModal"
+import { ReaderProvider } from "@/reader/session"
 
 const footerColumns = [
   {
@@ -99,33 +102,37 @@ export function Layout() {
   }, [location.pathname, location.hash])
 
   return (
-    <div className="bg-background text-foreground relative isolate flex min-h-svh flex-col">
-      <AmbientBackground />
-      <a
-        href="#content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2"
-      >
-        Агуулга руу
-      </a>
-      <Navigation1 theme={theme} onThemeChange={changeTheme} />
-      <main id="content" className="flex-1">
-        <Outlet />
-      </main>
-      <Footer12
-        brandName="ЭДИЙН ЗАСАГ"
-        description="EZ Эдийн засаг Монголын эдийн засаг, дэлхийн зах зээлийн тоймыг нэг ширээн дээр тавьдаг."
-        onSubscribe={openSubstackSubscribe}
-        columns={footerColumns}
-        notices={footerNotices}
-        copyright={footerCopyright}
-        socialLinks={[
-          { label: "YouTube", href: channels.youtube, icon: <FaYoutube /> },
-          { label: "Facebook", href: channels.facebook, icon: <FaFacebookF /> },
-          { label: "Instagram", href: channels.instagram, icon: <FaInstagram /> },
-          { label: "Telegram", href: channels.telegram, icon: <FaTelegram /> },
-          { label: "X", href: channels.x, icon: <FaXTwitter /> },
-        ]}
-      />
-    </div>
+    <ReaderProvider>
+      <div className="bg-background text-foreground relative isolate flex min-h-svh flex-col">
+        <AmbientBackground />
+        <a
+          href="#content"
+          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2"
+        >
+          Агуулга руу
+        </a>
+        <Navigation1 theme={theme} onThemeChange={changeTheme} />
+        <main id="content" className="flex-1">
+          <Outlet />
+        </main>
+        <Footer12
+          brandName="ЭДИЙН ЗАСАГ"
+          description="EZ Эдийн засаг Монголын эдийн засаг, дэлхийн зах зээлийн тоймыг нэг ширээн дээр тавьдаг."
+          onSubscribe={openSubstackSubscribe}
+          columns={footerColumns}
+          notices={footerNotices}
+          copyright={footerCopyright}
+          socialLinks={[
+            { label: "YouTube", href: channels.youtube, icon: <FaYoutube /> },
+            { label: "Facebook", href: channels.facebook, icon: <FaFacebookF /> },
+            { label: "Instagram", href: channels.instagram, icon: <FaInstagram /> },
+            { label: "Telegram", href: channels.telegram, icon: <FaTelegram /> },
+            { label: "X", href: channels.x, icon: <FaXTwitter /> },
+          ]}
+        />
+      </div>
+      <LoginModal />
+      <CompleteProfile />
+    </ReaderProvider>
   )
 }

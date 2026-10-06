@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
+import { sortByDate, useStories } from "@/content/live"
 import {
   deskLabel,
   formatStoryDate,
-  storiesByDesk,
   storyArt,
   topicLabel,
   type Desk,
@@ -12,7 +12,8 @@ import {
 } from "@/content/stories"
 
 export function DeskPage({ desk }: { desk: Desk }) {
-  const items = storiesByDesk(desk)
+  const { stories } = useStories()
+  const items = sortByDate(stories.filter((story) => story.desk === desk))
   const heroLead = items[0]
   const heroSides = items.slice(1, 3)
   const list = items.slice(1 + heroSides.length)

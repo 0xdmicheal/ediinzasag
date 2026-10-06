@@ -113,11 +113,13 @@ export function ArticleLayout({
   author,
   toc,
   ad,
+  rail,
   children,
   after,
 }: {
   back: { to: string; label: string }
-  tags: string[]
+  /** Plain labels, or links (e.g. tag pages). */
+  tags: (string | { label: string; to: string })[]
   date: string
   title: string
   dek?: string
@@ -125,6 +127,11 @@ export function ArticleLayout({
   author: { name: string; role: string; avatar?: ReactNode }
   toc: TocItem[]
   ad: AdSlot
+  /**
+   * Article actions (🔥, save): drawn as a sticky column left of the text on
+   * desktop and as a row under the dek on smaller screens.
+   */
+  rail?: (layout: "vertical" | "horizontal") => ReactNode
   children: ReactNode
   after?: ReactNode
 }) {
@@ -144,11 +151,21 @@ export function ArticleLayout({
             >
               <ArrowLeft className="size-4" />
             </Link>
-            {tags.map((tag) => (
-              <span key={tag} className="bg-muted text-ds-label rounded-md border px-2.5 py-1">
-                {tag}
-              </span>
-            ))}
+            {tags.map((tag) =>
+              typeof tag === "string" ? (
+                <span key={tag} className="bg-muted text-ds-label rounded-md border px-2.5 py-1">
+                  {tag}
+                </span>
+              ) : (
+                <Link
+                  key={tag.to}
+                  to={tag.to}
+                  className="bg-muted text-ds-label hover:border-foreground/30 hover:bg-card rounded-md border px-2.5 py-1 transition-colors"
+                >
+                  {tag.label}
+                </Link>
+              ),
+            )}
             <span className="text-muted-foreground text-ds-label ml-1">{date}</span>
           </div>
           {/* Sized to stay within two lines on desktop; longer titles step down. */}
@@ -158,11 +175,21 @@ export function ArticleLayout({
             {title}
           </h1>
           {dek ? <p className="text-muted-foreground mt-5 max-w-2xl text-lg leading-relaxed">{dek}</p> : null}
+          {rail ? <div className="mt-6 flex flex-wrap items-center gap-2 lg:hidden">{rail("horizontal")}</div> : null}
         </div>
       </header>
 
       <div className="border-t">
-        <div className="mx-auto grid max-w-[1200px] lg:grid-cols-[minmax(0,1fr)_20rem] lg:border-x">
+        <div
+          className={`mx-auto grid max-w-[1200px] lg:border-x ${rail ? "lg:grid-cols-[5rem_minmax(0,1fr)_20rem]" : "lg:grid-cols-[minmax(0,1fr)_20rem]"}`}
+        >
+          {rail ? (
+            <div className="hidden border-r lg:block">
+              <div className="sticky top-20 flex flex-col items-center gap-3 py-8" role="group" aria-label="Нийтлэлийн үйлдэл">
+                {rail("vertical")}
+              </div>
+            </div>
+          ) : null}
           <div className="min-w-0">
             {image ? (
               <figure>

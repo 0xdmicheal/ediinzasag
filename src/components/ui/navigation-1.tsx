@@ -5,11 +5,14 @@ import {
   Menu,
   Moon,
   Sun,
+  VenetianMask,
   X,
 } from "lucide-react"
 
 import { channels } from "@/content/channels"
 import { publicUrl } from "@/lib/public-url"
+import { ReaderAvatar } from "@/reader/ReaderAvatar"
+import { useReader } from "@/reader/session"
 import {
   byDate,
   deskLabel,
@@ -67,6 +70,7 @@ export function Navigation1({
   theme: "light" | "dark"
   onThemeChange: (theme: "light" | "dark") => void
 }) {
+  const { reader, openLogin } = useReader()
   const lead = byDate()[0]
   const mongolia = storiesByDesk("mongolia").slice(0, 3)
   const world = storiesByDesk("world").slice(0, 3)
@@ -168,15 +172,11 @@ export function Navigation1({
             <Mail className="size-3.5" />
             Subscribe
           </a>
-          <NavLink
-            to="/newsletter"
-            className="inline-flex h-8 items-center rounded-full bg-primary px-3.5 text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/85"
-          >
-            Нийтлэл
-          </NavLink>
+          <AccountButton />
         </div>
 
-        <div className="shrink-0 lg:hidden">
+        <div className="flex shrink-0 items-center gap-1 lg:hidden">
+          <AccountButton compact />
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Цэс нээх" className="text-foreground hover:bg-foreground/5 hover:text-foreground">
@@ -276,12 +276,23 @@ export function Navigation1({
                   Subscribe
                 </a>
                 <SheetClose asChild>
-                  <NavLink
-                    to="/newsletter"
-                    className="bg-primary text-primary-foreground hover:bg-primary/85 inline-flex h-10 items-center justify-center rounded-full text-[13px] font-medium transition-colors"
-                  >
-                    Нийтлэл унших
-                  </NavLink>
+                  {reader ? (
+                    <NavLink
+                      to="/account"
+                      className="border-foreground/20 hover:bg-foreground/5 inline-flex h-10 items-center justify-center gap-2 rounded-full border text-[13px] font-medium transition-colors"
+                    >
+                      <ReaderAvatar name={reader.name || reader.email || reader.phone} avatar={reader.avatar} size="sm" />
+                      {reader.name || "Миний бүртгэл"}
+                    </NavLink>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={openLogin}
+                      className="bg-primary text-primary-foreground hover:bg-primary/85 inline-flex h-10 items-center justify-center rounded-full text-[13px] font-medium transition-colors"
+                    >
+                      Нэвтрэх
+                    </button>
+                  )}
                 </SheetClose>
               </div>
             </SheetContent>
@@ -289,6 +300,47 @@ export function Navigation1({
         </div>
       </div>
     </header>
+  )
+}
+
+/**
+ * The header's main call to action: signed out, a button that opens the login
+ * popup; signed in, the reader's avatar and name (desktop only; on phones the
+ * picture lives in the ☰ menu).
+ */
+function AccountButton({ compact = false }: { compact?: boolean }) {
+  const { reader, openLogin } = useReader()
+  if (reader && compact) return null
+  if (reader) {
+    return (
+      <NavLink
+        to="/account"
+        aria-label="Миний бүртгэл"
+        className="inline-flex h-8 items-center gap-2 rounded-full border border-foreground/20 py-0.5 pr-3 pl-0.5 text-[13px] font-medium transition-colors hover:bg-foreground/5"
+      >
+        <span className="relative">
+          <ReaderAvatar name={reader.name || reader.email || reader.phone} avatar={reader.avatar} size="sm" />
+          {reader.anonymous ? (
+            <span
+              aria-label="Зочин горим"
+              className="bg-foreground text-background ring-background absolute -right-1 -bottom-1 grid size-3.5 place-items-center rounded-full ring-2"
+            >
+              <VenetianMask className="size-2.5" />
+            </span>
+          ) : null}
+        </span>
+        <span className="max-w-[8rem] truncate">{reader.name || "Бүртгэл"}</span>
+      </NavLink>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={openLogin}
+      className={`inline-flex h-8 items-center rounded-full bg-primary text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/85 ${compact ? "px-3" : "px-3.5"}`}
+    >
+      Нэвтрэх
+    </button>
   )
 }
 
