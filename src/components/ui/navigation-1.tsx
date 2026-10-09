@@ -1,17 +1,24 @@
 import { useEffect, useRef, type MouseEvent } from "react"
 import { flushSync } from "react-dom"
-import { NavLink } from "react-router-dom"
+import { NavLink, useLocation } from "react-router-dom"
 import {
   ArrowUpRight,
+  GraduationCap,
+  House,
+  Info,
   Mail,
   Menu,
   Moon,
   Sun,
   VenetianMask,
   X,
+  type LucideIcon,
 } from "lucide-react"
 
 import { channels } from "@/content/channels"
+import { tint } from "@/components/ds/primitives"
+import { MenuBriefings } from "@/components/site/MenuBriefings"
+import { desks } from "@/design/desks"
 import { publicUrl } from "@/lib/public-url"
 import { ReaderAvatar } from "@/reader/ReaderAvatar"
 import { useReader } from "@/reader/session"
@@ -52,6 +59,18 @@ const primary = [
 ]
 const BEFORE_TOIM = 3
 
+/** Phone menu tiles: the desk's icon where there is a desk. All drawn in neutral gray. */
+const menuIcon: Record<string, { icon: LucideIcon }> = {
+  "/": { icon: House },
+  "/mongolia": { icon: desks.mongolia.icon },
+  "/world": { icon: desks.world.icon },
+  "/markets": { icon: desks.markets.icon },
+  "/ez-edu": { icon: GraduationCap },
+  "/ez-talk": { icon: desks.talk.icon },
+  "/about": { icon: Info },
+  "/newsletter": { icon: desks.letters.icon },
+}
+
 // The current page is the darker word. No underline, and no blue ring on click.
 const linkClass =
   "relative bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-transparent hover:text-foreground focus:bg-transparent focus-visible:ring-0 focus-visible:outline-none data-active:bg-transparent aria-[current=page]:text-foreground"
@@ -66,10 +85,11 @@ function revealTheme(
   if (lock.current) return
   const next = theme === "dark" ? "light" : "dark"
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  // The phone switch lives in the menu. Photographing the whole page for the
-  // circle stalls that tap, so phones flip the theme immediately.
+  // Phones get the same circle reveal as desktop (the menu's switch is the origin).
+  // While the theme flips, colour transitions on the open menu are switched off so
+  // its glass edges don't flash.
   const phone = window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 1024
-  if (reduced || phone || typeof document.startViewTransition !== "function") {
+  if (reduced || typeof document.startViewTransition !== "function") {
     // Color transitions on the open menu draw bright edges while the theme flips.
     if (phone) document.documentElement.classList.add("ez-theme-swap")
     onThemeChange(next)
@@ -104,10 +124,14 @@ function revealTheme(
   }
 
   try {
+    if (phone) root.classList.add("ez-theme-swap")
     const transition = document.startViewTransition(() => {
       flushSync(() => onThemeChange(next))
     })
-    transition.finished.finally(done)
+    transition.finished.finally(() => {
+      root.classList.remove("ez-theme-swap")
+      done()
+    })
     transition.ready.then(() => {
       document.documentElement.animate(
         { clipPath: clip },
@@ -143,6 +167,7 @@ export function Navigation1({
   onThemeChange: (theme: "light" | "dark") => void
 }) {
   const { reader, openLogin } = useReader()
+  const { pathname } = useLocation()
   const themeLock = useRef(false)
   const lead = byDate()[0]
   useEffect(() => {
@@ -290,7 +315,7 @@ export function Navigation1({
                     type="button"
                     aria-label={theme === "dark" ? "Гэрэл горим" : "Харанхуй горим"}
                     onClick={(event) => revealTheme(event, theme, onThemeChange, themeLock)}
-                    className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center outline-none focus:outline-none focus-visible:outline-none"
+                    className="ez-hit text-muted-foreground hover:bg-foreground/5 hover:text-foreground mx-1.5 flex size-8 items-center justify-center rounded-full transition-colors outline-none focus:outline-none focus-visible:outline-none"
                   >
                     {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                   </button>
@@ -306,39 +331,35 @@ export function Navigation1({
                 </div>
               </div>
 
-              <nav aria-label="Үндсэн цэс" className="flex flex-col px-2 py-3">
-                {[{ to: "/", label: "Нүүр" }, ...primary, { to: "/newsletter", label: "Нийтлэл" }].map((item) => (
-                  <SheetClose asChild key={item.to}>
-                    <NavLink
-                      to={item.to}
-                      end={item.to === "/"}
-                      className={({ isActive }) =>
-                        `flex h-11 items-center justify-between rounded-md px-3 text-[15px] font-medium transition-colors ${isActive ? "bg-foreground/5 text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"}`
-                      }
-                    >
-                      {item.label}
-                    </NavLink>
-                  </SheetClose>
-                ))}
-              </nav>
-
-              <div className="border-border border-t px-2 py-3">
-                <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs tracking-wide uppercase">Сүүлийн тойм</p>
-                <div className="flex flex-col">
-                  {byDate().slice(0, 5).map((story) => (
-                    <SheetClose asChild key={story.slug}>
+              <nav aria-label="Үндсэн цэс" className="grid grid-cols-2 gap-1.5 px-4 pt-4 pb-3">
+                {[{ to: "/", label: "Нүүр" }, ...primary, { to: "/newsletter", label: "Нийтлэл" }].map((item) => {
+                  const { icon: Icon } = menuIcon[item.to] ?? { icon: House }
+                  // SheetClose (a Radix Slot) can't merge NavLink's className/style functions, so work out "active" here.
+                  const active = item.to === "/" ? pathname === "/" : pathname === item.to || pathname.startsWith(`${item.to}/`)
+                  return (
+                    <SheetClose asChild key={item.to}>
                       <NavLink
-                        to={`/story/${story.slug}`}
-                        className="hover:bg-foreground/5 rounded-md px-3 py-2.5 text-[14px] leading-snug text-foreground no-underline"
+                        to={item.to}
+                        end={item.to === "/"}
+                        aria-current={active ? "page" : undefined}
+                        className={`flex h-12 items-center gap-2.5 rounded-lg border px-2.5 text-[14px] font-medium transition-colors ${active ? "text-foreground border-transparent" : "text-foreground/80 hover:text-foreground hover:bg-foreground/5"}`}
+                        style={active ? { background: tint("var(--foreground)", 8) } : undefined}
                       >
-                        <span className="text-muted-foreground block font-mono text-xs">
-                          {deskLabel[story.desk]} · {formatStoryDate(story.date)}
+                        <span
+                          className="text-muted-foreground bg-foreground/[0.07] grid size-7 shrink-0 place-items-center rounded-md"
+                          aria-hidden
+                        >
+                          <Icon className="size-4" strokeWidth={2.25} />
                         </span>
-                        {story.title}
+                        <span className="truncate">{item.label}</span>
                       </NavLink>
                     </SheetClose>
-                  ))}
-                </div>
+                  )
+                })}
+              </nav>
+
+              <div className="border-border border-t">
+                <MenuBriefings />
               </div>
 
               <div className="border-border mt-auto flex flex-col gap-2 border-t p-4">

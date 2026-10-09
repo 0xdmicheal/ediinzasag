@@ -79,7 +79,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
 
       {/* Stage */}
       <div
-        className="bg-ink relative h-[34rem] touch-pan-y overflow-hidden rounded-xl select-none sm:h-[40rem] lg:h-full"
+        className="bg-studio relative isolate h-[34rem] touch-pan-y overflow-hidden rounded-xl [clip-path:inset(0_round_var(--radius-xl))] select-none sm:h-[40rem] lg:h-full"
         onPointerDown={(event) => {
           startX.current = event.clientX
           dragged.current = false
@@ -156,10 +156,10 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
           aria-live={paused ? "polite" : "off"}
         >
           <p
-            className={`inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[12px] tracking-[0.04em] uppercase backdrop-blur-sm ${isPartner ? "bg-brand-foreground/10" : "bg-black/30"}`}
+            className={`inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 font-mono text-[11px] tracking-[0.04em] whitespace-nowrap uppercase backdrop-blur-sm sm:text-[12px] ${isPartner ? "bg-brand-foreground/10" : "bg-black/30"}`}
           >
-            <span className={`size-1.5 rounded-full ${isPartner ? "bg-brand-foreground" : "bg-brand"}`} />
-            {slide.kicker}
+            <span className={`size-1.5 shrink-0 rounded-full ${isPartner ? "bg-brand-foreground" : "bg-brand"}`} />
+            <KickerText text={slide.kicker} />
           </p>
           <h2
             className={`font-news mt-4 max-w-4xl leading-[1.04] font-medium text-balance ${isPartner ? "text-4xl sm:text-6xl lg:text-7xl" : "text-[2rem] sm:text-5xl lg:text-6xl xl:text-[4.25rem]"}`}
@@ -229,7 +229,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
       {/* Side rail */}
       <aside className="flex min-h-0 flex-col gap-3">
         <MarketPulse />
-        <ol className="bg-card hidden min-h-0 flex-1 flex-col overflow-hidden rounded-xl border lg:flex">
+        <ol className="bg-card hidden min-h-0 flex-1 flex-col overflow-hidden rounded-xl border [clip-path:inset(0_round_var(--radius-xl))] lg:flex">
           {slides.map((item, itemIndex) => {
             const active = itemIndex === index
             return (
@@ -271,6 +271,19 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
   )
 }
 
+/** "Монгол · Мөнгөний бодлого · 2026.10.09": on phones the date part is dropped so the label fits one line. */
+function KickerText({ text }: { text: string }) {
+  const parts = text.split(" · ")
+  const last = parts[parts.length - 1]
+  const datePart = parts.length > 1 && /^\d{4}\.\d{2}\.\d{2}$/.test(last)
+  return (
+    <span className="min-w-0 truncate">
+      {datePart ? parts.slice(0, -1).join(" · ") : text}
+      {datePart ? <span className="hidden sm:inline"> · {last}</span> : null}
+    </span>
+  )
+}
+
 function SlideVisual({
   slide,
   active,
@@ -305,8 +318,9 @@ function SlideVisual({
             className={`h-full w-full object-cover ${active ? "ez-hero-zoom" : ""}`}
             style={active ? { animationPlayState: playState } : undefined}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/10" />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/45 via-transparent to-transparent" />
+          {/* Phones stack a long headline high on the photo, so the shade reaches further up there. */}
+          <div className="absolute -inset-px bg-gradient-to-t from-black/90 from-10% via-black/55 via-55% to-black/15 sm:from-black/85 sm:from-0% sm:via-black/35 sm:via-50% sm:to-black/10" />
+          <div className="absolute -inset-px bg-gradient-to-r from-black/45 via-transparent to-transparent" />
         </>
       )}
     </div>

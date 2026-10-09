@@ -56,14 +56,14 @@ export function HomePage() {
 
       <div className={`${sectionContainer} flex flex-col gap-16 pt-8 pb-16 sm:gap-20 sm:pt-10 sm:pb-20`}>
         <section>
-          <SectionHeader index="01" kicker="Substack" title="Нийтлэл">
+          <SectionHeader title="Нийтлэл">
             <HeaderLink to="/newsletter">Бүх нийтлэл</HeaderLink>
           </SectionHeader>
           <LetterBento posts={substackPosts.slice(0, 5)} />
         </section>
 
         <section>
-          <SectionHeader index="02" kicker="Өнөөдрийн тойм" title="Монголын мэдээ">
+          <SectionHeader title="Монголын мэдээ">
             <HeaderLink to="/mongolia">Бүх монгол тойм</HeaderLink>
           </SectionHeader>
           <DeskSpread stories={mongolia} />
@@ -71,8 +71,6 @@ export function HomePage() {
 
         <section id="delhiin-shiree">
           <StoryRail
-            index="03"
-            kicker="Дэлхий"
             title="Дэлхийн мэдээ"
             ctaText="Бүх дэлхийн тойм"
             ctaTo="/world"
@@ -82,7 +80,7 @@ export function HomePage() {
 
         {more.length > 0 ? (
           <section>
-            <SectionHeader index="04" kicker="Архив" title="Бусад тойм" />
+            <SectionHeader title="Бусад тойм" />
             <CompactGrid stories={more} />
           </section>
         ) : null}

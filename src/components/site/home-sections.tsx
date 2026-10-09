@@ -33,28 +33,38 @@ function letterDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? formatStoryDate(value) : value
 }
 
+/**
+ * Section title with an optional "01 — LABEL" line above it (the home page
+ * leaves it out). On phones the title steps down and stays on one row with its
+ * action button, so every section header lines up the same way.
+ */
 export function SectionHeader({
   index,
   kicker,
   title,
   children,
 }: {
-  index: string
-  kicker: string
+  index?: string
+  kicker?: string
   title: string
   children?: ReactNode
 }) {
   return (
-    <header className="mb-6 flex flex-wrap items-end justify-between gap-3 border-b pb-4">
-      <div>
-        <p className="text-brand-strong flex items-center gap-2.5 font-mono text-[12px] tracking-[0.04em] uppercase">
-          <span>{index}</span>
-          <span aria-hidden>—</span>
-          {kicker}
-        </p>
-        <h2 className="font-news mt-1.5 text-3xl leading-none sm:text-4xl">{title}</h2>
+    // With a label line above the title, the button sits on the title's baseline row; without one, it centres on the title.
+    <header
+      className={`mb-5 flex justify-between gap-3 border-b pb-3 sm:mb-6 sm:pb-4 ${index || kicker ? "items-end" : "items-center"}`}
+    >
+      <div className="min-w-0">
+        {index || kicker ? (
+          <p className="text-brand-strong mb-1.5 flex items-center gap-2.5 font-mono text-[12px] tracking-[0.04em] uppercase">
+            {index ? <span>{index}</span> : null}
+            {index && kicker ? <span aria-hidden>—</span> : null}
+            {kicker}
+          </p>
+        ) : null}
+        <h2 className="font-news text-2xl leading-none sm:text-4xl">{title}</h2>
       </div>
-      <div className="flex items-center gap-2">{children}</div>
+      {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}
     </header>
   )
 }
@@ -63,10 +73,10 @@ export function HeaderLink({ to, children }: { to: string; children: ReactNode }
   return (
     <Link
       to={to}
-      className="ez-hit group hover:bg-foreground hover:text-background inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-colors"
+      className="ez-hit group hover:bg-foreground hover:text-background inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[12px] font-medium whitespace-nowrap transition-colors sm:h-9 sm:gap-1.5 sm:px-3.5 sm:text-[13px]"
     >
       {children}
-      <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+      <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:size-4" />
     </Link>
   )
 }
@@ -139,8 +149,10 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
         to={`/letter/${feature.slug}`}
         className="group ez-lift relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden rounded-lg sm:min-h-[22rem] md:col-span-2 lg:row-span-2"
       >
-        <Cover src={feature.image} className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-25% via-black/70 via-55% to-black/15" />
+        <span aria-hidden className="ez-clip absolute inset-0 -z-10 overflow-hidden rounded-lg">
+          <Cover src={feature.image} className={`h-full w-full ${zoom}`} />
+          <span className="absolute inset-0 bg-gradient-to-t from-black/95 from-25% via-black/70 via-55% to-black/15" />
+        </span>
         <div className="text-photo-foreground p-5 sm:p-6">
           <p className="text-photo-foreground/75 text-[11px] tracking-[0.16em] uppercase">
             Онцлох захидал · {letterDate(feature.date)}
@@ -173,7 +185,7 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
           // Phones: a compact row (thumbnail beside the title). Tablet up: a card.
           className="group ez-lift bg-card flex flex-row overflow-hidden rounded-lg border md:flex-col"
         >
-          <div className="relative w-28 shrink-0 overflow-hidden sm:w-36 md:aspect-[2/1] md:w-auto">
+          <div className="ez-clip-row relative w-28 shrink-0 overflow-hidden sm:w-36 md:aspect-[2/1] md:w-auto">
             <Cover src={post.image} className={`h-full w-full ${zoom}`} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col p-3 md:p-3.5">
@@ -210,7 +222,7 @@ export function DeskSpread({ stories }: { stories: Story[] }) {
         to={`/story/${lead.slug}`}
         className="group ez-lift bg-card flex flex-col overflow-hidden rounded-lg border lg:col-span-7"
       >
-        <div className="relative aspect-[16/9] overflow-hidden lg:aspect-[2/1]">
+        <div className="ez-clip-top relative aspect-[16/9] overflow-hidden lg:aspect-[2/1]">
           <img src={art.src} alt={art.alt} className={`h-full w-full object-cover ${zoom}`} />
           <div className="absolute top-4 left-4">
             <TopicChip topic={lead.topic} onPhoto />
@@ -287,8 +299,8 @@ export function StoryRail({
   ctaTo,
   stories,
 }: {
-  index: string
-  kicker: string
+  index?: string
+  kicker?: string
   title: string
   ctaText: string
   ctaTo: string
@@ -328,8 +340,10 @@ export function StoryRail({
               to={`/story/${story.slug}`}
               className="group ez-lift relative isolate flex aspect-[4/5] w-[72%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-lg sm:w-[17rem] lg:w-[calc((100%-2.25rem)/4)]"
             >
-              <img src={art.src} alt={art.alt} className={`absolute inset-0 -z-10 h-full w-full object-cover ${zoom}`} />
-              <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-20% via-black/60 via-55% to-black/15" />
+              <span aria-hidden className="ez-clip absolute inset-0 -z-10 overflow-hidden rounded-lg">
+                <img src={art.src} alt={art.alt} className={`h-full w-full object-cover ${zoom}`} />
+                <span className="absolute inset-0 bg-gradient-to-t from-black/95 from-20% via-black/60 via-55% to-black/15" />
+              </span>
               <div className="flex items-start justify-between p-3.5">
                 <TopicChip topic={story.topic} onPhoto />
                 <span className="text-photo-foreground/70 text-[11px] tabular-nums">{formatStoryDate(story.date)}</span>
@@ -371,7 +385,7 @@ export function CompactGrid({ stories }: { stories: Story[] }) {
             to={`/story/${story.slug}`}
             className="group ez-lift bg-card flex items-center gap-3.5 rounded-lg border p-2.5"
           >
-            <span className="relative size-[4.5rem] shrink-0 overflow-hidden rounded-md">
+            <span className="ez-clip-md relative size-[4.5rem] shrink-0 overflow-hidden rounded-md">
               <img src={art.src} alt="" className={`h-full w-full object-cover ${zoom}`} />
             </span>
             <span className="min-w-0 flex-1">
@@ -424,7 +438,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
   if (!latest) return null
 
   return (
-    <section className="bg-ink text-ink-foreground grid overflow-hidden rounded-lg lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+    <section className="ez-clip bg-ink text-ink-foreground grid overflow-hidden rounded-lg lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <Link to="/ez-talk" className="group relative isolate block aspect-video self-center overflow-hidden">
         <EpisodeThumb episode={latest} quality="max" className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-15% via-black/45 via-45% to-black/5" />
