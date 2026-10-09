@@ -24,6 +24,7 @@ export const plain: Record<string, string> = {
   jpy: "Японы валют ба ам.долларын харьцаа",
   cny: "Хятадын валют ба ам.долларын харьцаа",
   ust: "Дэлхийн зээлийн хүүний жишиг. Өсөхөд зээл үнэтэй болдог.",
+  mnt: "Нэг ам.доллар хэдэн төгрөг вэ. Өсөхөд төгрөг суларч, импорт үнэтэй болно.",
   scco: "Дэлхийн томоохон зэсийн компани",
   fcx: "Дэлхийн томоохон зэсийн компани",
 }
@@ -39,12 +40,13 @@ export const friendlyName: Record<string, string> = {
   jpy: "Японы иен",
   cny: "Хятадын юань",
   ust: "АНУ-ын 10 жилийн бонд",
+  mnt: "Төгрөг",
 }
 
 export const regions: { title: string; ids: string[] }[] = [
   { title: "АНУ", ids: ["dow", "spx", "nasdaq"] },
   { title: "Европ", ids: ["dax", "ftse", "cac"] },
-  { title: "Ази, Номхон далай", ids: ["nikkei", "hsi", "shanghai", "asx"] },
+  { title: "Ази, Номхон далай", ids: ["nikkei", "hsi", "shanghai"] },
 ]
 
 /** How many litres / grams a quoted unit is, so the price means something. */
