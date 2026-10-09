@@ -1,8 +1,9 @@
-import { useEffect, useRef, type MouseEvent } from "react"
+import { useEffect, useRef, useState, type MouseEvent } from "react"
 import { flushSync } from "react-dom"
 import { NavLink } from "react-router-dom"
 import {
   ArrowUpRight,
+  ChevronDown,
   Mail,
   Menu,
   Moon,
@@ -21,12 +22,6 @@ import {
   formatStoryDate,
   storiesByDesk,
 } from "@/content/stories"
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { Button } from "@/components/ui/button"
@@ -73,7 +68,14 @@ function revealTheme(
   // circle stalls that tap, so phones flip the theme immediately.
   const phone = window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 1024
   if (reduced || phone || typeof document.startViewTransition !== "function") {
+    // Color transitions on the open menu draw bright edges while the theme flips.
+    if (phone) document.documentElement.classList.add("ez-theme-swap")
     onThemeChange(next)
+    if (phone) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => document.documentElement.classList.remove("ez-theme-swap"))
+      })
+    }
     return
   }
 
@@ -265,15 +267,15 @@ export function Navigation1({
                 <Menu />
               </Button>
             </SheetTrigger>
-            {/* Same glass, type and pills as the header bar. */}
             <SheetContent
               side="right"
               showCloseButton={false}
               // Opening with a tap should not paint a focus ring on the first button.
               onOpenAutoFocus={(event) => event.preventDefault()}
-              className="border-border w-[min(100%,22rem)] ez-glass gap-0 overflow-y-auto bg-background/85 p-0 shadow-none"
+              onCloseAutoFocus={(event) => event.preventDefault()}
+              className="data-[side=right]:w-full data-[side=right]:max-w-none w-full max-w-none gap-0 overflow-y-auto border-0 bg-background p-0 shadow-none outline-none transition-none focus:outline-none focus-visible:outline-none sm:max-w-none"
             >
-              <div className="border-border flex h-14 shrink-0 items-center justify-between border-b px-4">
+              <div className="border-foreground/10 flex h-14 shrink-0 items-center justify-between border-b px-4">
                 <SheetClose asChild>
                   <NavLink to="/" className="flex items-center" aria-label="Эдийн засаг">
                     <img src={publicUrl("brand/logo-black.png")} alt="" className="h-7 w-auto dark:hidden" />
@@ -286,7 +288,7 @@ export function Navigation1({
                     type="button"
                     aria-label={theme === "dark" ? "Гэрэл горим" : "Харанхуй горим"}
                     onClick={(event) => revealTheme(event, theme, onThemeChange, themeLock)}
-                    className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center transition-colors"
+                    className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center outline-none focus:outline-none focus-visible:outline-none"
                   >
                     {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                   </button>
@@ -294,7 +296,7 @@ export function Navigation1({
                     <button
                       type="button"
                       aria-label="Цэс хаах"
-                      className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center transition-colors"
+                      className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center outline-none focus:outline-none focus-visible:outline-none"
                     >
                       <X className="size-5" />
                     </button>
@@ -318,29 +320,9 @@ export function Navigation1({
                 ))}
               </nav>
 
-              <div className="border-border border-t px-2 py-3">
-                <Accordion type="single" collapsible>
-                  <AccordionItem value="latest" className="border-0">
-                    <AccordionTrigger className="text-muted-foreground hover:text-foreground px-3 text-[15px] hover:no-underline">
-                      Сүүлийн тойм
-                    </AccordionTrigger>
-                    <AccordionContent className="flex flex-col gap-1 px-1">
-                      {byDate().slice(0, 5).map((story) => (
-                        <SheetClose asChild key={story.slug}>
-                          <NavLink to={`/story/${story.slug}`} className="hover:bg-foreground/5 rounded-md px-2 py-2.5 text-[14px] leading-snug">
-                            <span className="text-muted-foreground block font-mono text-xs">
-                              {deskLabel[story.desk]} · {formatStoryDate(story.date)}
-                            </span>
-                            {story.title}
-                          </NavLink>
-                        </SheetClose>
-                      ))}
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              </div>
+              <PhoneLatest />
 
-              <div className="border-border mt-auto flex flex-col gap-2 border-t p-4">
+              <div className="border-foreground/10 mt-auto flex flex-col gap-2 border-t p-4">
                 <a
                   href={channels.youtube}
                   className="text-muted-foreground hover:text-foreground inline-flex h-10 items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
@@ -378,6 +360,39 @@ export function Navigation1({
         </div>
       </div>
     </header>
+  )
+}
+
+/** Latest stories inside the phone menu. Same rows as the links above, no underlines. */
+function PhoneLatest() {
+  const [open, setOpen] = useState(false)
+  const latest = byDate().slice(0, 5)
+  return (
+    <div className="px-2 py-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="text-muted-foreground hover:bg-foreground/5 hover:text-foreground flex h-11 w-full items-center justify-between rounded-md px-3 text-left text-[15px] font-medium outline-none focus:outline-none focus-visible:outline-none"
+      >
+        Сүүлийн тойм
+        <ChevronDown className={`size-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        <div className="bg-foreground/5 mt-1 flex flex-col rounded-lg p-1">
+          {latest.map((story) => (
+            <SheetClose asChild key={story.slug}>
+              <NavLink to={`/story/${story.slug}`} className="hover:bg-background rounded-md px-2.5 py-2 no-underline">
+                <span className="text-muted-foreground block text-[11px] font-medium tracking-wide">
+                  {deskLabel[story.desk]} · {formatStoryDate(story.date)}
+                </span>
+                <span className="text-foreground mt-0.5 block text-[14px] leading-snug font-medium">{story.title}</span>
+              </NavLink>
+            </SheetClose>
+          ))}
+        </div>
+      ) : null}
+    </div>
   )
 }
 

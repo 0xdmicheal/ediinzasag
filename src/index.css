@@ -649,6 +649,13 @@
  * theme does not flash full-frame. Percentages keep the origin on the
  * button at fractional display scales.
  */
+/* Phone theme flips skip color transitions, so borders do not flash bright mid-way. */
+html.ez-theme-swap *,
+html.ez-theme-swap *::before,
+html.ez-theme-swap *::after {
+  transition: none !important;
+}
+
 html[data-ez-theme-vt="active"]::view-transition-group(root) {
   animation-duration: var(--ez-theme-duration, 400ms);
 }
@@ -700,6 +707,10 @@ html[data-ez-theme-vt="active"]::view-transition-new(root) {
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
     background-color: var(--background) !important;
+    outline: none !important;
+    box-shadow: none !important;
+    border-color: transparent !important;
+    transition: none !important;
   }
 }
 
