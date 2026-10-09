@@ -3,38 +3,50 @@ import { Link } from "react-router-dom"
 import { cn } from "cn"
 
 import { SectionHeader } from "@/components/site/home-sections"
+import { MarketTerminal } from "@/components/site/MarketTerminal"
 import { signedPct } from "@/components/site/market-marks"
 import {
   ChangePill,
   CheckpointChart,
+  ExportMix,
   IndexRanking,
   parseNumber,
+  PerformanceChart,
   StockExplorer,
   ValueBars,
+  YieldCurve,
+  type PerformanceRow,
 } from "@/components/site/market-charts"
 import { formatMove, formatValue, money, UnitChip } from "@/components/site/money"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { friendlyName, glossary, plain, regions, unitHint } from "@/content/market-guide"
 import {
   commodities,
+  exportMix,
   fridayCloses,
   fridayFlow,
   fx,
   miners,
   mongoliaIndices,
+  mongoliaMacro,
+  sessionShort,
   sessionStats,
   top20,
+  usCurve,
   worldIndices,
   type Quote,
 } from "@/content/markets"
 
-const narrow = "mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8"
+const narrow = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
 
 const sections = [
+  { id: "chart", label: "Терминал" },
   { id: "top20", label: "ТОП-20" },
-  { id: "mongolia", label: "Монгол" },
+  { id: "macro", label: "Макро" },
+  { id: "performance", label: "Гүйцэтгэл" },
   { id: "world", label: "Дэлхий" },
   { id: "commodities", label: "Түүхий эд" },
+  { id: "mongolia", label: "Монгол хувьцаа" },
   { id: "currency", label: "Валют" },
   { id: "glossary", label: "Тайлбар" },
 ]
@@ -112,66 +124,26 @@ export function MarketsPage() {
               </a>
             ))}
           </div>
-          <span className="text-muted-foreground hidden shrink-0 text-xs sm:block">10.02-ны хаалт</span>
+          <span className="text-muted-foreground hidden shrink-0 text-xs sm:block">{sessionShort}</span>
         </div>
       </nav>
 
-      <div className={`${narrow} flex flex-col gap-20 pt-8 pb-20`}>
-        <div className="flex flex-col gap-4">
-          <Snapshot />
-          <Top20 />
+      <div className={`${narrow} flex flex-col gap-16 pt-6 pb-20 sm:gap-20`}>
+        {/* The terminal leads; everything below explains the numbers in it. */}
+        <MarketTerminal />
+        <Top20 />
+        <Macro />
+        <Performance />
+        {/* Wide screens: the two global boards side by side. */}
+        <div className="grid gap-16 xl:grid-cols-2 xl:gap-8 [&>*]:min-w-0">
+          <World />
+          <Commodities />
         </div>
         <Mongolia />
-        <World />
-        <Commodities />
         <Currency />
         <Glossary />
       </div>
     </>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/* Snapshot: six numbers, no sentences                                 */
-/* ------------------------------------------------------------------ */
-
-function Snapshot() {
-  const tiles = [
-    { id: "top20", label: "ТОП-20", sub: "Монгол", value: top20.price, unit: "оноо", pct: top20.pct },
-    ...["spx", "hsi", "gold", "brent", "copper"].map((id) => {
-      const item = quote(id)!
-      const isIndex = item.denom.kind === "index"
-      return {
-        id,
-        label: friendlyName[id] ?? item.label,
-        sub: isIndex ? regionOf(id) : item.denom.kind === "money" && item.denom.per ? `1 ${item.denom.per}` : "",
-        value: isIndex ? item.price : formatValue(item.price, item.denom),
-        unit: isIndex ? "оноо" : "",
-        pct: item.pct,
-      }
-    }),
-  ]
-
-  return (
-    <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-6 lg:overflow-visible lg:px-0">
-      {tiles.map((tile) => (
-        <a
-          key={tile.id}
-          href={`#${tile.id}`}
-          className="bg-card hover:border-foreground/25 flex w-44 shrink-0 flex-col rounded-lg border p-4 transition-colors lg:w-auto"
-        >
-          <span className="truncate text-sm font-semibold">{tile.label}</span>
-          <span className="text-muted-foreground truncate text-[11px]">{tile.sub || "\u00a0"}</span>
-          <span className="mt-2 text-xl font-semibold tracking-tight">
-            {tile.value}
-            {tile.unit ? <span className="text-muted-foreground ml-1 text-[11px] font-normal">{tile.unit}</span> : null}
-          </span>
-          <span className="mt-2">
-            <ChangePill pct={tile.pct} />
-          </span>
-        </a>
-      ))}
-    </div>
   )
 }
 
@@ -266,9 +238,9 @@ function Top20() {
             <a className="underline" href={top20.monthHref}>
               {top20.monthSource}
             </a>{" "}
-            · Өнөөдөр:{" "}
+            · {top20.asOf}:{" "}
             <a className="underline" href={top20.href}>
-              МХБ
+              {top20.source}
             </a>
           </p>
         </aside>
@@ -290,9 +262,16 @@ function Mongolia() {
 
   return (
     <section id="mongolia" className="scroll-mt-28">
-      <SectionHeader index="01" kicker="Монголын хөрөнгийн бирж" title="Монголын хувьцаа">
+      <SectionHeader index="05" kicker="Монголын хөрөнгийн бирж" title="Монголын хувьцаа">
         <UnitChip denom={{ kind: "money", currency: "MNT" }} />
       </SectionHeader>
+      <Lead>
+        ТОП-20 индекс {top20.asOf}-ний тоо. Доорх арилжааны дүн, хувьцаа, бусад индекс нь{" "}
+        <a className="underline" href={top20.reportHref}>
+          {top20.reportLabel}
+        </a>
+        : биржийн шинэ тайлан уншигдахуйц хэлбэрээр гараагүй байна.
+      </Lead>
 
       <dl className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
@@ -308,7 +287,7 @@ function Mongolia() {
         ))}
       </dl>
 
-      <StockExplorer rows={fridayCloses} reportHref={top20.href} />
+      <StockExplorer rows={fridayCloses} reportHref={top20.reportHref} />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <div className="bg-card rounded-lg border p-5 sm:p-6">
@@ -357,14 +336,15 @@ function Mongolia() {
 function World() {
   return (
     <section id="world" className="scroll-mt-28">
-      <SectionHeader index="02" kicker="Индекс · оноогоор" title="Дэлхийн хувьцаа">
+      <SectionHeader index="03" kicker="Индекс · оноогоор" title="Дэлхийн хувьцаа">
         <UnitChip denom={{ kind: "index" }} />
       </SectionHeader>
-      <Lead>Өнөөдрийн өөрчлөлтөөр эрэмбэлэв. Баруун тийш ногоон нь өссөн, зүүн тийш улаан нь буурсан.</Lead>
+      <Lead>Сүүлийн өдрийн өөрчлөлтөөр эрэмбэлэв. Баруун тийш цэнхэр нь өссөн, зүүн тийш саарал нь буурсан.</Lead>
       <IndexRanking quotes={worldIndices} describe={(id) => plain[id] ?? ""} region={regionOf} />
       <p className="text-muted-foreground mt-4 text-sm">
-        Шанхайн сүүлийн арилжаа 2026.09.30. Аравдугаар сарын эхээр Хятадын зах зээл Алтан долоо хоногоор хаалттай байсан.{" "}
-        <Link to="/story/world-friday-board" className="underline">
+        АНУ, Европ, Япон, Шанхай: 10.08-ны пүрэв гарагийн хаалт. Hang Seng: 10.09. Чип үйлдвэрлэгчид Nasdaq-ийг 1.25 хувиар
+        унагав.{" "}
+        <Link to="/story/wall-street-chip-selloff" className="underline">
           Дэлгэрэнгүй тойм
         </Link>
       </p>
@@ -382,13 +362,13 @@ function Commodities() {
 
   return (
     <section id="commodities" className="scroll-mt-28">
-      <SectionHeader index="03" kicker="Ам.доллараар" title="Түүхий эд">
+      <SectionHeader index="04" kicker="Ам.доллараар" title="Түүхий эд">
         <UnitChip denom={{ kind: "money", currency: "USD" }} />
       </SectionHeader>
       <Lead>Монголын экспортын орлого, таны шатахууны үнэ эдгээр үнээс хамаардаг. Бүгд ам.доллараар.</Lead>
 
       <h3 className="text-muted-foreground mb-3 text-[11px] tracking-[0.16em] uppercase">Монголын экспорт</h3>
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-2 xl:[&>*:last-child:nth-child(odd)]:col-span-2">
         {forMongolia.map((id) => (
           <CommodityCard key={id} item={quote(id)!} />
         ))}
@@ -403,7 +383,7 @@ function Commodities() {
 
       <div className="bg-muted/50 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg p-4">
         <p className="text-sm">
-          <span className="font-semibold">Зэсийн компаниудын хувьцаа:</span>{" "}
+          <span className="font-semibold">Зэсийн компаниудын хувьцаа (10.02):</span>{" "}
           {miners.map((row, index) => (
             <span key={row.symbol}>
               {index > 0 ? " · " : ""}
@@ -415,10 +395,13 @@ function Commodities() {
           ))}
         </p>
         <p className="flex gap-4 text-sm">
-          <Link to="/story/copper-coal-friday" className="underline">
-            Зэс, нүүрсний тойм
+          <Link to="/story/copper-weekly-gain" className="underline">
+            Зэсийн тойм
           </Link>
-          <Link to="/story/gold-friday" className="underline">
+          <Link to="/story/brent-hormuz-october" className="underline">
+            Нефтийн тойм
+          </Link>
+          <Link to="/story/gold-yields-ease" className="underline">
             Алтны тойм
           </Link>
         </p>
@@ -459,9 +442,9 @@ function CommodityCard({ item }: { item: Quote }) {
 function Currency() {
   return (
     <section id="currency" className="scroll-mt-28">
-      <SectionHeader index="04" kicker="Ханш, хүү" title="Валют ба хүү" />
-      <Lead>Гадаад валютын ханш ба дэлхийн зээлийн хүүний жишиг.</Lead>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <SectionHeader index="06" kicker="Ханш, хүү" title="Валют ба хүү" />
+      <Lead>Төгрөг, гол валютын ханш ба дэлхийн зээлийн хүүний жишиг.</Lead>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {fx.map((item) => (
           <article key={item.id} id={item.id} className="bg-card target:bg-muted flex scroll-mt-28 flex-col rounded-lg border p-5">
             <div className="flex items-start justify-between gap-3">
@@ -473,7 +456,7 @@ function Currency() {
             <div className="mt-3">
               {item.pct === 0 ? (
                 <span className="text-muted-foreground text-xs">
-                  {/\d/.test(item.move) ? "Өөрчлөлтгүй" : item.move}
+                  {item.denom.kind === "percent" || !/\d/.test(item.move) ? item.move : "Өөрчлөлтгүй"}
                 </span>
               ) : (
                 <ChangePill pct={item.pct} />
@@ -483,6 +466,172 @@ function Currency() {
           </article>
         ))}
       </div>
+
+      <div className="bg-card mt-4 grid gap-6 rounded-lg border p-5 sm:p-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:items-center">
+        <div>
+          <h3 className="font-semibold">АНУ-ын бондын өгөөжийн муруй</h3>
+          <p className="text-muted-foreground text-xs">Хугацаагаар · {usCurve.asOf}</p>
+          <div className="mt-4 max-w-[520px]">
+            <YieldCurve points={usCurve.points} />
+          </div>
+        </div>
+        <div className="text-sm leading-relaxed">
+          <p>
+            Урт хугацааны зээл богиноосоо үнэтэй: 30 жилийн өгөөж 2 жилийнхээс{" "}
+            <strong className="tabular-nums">
+              {(usCurve.points[2].yield - usCurve.points[0].yield).toFixed(2)} нэгжээр
+            </strong>{" "}
+            өндөр. Хөрөнгө оруулагчид инфляц, төсвийн алдагдлын эрсдэлд нэмэлт хүү шаардаж байна. 10 жилийн өгөөж 10.08-нд{" "}
+            {usCurve.high10}% хүрч, 2002 оноос хойших дээд түвшинд гарсан.
+          </p>
+          <p className="text-muted-foreground mt-3">
+            Харьцуулахад Японы 10 жилийн өгөөж {usCurve.japan10.yield}%. Монголын гадаад зээл, бондын хүү АНУ-ын өгөөж дээр
+            эрсдэлийн нэмэгдэл нэмж тогтдог.
+          </p>
+          <p className="text-muted-foreground mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+            <a className="underline" href={usCurve.href}>
+              {usCurve.source}
+            </a>
+            <Link to="/story/treasury-yields-24-year-high" className="underline">
+              АНУ-ын өгөөжийн тойм
+            </Link>
+            <Link to="/story/japan-yields-takaichi" className="underline">
+              Японы өгөөжийн тойм
+            </Link>
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Макро: Mongolia in four numbers and one bar                         */
+/* ------------------------------------------------------------------ */
+
+function Macro() {
+  const { inflation, policyRate, reserves } = mongoliaMacro
+  const real = policyRate.value - inflation.value
+  const usdMnt = fx.find((item) => item.id === "mnt")
+
+  return (
+    <section id="macro" className="scroll-mt-28">
+      <SectionHeader index="01" kicker="Монголын эдийн засаг" title="Макро самбар" />
+      <Lead>Ханш, хувьцааны ард байгаа үндсэн тоонууд. Тус бүр өөрийн огноо, эх сурвалжтай.</Lead>
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-muted-foreground text-xs">Инфляц, жилээр</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{inflation.value}%</p>
+          <p className="text-muted-foreground mt-1 text-[11px]">
+            Зорилт {mongoliaMacro.target} ·{" "}
+            <a className="underline" href={inflation.href}>
+              {inflation.source}, {inflation.label}
+            </a>
+          </p>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-muted-foreground text-xs">Бодлогын хүү</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">{policyRate.value}%</p>
+          <p className="text-muted-foreground mt-1 text-[11px]">
+            <a className="underline" href={policyRate.href}>
+              {policyRate.source}, {policyRate.label}
+            </a>
+          </p>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-muted-foreground text-xs">Бодит хүү (хүү − инфляц)</p>
+          <p className={cn("mt-1 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl", real < 0 ? "text-[var(--down)]" : "text-[var(--up)]")}>
+            {real < 0 ? "▼ −" : "▲ +"}
+            {Math.abs(real).toFixed(1)} нэгж
+          </p>
+          <p className="text-muted-foreground mt-1 text-[11px]">
+            {real < 0 ? "Хүү инфляцаас доогуур: хадгаламжийн бодит өгөөж хасах." : "Хүү инфляцаас дээгүүр."}
+          </p>
+        </div>
+        <div className="bg-card rounded-lg border p-4">
+          <p className="text-muted-foreground text-xs">Валютын нөөц</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight tabular-nums sm:text-3xl">
+            {reserves.value} <span className="text-muted-foreground text-sm font-normal">тэрбум $</span>
+          </p>
+          <div className="bg-foreground/10 mt-2 h-1.5 overflow-hidden rounded-full" aria-hidden>
+            <div className="bg-brand h-full rounded-full" style={{ width: `${(reserves.value / mongoliaMacro.reservesGoal) * 100}%` }} />
+          </div>
+          <p className="text-muted-foreground mt-1.5 text-[11px]">
+            Урт хугацааны зорилт {mongoliaMacro.reservesGoal} тэрбумын {Math.round((reserves.value / mongoliaMacro.reservesGoal) * 100)}% ·{" "}
+            <a className="underline" href={reserves.href}>
+              {reserves.source}, {reserves.label}
+            </a>
+          </p>
+        </div>
+      </div>
+
+      <div className="bg-card mt-4 rounded-lg border p-5 sm:p-6">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-semibold">Экспорт юунаас бүрдэв</h3>
+          <p className="text-muted-foreground text-xs">
+            {exportMix.label} · нийт {exportMix.total} тэрбум $ · ▲ {exportMix.growth}% жилээр
+          </p>
+        </div>
+        <div className="mt-4">
+          <ExportMix parts={exportMix.parts} total={exportMix.total} />
+        </div>
+        <p className="text-muted-foreground mt-4 text-[11px] leading-relaxed">
+          Зэс, нүүрс хоёр экспортын {Math.round(((exportMix.parts[0].value + exportMix.parts[1].value) / exportMix.total) * 100)}%.
+          Тиймээс доорх зэс, нүүрсний үнэ валютын нөөц, төсөвт шууд нөлөөлнө.
+          {usdMnt ? ` Төгрөг ам.доллартай ${usdMnt.price} (${usdMnt.asOf}).` : ""} Эх сурвалж:{" "}
+          <a className="underline" href={exportMix.href}>
+            {exportMix.source}
+          </a>
+          .{" "}
+          <Link to="/story/reserves-record-september" className="underline">
+            Нөөцийн тойм
+          </Link>
+        </p>
+      </div>
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Гүйцэтгэл: all markets, three time frames                           */
+/* ------------------------------------------------------------------ */
+
+const sinceOf = (item: { price: string; prev?: string }) =>
+  item.prev ? Math.round(((parseNumber(item.price) - parseNumber(item.prev)) / parseNumber(item.prev)) * 10000) / 100 : undefined
+
+function Performance() {
+  const groupOf = (id: string) =>
+    commodities.some((item) => item.id === id) ? "Түүхий эд" : fx.some((item) => item.id === id) ? "Валют" : regionOf(id) || "Индекс"
+  const rows: PerformanceRow[] = [
+    {
+      id: "top20",
+      label: "ТОП-20",
+      group: "Монгол",
+      since: sinceOf(top20),
+      year: parseNumber(top20.year),
+      detail: `10.02: ${top20.prev} → ${top20.price}`,
+    },
+    ...[...worldIndices, ...commodities, ...fx]
+      .filter((item) => item.denom.kind !== "percent")
+      .map((item) => ({
+        id: item.id,
+        label: friendlyName[item.id] ?? item.label,
+        group: groupOf(item.id),
+        since: sinceOf(item),
+        ytd: item.ytd,
+        year: item.year,
+        detail: item.prev ? `10.02: ${item.prev} → ${item.price}` : undefined,
+      })),
+  ]
+
+  return (
+    <section id="performance" className="scroll-mt-28">
+      <SectionHeader index="02" kicker="Харьцуулалт" title="Гүйцэтгэл" />
+      <Lead>
+        Бүх зах зээл нэг хэмжүүрээр. Хугацаагаа сонгоно уу. Валютын хувьд өсөлт нь ам.доллар чангарсныг (эсвэл евро) илтгэнэ.
+      </Lead>
+      <PerformanceChart rows={rows} />
     </section>
   )
 }
@@ -494,7 +643,7 @@ function Currency() {
 function Glossary() {
   return (
     <section id="glossary" className="scroll-mt-28">
-      <SectionHeader index="05" kicker="Ойлгомжтой болгох" title="Үгийн тайлбар" />
+      <SectionHeader index="07" kicker="Ойлгомжтой болгох" title="Үгийн тайлбар" />
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Accordion type="single" collapsible defaultValue={glossary[0].term} className="bg-card rounded-lg border px-5">
           {glossary.map((item) => (

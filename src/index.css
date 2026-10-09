@@ -146,6 +146,11 @@
     --down: #c2380f;
     --mark-up: #298dff;
     --mark-down: #89919f;
+    /* Categorical chart slots (export mix), validated light/dark with the dataviz checker. */
+    --cat-1: #2a78d6;
+    --cat-2: #eb6834;
+    --cat-3: #1baf7a;
+    --cat-4: #eda100;
     /* On the inverted ink surface (black in light mode). */
     --up-on-ink: #2fae74;
     --down-on-ink: #f0643f;
@@ -198,6 +203,10 @@
     --down: #f0643f;
     --mark-up: #298dff;
     --mark-down: #6c7584;
+    --cat-1: #3987e5;
+    --cat-2: #d95926;
+    --cat-3: #199e70;
+    --cat-4: #c98500;
     --up-on-ink: #087a4b;
     --down-on-ink: #c2380f;
     --sidebar: #17191d;

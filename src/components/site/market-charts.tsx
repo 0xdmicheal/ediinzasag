@@ -426,3 +426,253 @@ export function ValueBars({ rows }: { rows: { key: string; name: string; value: 
     </ol>
   )
 }
+
+/* ------------------------------------------------------------------ */
+/* Performance: every market on one diverging axis, three time frames  */
+/* ------------------------------------------------------------------ */
+
+export interface PerformanceRow {
+  id: string
+  label: string
+  group: string
+  /** % since the previous refresh (2026.10.02). */
+  since?: number
+  /** % since 1 January. */
+  ytd?: number
+  /** % over 12 months. */
+  year?: number
+  /** "10.02: 7,722.72 → 7,765.36" style detail shown on hover / focus. */
+  detail?: string
+}
+
+type Frame = "since" | "ytd" | "year"
+
+const frames: { key: Frame; label: string; note: string }[] = [
+  { key: "since", label: "10.02-оос хойш", note: "Өмнөх шинэчлэлээс (2026.10.02) хойших өөрчлөлт." },
+  { key: "ytd", label: "Оны эхнээс", note: "1-р сарын 1-нээс хойш. Эх сурвалж оны эхний тоог нийтэлсэн зах зээлүүд." },
+  { key: "year", label: "12 сард", note: "Сүүлийн 12 сарын өөрчлөлт. Эх сурвалж зөвхөн 12 сарын тоо нийтэлсэн зах зээлүүд." },
+]
+
+/**
+ * Ranked diverging bars. Blue = up, gray = down (the site's chart rule), and
+ * every value carries ▲/▼ and a sign, so direction never rests on colour.
+ * Each time frame only lists markets whose source publishes that measure:
+ * mixing a 12-month change into a year-to-date ranking would be wrong.
+ */
+export function PerformanceChart({ rows }: { rows: PerformanceRow[] }) {
+  const [frame, setFrame] = useState<Frame>("since")
+  const [view, setView] = useState<"map" | "list">("map")
+  const visible = rows
+    .filter((row) => row[frame] !== undefined)
+    .map((row) => ({ ...row, value: row[frame] as number }))
+    .sort((a, b) => b.value - a.value)
+  const max = Math.max(...visible.map((row) => Math.abs(row.value)), 0.01)
+  const note = frames.find((item) => item.key === frame)!.note
+
+  return (
+    <figure className="bg-card rounded-lg border">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3 sm:px-5">
+        <div role="group" aria-label="Хугацаа" className="bg-muted inline-flex rounded-full p-1">
+          {frames.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={frame === item.key}
+              onClick={() => setFrame(item.key)}
+              className={cn(
+                "ez-hit h-8 rounded-full px-3 text-[13px] font-medium transition-colors",
+                frame === item.key ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-muted-foreground hidden items-center gap-3 text-[11px] sm:flex">
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-[2px] bg-[var(--mark-up)]" aria-hidden /> Өссөн
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-[2px] bg-[var(--mark-down)]" aria-hidden /> Буурсан
+            </span>
+          </span>
+          <div role="group" aria-label="Харагдац" className="flex rounded-full border p-0.5">
+            {(
+              [
+                ["map", "Дулааны зураг"],
+                ["list", "Эрэмбэ"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={view === key}
+                onClick={() => setView(key)}
+                className={cn(
+                  "ez-hit h-7 rounded-full px-2.5 text-[12px] font-medium transition-colors",
+                  view === key ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {view === "map" ? (
+        <ul className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-3 sm:p-3 lg:grid-cols-4 xl:grid-cols-6">
+          {visible.map((row) => {
+            const up = row.value >= 0
+            // Shade by size of move, capped at 55% so ink stays readable in both themes.
+            const share = 10 + Math.round((Math.abs(row.value) / max) * 45)
+            return (
+              <li
+                key={row.id}
+                tabIndex={0}
+                aria-label={`${row.label}: ${signedPct(row.value).replace("-", "−")}${row.detail ? `. ${row.detail}` : ""}`}
+                title={row.detail}
+                className="flex min-h-[5.5rem] flex-col justify-between rounded-md p-3 outline-none transition-transform focus-visible:ring-2 focus-visible:ring-[var(--ring)] sm:min-h-[6.5rem]"
+                style={{ background: `color-mix(in oklch, var(${up ? "--mark-up" : "--mark-down"}) ${share}%, transparent)` }}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-semibold">{row.label}</span>
+                  <span className="text-foreground/70 block truncate text-[11px]">{row.group}</span>
+                </span>
+                <span className="text-lg font-semibold tabular-nums sm:text-xl">
+                  {up ? "▲" : "▼"} {signedPct(row.value).replace("-", "−")}
+                </span>
+              </li>
+            )
+          })}
+        </ul>
+      ) : (
+      <ol className="divide-y">
+        {visible.map((row) => {
+          const width = (Math.abs(row.value) / max) * 50
+          const up = row.value >= 0
+          return (
+            <li
+              key={row.id}
+              tabIndex={0}
+              aria-label={`${row.label}: ${signedPct(row.value).replace("-", "−")}${row.detail ? `. ${row.detail}` : ""}`}
+              className="group hover:bg-muted/50 focus-visible:bg-muted/50 grid grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_4.5rem] items-center gap-3 px-4 py-2.5 outline-none sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)_5.5rem] sm:px-5"
+            >
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium">{row.label}</span>
+                <span className="text-muted-foreground block truncate text-[11px]">
+                  <span className="group-hover:hidden group-focus-visible:hidden">{row.group}</span>
+                  <span className="hidden tabular-nums group-hover:inline group-focus-visible:inline">{row.detail ?? row.group}</span>
+                </span>
+              </span>
+              <span aria-hidden className="relative h-3">
+                <span className="bg-border absolute inset-y-[-6px] left-1/2 w-px" />
+                <span
+                  className={cn("absolute inset-y-0", up ? "rounded-r-[4px] bg-[var(--mark-up)]" : "rounded-l-[4px] bg-[var(--mark-down)]")}
+                  style={up ? { left: "50%", width: `${width}%` } : { right: "50%", width: `${width}%` }}
+                />
+              </span>
+              <span className={cn("text-right text-sm font-semibold tabular-nums", up ? "text-[var(--up)]" : "text-[var(--down)]")}>
+                {up ? "▲" : "▼"} {signedPct(row.value).replace("-", "−")}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+      )}
+      <figcaption className="text-muted-foreground border-t px-4 py-3 text-[11px] leading-relaxed sm:px-5">{note}</figcaption>
+    </figure>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* US yield curve: one country, one date, one axis                     */
+/* ------------------------------------------------------------------ */
+
+export function YieldCurve({ points }: { points: { label: string; yield: number }[] }) {
+  const width = 360
+  const height = 190
+  const pad = { top: 30, right: 36, bottom: 30, left: 40 }
+  // Points sit inside the plot, clear of the axis labels.
+  const inset = 28
+  const lo = Math.floor(Math.min(...points.map((point) => point.yield)) * 2) / 2 - 0.25
+  const hi = Math.ceil(Math.max(...points.map((point) => point.yield)) * 2) / 2 + 0.25
+  const ticks: number[] = []
+  for (let tick = Math.ceil(lo * 2) / 2; tick <= hi + 1e-9; tick += 0.5) ticks.push(tick)
+  const x = (index: number) => pad.left + inset + (index * (width - pad.left - pad.right - inset)) / (points.length - 1)
+  const y = (value: number) => pad.top + ((hi - value) * (height - pad.top - pad.bottom)) / (hi - lo)
+  const path = points.map((point, index) => `${index ? "L" : "M"}${x(index)},${y(point.yield)}`).join(" ")
+  const label = `АНУ-ын засгийн газрын бондын өгөөж: ${points.map((point) => `${point.label} ${point.yield}%`).join(", ")}`
+
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-auto w-full overflow-visible" role="img" aria-label={label}>
+      {ticks.map((tick) => (
+        <g key={tick}>
+          <line x1={pad.left} x2={width - pad.right / 2} y1={y(tick)} y2={y(tick)} className="stroke-border" strokeWidth={1} />
+          <text x={pad.left - 8} y={y(tick)} dy="0.32em" textAnchor="end" className="fill-muted-foreground text-[10px] tabular-nums">
+            {tick.toFixed(1)}%
+          </text>
+        </g>
+      ))}
+      <path d={path} fill="none" stroke="var(--brand)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+      {points.map((point, index) => (
+        <g key={point.label} tabIndex={0} className="outline-none [&:focus-visible>circle:nth-of-type(2)]:stroke-[var(--ring)]">
+          <title>{`${point.label}: ${point.yield}%`}</title>
+          <circle cx={x(index)} cy={y(point.yield)} r={14} fill="transparent" />
+          <circle cx={x(index)} cy={y(point.yield)} r={4.5} fill="var(--brand)" className="stroke-card" strokeWidth={2} />
+          <text x={x(index)} y={y(point.yield) - 12} textAnchor="middle" className="fill-foreground text-[11px] font-semibold tabular-nums">
+            {point.yield.toFixed(2)}%
+          </text>
+          <text x={x(index)} y={height - 8} textAnchor="middle" className="fill-muted-foreground text-[11px]">
+            {point.label}
+          </text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Export mix: one 100% bar, four labelled parts                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Categorical colours --cat-1..4 (index.css) were checked with the dataviz
+ * validator on this site's light and dark cards. In light mode the aqua and
+ * yellow sit under 3:1 against the card, so every part is also named with its
+ * value below the bar: colour is never the only key.
+ */
+export function ExportMix({ parts, total }: { parts: { key: string; label: string; value: number; growth?: number }[]; total: number }) {
+  const sum = parts.reduce((acc, part) => acc + part.value, 0)
+  return (
+    <div>
+      <div className="flex h-5 gap-[2px]" role="img" aria-label={parts.map((part) => `${part.label} ${part.value} тэрбум ам.доллар`).join(", ")}>
+        {parts.map((part, index) => (
+          <span
+            key={part.key}
+            title={`${part.label}: ${part.value} тэрбум ам.доллар (${Math.round((part.value / sum) * 100)}%)`}
+            className={cn("h-full", index === 0 && "rounded-l-[4px]", index === parts.length - 1 && "rounded-r-[4px]")}
+            style={{ width: `${(part.value / sum) * 100}%`, background: `var(--cat-${index + 1})` }}
+          />
+        ))}
+      </div>
+      <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
+        {parts.map((part, index) => (
+          <div key={part.key} className="min-w-0">
+            <dt className="text-muted-foreground flex items-center gap-1.5 text-xs">
+              <span className="size-2.5 shrink-0 rounded-[2px]" style={{ background: `var(--cat-${index + 1})` }} aria-hidden />
+              <span className="truncate">{part.label}</span>
+            </dt>
+            <dd className="mt-0.5 text-lg font-semibold tabular-nums">
+              {part.value} <span className="text-muted-foreground text-xs font-normal">тэрбум $</span>
+            </dd>
+            <dd className="text-muted-foreground text-[11px] tabular-nums">
+              {Math.round((part.value / total) * 100)}%{part.growth !== undefined ? ` · ▲ ${part.growth}% жилээр` : ""}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  )
+}

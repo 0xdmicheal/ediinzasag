@@ -40,14 +40,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 
+// Header order: Монгол · Дэлхий · Ханш · Тойм (menu) · EZ Edu · EZ Talk · Бид.
+// The first BEFORE_TOIM links come before the Тойм menu on desktop.
 const primary = [
   { to: "/mongolia", label: "Монгол" },
   { to: "/world", label: "Дэлхий" },
+  { to: "/markets", label: "Ханш" },
   { to: "/ez-edu", label: "EZ Edu" },
   { to: "/ez-talk", label: "EZ Talk" },
-  { to: "/markets", label: "Ханш" },
   { to: "/about", label: "Бид" },
 ]
+const BEFORE_TOIM = 3
 
 // The current page is the darker word. No underline, and no blue ring on click.
 const linkClass =
@@ -160,7 +163,7 @@ export function Navigation1({
         <div className="hidden lg:flex">
             <NavigationMenu viewport={false}>
               <NavigationMenuList className="gap-1">
-                {primary.slice(0, 2).map((item) => (
+                {primary.slice(0, BEFORE_TOIM).map((item) => (
                   <NavigationMenuItem key={item.to}>
                     <NavigationMenuLink asChild className={linkClass}>
                       <NavLink to={item.to}>{item.label}</NavLink>
@@ -218,7 +221,7 @@ export function Navigation1({
                     </div>
                   </NavigationMenuContent>
                 </NavigationMenuItem>
-                {primary.slice(2).map((item) => (
+                {primary.slice(BEFORE_TOIM).map((item) => (
                   <NavigationMenuItem key={item.to}>
                     <NavigationMenuLink asChild className={linkClass}>
                       <NavLink to={item.to}>{item.label}</NavLink>
