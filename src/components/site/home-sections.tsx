@@ -1,6 +1,6 @@
-import { useRef, useState, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { Link } from "react-router-dom"
-import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Play } from "lucide-react"
+import { ArrowRight, ArrowUpRight, Play } from "lucide-react"
 
 import { youtubeId } from "@/components/site/YoutubeFrame"
 import { channels, type Episode } from "@/content/channels"
@@ -272,6 +272,12 @@ export function DeskSpread({ stories }: { stories: Story[] }) {
 /* Дэлхий: swipeable rail                                              */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Дэлхийн мэдээ: a grid of photo cards. Two columns on phones, three on
+ * desktop. It used to be a sideways-scrolling rail, but sideways swipes on the
+ * home page read as the page itself moving, and the scroll box clipped the
+ * cards' hover shadow.
+ */
 export function StoryRail({
   index,
   kicker,
@@ -287,56 +293,36 @@ export function StoryRail({
   ctaTo: string
   stories: Story[]
 }) {
-  const rail = useRef<HTMLDivElement>(null)
-
-  function scroll(direction: 1 | -1) {
-    const node = rail.current
-    if (!node) return
-    node.scrollBy({ left: direction * node.clientWidth * 0.8, behavior: "smooth" })
-  }
-
-  const arrowClass =
-    "hover:bg-foreground hover:text-background grid size-9 place-items-center rounded-full border transition-colors"
-
   return (
     <>
       <SectionHeader index={index} kicker={kicker} title={title}>
-        <button type="button" aria-label="Өмнөх" onClick={() => scroll(-1)} className={`${arrowClass} hidden sm:grid`}>
-          <ChevronLeft className="size-4" />
-        </button>
-        <button type="button" aria-label="Дараах" onClick={() => scroll(1)} className={`${arrowClass} hidden sm:grid`}>
-          <ChevronRight className="size-4" />
-        </button>
         <HeaderLink to={ctaTo}>{ctaText}</HeaderLink>
       </SectionHeader>
-      <div
-        ref={rail}
-        className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto -my-3 px-4 py-3 [scrollbar-width:none] sm:-mx-6 sm:scroll-px-6 sm:px-6 lg:-mx-8 lg:scroll-px-8 lg:px-8 [&::-webkit-scrollbar]:hidden"
-      >
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {stories.map((story) => {
           const art = storyArt(story.slug)
           return (
             <Link
               key={story.slug}
               to={`/story/${story.slug}`}
-              className="group ez-lift relative isolate flex aspect-[4/5] w-[72%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-lg sm:w-[17rem] lg:w-[calc((100%-2.25rem)/4)]"
+              className="group ez-lift relative isolate flex aspect-[3/4] flex-col justify-between overflow-hidden rounded-lg sm:aspect-[4/5]"
             >
               <img src={art.src} alt={art.alt} className={`absolute inset-0 -z-10 h-full w-full object-cover ${zoom}`} />
               <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-20% via-black/60 via-55% to-black/15" />
-              <div className="flex items-start justify-between p-3.5">
+              <div className="flex items-start justify-between gap-2 p-2.5 sm:p-3.5">
                 <TopicChip topic={story.topic} onPhoto />
-                <span className="text-photo-foreground/70 text-[11px] tabular-nums">{formatStoryDate(story.date)}</span>
+                <span className="text-photo-foreground/70 hidden text-[11px] tabular-nums sm:inline">{formatStoryDate(story.date)}</span>
               </div>
-              <div className="text-photo-foreground p-4">
-                <h3 className="font-news line-clamp-3 text-xl leading-[1.15]">
+              <div className="text-photo-foreground p-3 sm:p-4">
+                <h3 className="font-news line-clamp-4 text-[15px] leading-[1.2] sm:line-clamp-3 sm:text-xl sm:leading-[1.15]">
                   <span className="ez-underline">{story.title}</span>
                 </h3>
-                <div className="grid grid-rows-[0fr] transition-[grid-template-rows] duration-500 ease-out group-hover:grid-rows-[1fr] group-focus-visible:grid-rows-[1fr]">
+                <div className="hidden grid-rows-[0fr] transition-[grid-template-rows] duration-500 ease-out group-hover:grid-rows-[1fr] group-focus-visible:grid-rows-[1fr] sm:grid">
                   <p className="text-photo-foreground/80 overflow-hidden text-sm leading-relaxed">
                     <span className="line-clamp-3 pt-2 text-[13px]">{story.dek}</span>
                   </p>
                 </div>
-                <p className="text-photo-foreground/70 mt-3 flex items-center justify-between text-[11px]">
+                <p className="text-photo-foreground/70 mt-2 flex items-center justify-between text-[11px] sm:mt-3">
                   <span>{story.readMinutes} мин уншина</span>
                   <ArrowUpRight className="group-hover:text-brand size-4 transition-transform duration-300 group-hover:rotate-45" />
                 </p>
@@ -348,10 +334,6 @@ export function StoryRail({
     </>
   )
 }
-
-/* ------------------------------------------------------------------ */
-/* Бусад: compact cards                                                */
-/* ------------------------------------------------------------------ */
 
 export function CompactGrid({ stories }: { stories: Story[] }) {
   return (

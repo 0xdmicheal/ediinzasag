@@ -84,7 +84,7 @@ export function StoryPage() {
       date={formatStoryDate(story.date)}
       title={story.title}
       dek={story.dek}
-      image={{ src: art.src, alt: art.alt, caption: story.author ? art.alt : `${art.alt} · Зураглал`, credit: story.coverCredit }}
+      image={{ src: art.src, alt: art.alt, caption: story.author || story.coverCredit ? art.alt : `${art.alt} · Зураглал`, credit: story.coverCredit }}
       author={{ name: story.author || "EZ тойм", role: "Эдийн засаг редакц" }}
       toc={toc}
       ad={articleAd}

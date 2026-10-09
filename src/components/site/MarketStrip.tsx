@@ -144,7 +144,7 @@ export function MarketStrip() {
         onClick={() => setStopped((value) => !value)}
         aria-label={stopped ? "Ханшийн зурвасыг үргэлжлүүлэх" : "Ханшийн зурвасыг зогсоох"}
         aria-pressed={stopped}
-        className="ez-hit text-muted-foreground hover:text-foreground hover:bg-foreground/5 grid w-10 shrink-0 place-items-center border-l transition-colors motion-reduce:hidden sm:w-11"
+        className="text-muted-foreground hover:text-foreground hover:bg-foreground/5 grid w-11 shrink-0 place-items-center border-l transition-colors motion-reduce:hidden"
       >
         {stopped ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
       </button>
