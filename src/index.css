@@ -623,7 +623,7 @@
 /*
  * Whole-site field. In light, AmbientBackground paints four soft washes that
  * drift, follow the pointer, and move with scroll, then a paper scrim. In dark
- * the canvas is a flat #121212. Fractal noise sits on both. Reduced transparency
+ * the canvas is a flat #121212. A still grain tile sits on both. Reduced transparency
  * hides the field (see below).
  */
 .ez-ambient-canvas {
@@ -631,6 +631,16 @@
   inset: 0;
   width: 100%;
   height: 100%;
+}
+
+/* Still grain. Opacity matches the old faint light speckle and the stronger dark one. */
+.ez-noise {
+  opacity: 0.22;
+  background-repeat: repeat;
+  background-size: 128px 128px;
+}
+.dark .ez-noise {
+  opacity: 0.5;
 }
 
 /*
@@ -674,6 +684,23 @@ html[data-ez-theme-vt="active"]::view-transition-new(root) {
 }
 .dark .ez-glass {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
+}
+
+/*
+ * Phones stall when a full-height blur samples the page under the sliding menu.
+ * The sheet becomes an opaque panel there. Desktop keeps the glass.
+ */
+@media (pointer: coarse), (max-width: 1023px) {
+  [data-slot="sheet-overlay"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: rgb(0 0 0 / 0.45);
+  }
+  [data-slot="sheet-content"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: var(--background) !important;
+  }
 }
 
 /*

@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef } from "react"
+import { useLayoutEffect, useRef } from "react"
 
 type ThemeName = "light" | "dark"
 type RGB = readonly [number, number, number]
@@ -24,7 +24,7 @@ type Orb = {
  * Light pages sit on a soft colour field. Four washes — purple, gold, coral,
  * and an ink shadow — drift on their own, lean toward the pointer, and shear
  * apart as the page scrolls. A paper scrim keeps Gray 600 and Blue 600 at or
- * above 4.5:1. Dark pages are a flat #121212; fractal noise on top is the
+ * above 4.5:1. Dark pages are a flat #121212; a still grain tile is the
  * only texture. Still when the reader asks for reduced motion or reduced transparency.
  */
 const LAYOUT: readonly Omit<Orb, "rgb" | "alpha">[] = [
@@ -105,6 +105,9 @@ function paint(
 
 export function AmbientBackground({ theme }: { theme: ThemeName }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const themeRef = useRef(theme)
+  const kickRef = useRef<() => void>(() => {})
+  themeRef.current = theme
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current
@@ -123,15 +126,27 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
     let frame = 0
     let last = 0
     let alive = true
+    let resizeQueued = false
 
     function still() {
       return reduceMotion.matches || reduceTransparency.matches || moreContrast.matches
     }
 
+    // The phone menu and the circle reveal both composite the whole page.
+    // Painting new gradients under them is what makes the tap stall.
+    function held() {
+      const root = document.documentElement
+      return root.dataset.ezSheet === "open" || root.dataset.ezThemeVt === "active"
+    }
+
     function resize() {
-      cssWidth = window.innerWidth
-      cssHeight = window.innerHeight
-      dpr = Math.min(window.devicePixelRatio || 1, finePointer.matches ? 1.35 : 1)
+      const width = window.innerWidth
+      const height = window.innerHeight
+      const nextDpr = Math.min(window.devicePixelRatio || 1, finePointer.matches ? 1.35 : 1)
+      if (width === cssWidth && height === cssHeight && nextDpr === dpr && canvas!.width > 0) return
+      cssWidth = width
+      cssHeight = height
+      dpr = nextDpr
       canvas!.width = Math.max(1, Math.round(cssWidth * dpr))
       canvas!.height = Math.max(1, Math.round(cssHeight * dpr))
     }
@@ -148,7 +163,7 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
         ctx!,
         cssWidth,
         cssHeight,
-        theme,
+        themeRef.current,
         frozen ? 0 : now / 1000,
         frozen ? 0 : window.scrollY,
         frozen ? 0 : pointer.x,
@@ -159,7 +174,7 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
 
     function loop(now: number) {
       if (!alive) return
-      if (theme === "dark" || document.hidden || still()) return
+      if (themeRef.current === "dark" || document.hidden || still() || held()) return
       if (now - last >= 32) {
         last = now
         render(now)
@@ -167,21 +182,53 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
       frame = window.requestAnimationFrame(loop)
     }
 
-    function start() {
+    function stopLoop() {
       window.cancelAnimationFrame(frame)
-      resize()
+    }
+
+    function resume() {
+      stopLoop()
+      if (resizeQueued && !held()) {
+        resizeQueued = false
+        resize()
+      }
+      if (themeRef.current !== "dark" && !document.hidden && !still() && !held()) {
+        frame = window.requestAnimationFrame(loop)
+      }
+    }
+
+    // One still frame for a theme change. Opening the menu only stops the loop,
+    // so the tap is not waiting on a fresh full-screen paint.
+    function paintNow() {
+      if (resizeQueued && !held()) {
+        resizeQueued = false
+        resize()
+      }
       render(performance.now())
-      if (theme !== "dark" && !document.hidden && !still()) frame = window.requestAnimationFrame(loop)
+      resume()
+    }
+
+    function start() {
+      resize()
+      paintNow()
+    }
+
+    function onResize() {
+      if (held()) {
+        resizeQueued = true
+        return
+      }
+      start()
     }
 
     function onPointer(event: PointerEvent) {
-      if (!finePointer.matches || still()) return
+      if (!finePointer.matches || still() || held()) return
       pointer.tx = event.clientX / window.innerWidth - 0.5
       pointer.ty = event.clientY / window.innerHeight - 0.5
     }
 
     function onScroll() {
-      if (!alive || still()) return
+      if (!alive || still() || held() || themeRef.current === "dark") return
       const now = performance.now()
       if (now - last < 32) return
       last = now
@@ -196,8 +243,17 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
       start()
     }
 
+    kickRef.current = paintNow
     start()
-    window.addEventListener("resize", start)
+    const sheetWatch = new MutationObserver(() => {
+      if (held()) stopLoop()
+      else paintNow()
+    })
+    sheetWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-ez-sheet", "data-ez-theme-vt"],
+    })
+    window.addEventListener("resize", onResize)
     window.addEventListener("scroll", onScroll, { passive: true })
     window.addEventListener("pointermove", onPointer, { passive: true })
     document.addEventListener("visibilitychange", onVisibility)
@@ -208,8 +264,10 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
 
     return () => {
       alive = false
+      kickRef.current = () => {}
       window.cancelAnimationFrame(frame)
-      window.removeEventListener("resize", start)
+      sheetWatch.disconnect()
+      window.removeEventListener("resize", onResize)
       window.removeEventListener("scroll", onScroll)
       window.removeEventListener("pointermove", onPointer)
       document.removeEventListener("visibilitychange", onVisibility)
@@ -218,6 +276,10 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
       moreContrast.removeEventListener("change", start)
       finePointer.removeEventListener("change", start)
     }
+  }, [])
+
+  useLayoutEffect(() => {
+    kickRef.current()
   }, [theme])
 
   return (
@@ -228,25 +290,38 @@ export function AmbientBackground({ theme }: { theme: ThemeName }) {
   )
 }
 
-/** Fractal grain over the page. On dark it is the only texture on #121212. */
+/**
+ * Grain over the page. A live turbulence filter has to be redrawn whenever
+ * the menu blurs the page or the theme snapshots it, which stalls a phone.
+ * This tile is painted once and then only scrolled by the compositor.
+ */
+let grainTile = ""
+
+function noiseTile() {
+  if (grainTile) return grainTile
+  const size = 128
+  const canvas = document.createElement("canvas")
+  canvas.width = size
+  canvas.height = size
+  const ctx = canvas.getContext("2d")
+  if (!ctx) return ""
+  const image = ctx.createImageData(size, size)
+  const data = image.data
+  for (let i = 0; i < data.length; i += 4) {
+    const speck = Math.random()
+    data[i] = data[i + 1] = data[i + 2] = 0
+    data[i + 3] = speck < 0.55 ? 0 : Math.round((speck - 0.55) * 170)
+  }
+  ctx.putImageData(image, 0, 0)
+  grainTile = canvas.toDataURL("image/png")
+  return grainTile
+}
+
 function NoiseTexture() {
-  const rawId = useId()
-  const filterId = `ez-noise-${rawId.replace(/:/g, "")}`
   return (
-    <svg
-      className="pointer-events-none absolute inset-0 size-full opacity-[0.12] select-none dark:opacity-30"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <filter id={filterId}>
-        <feTurbulence type="fractalNoise" baseFrequency="0.4" numOctaves="6" stitchTiles="stitch" />
-        <feColorMatrix type="saturate" values="0" />
-        <feComponentTransfer>
-          <feFuncR type="linear" slope="0.15" />
-          <feFuncG type="linear" slope="0.15" />
-          <feFuncB type="linear" slope="0.15" />
-        </feComponentTransfer>
-      </filter>
-      <rect width="100%" height="100%" filter={`url(#${filterId})`} opacity="0.22" />
-    </svg>
+    <div
+      className="ez-noise pointer-events-none absolute inset-0 size-full select-none"
+      style={{ backgroundImage: `url("${noiseTile()}")` }}
+    />
   )
 }
