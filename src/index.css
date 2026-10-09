@@ -245,6 +245,11 @@
   html {
     scrollbar-gutter: stable;
   }
+  /* The page never scrolls sideways: anything wider than the screen is clipped, not swipeable. */
+  html,
+  body {
+    overflow-x: clip;
+  }
   * {
     @apply border-border outline-ring/50;
     }

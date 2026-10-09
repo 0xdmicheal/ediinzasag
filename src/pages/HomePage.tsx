@@ -18,6 +18,7 @@ import { substackPosts } from "@/content/substack.posts"
 const container = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
 // Sections sit in a narrower column than the hero so the hero stays the focal point.
 const sectionContainer = "mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8"
+const MORE_LIMIT = 6
 
 export function HomePage() {
   // The hero shows the three newest built-in stories; lists include admin-published ones too.
@@ -39,7 +40,9 @@ export function HomePage() {
     ...mongolia.map((story) => story.slug),
     ...world.map((story) => story.slug),
   ])
-  const more = all.filter((story) => !featured.has(story.slug))
+  // A fixed shelf of the newest leftovers (two rows of three on desktop), so the home page
+  // doesn't grow with every article. The full archive lives on the /mongolia and /world desks.
+  const more = all.filter((story) => !featured.has(story.slug)).slice(0, MORE_LIMIT)
 
   return (
     <>
