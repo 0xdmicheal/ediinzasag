@@ -1,4 +1,4 @@
-import { useRef, type MouseEvent } from "react"
+import { useEffect, useRef, type MouseEvent } from "react"
 import { flushSync } from "react-dom"
 import { NavLink } from "react-router-dom"
 import {
@@ -69,7 +69,10 @@ function revealTheme(
   if (lock.current) return
   const next = theme === "dark" ? "light" : "dark"
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-  if (reduced || typeof document.startViewTransition !== "function") {
+  // The phone switch lives in the menu. Photographing the whole page for the
+  // circle stalls that tap, so phones flip the theme immediately.
+  const phone = window.matchMedia("(pointer: coarse)").matches || window.innerWidth < 1024
+  if (reduced || phone || typeof document.startViewTransition !== "function") {
     onThemeChange(next)
     return
   }
@@ -138,6 +141,11 @@ export function Navigation1({
   const { reader, openLogin } = useReader()
   const themeLock = useRef(false)
   const lead = byDate()[0]
+  useEffect(() => {
+    return () => {
+      delete document.documentElement.dataset.ezSheet
+    }
+  }, [])
   const mongolia = storiesByDesk("mongolia").slice(0, 3)
   const world = storiesByDesk("world").slice(0, 3)
 
@@ -246,7 +254,12 @@ export function Navigation1({
 
         <div className="flex shrink-0 items-center gap-1 lg:hidden">
           <AccountButton compact />
-          <Sheet>
+          <Sheet
+            onOpenChange={(open) => {
+              if (open) document.documentElement.dataset.ezSheet = "open"
+              else delete document.documentElement.dataset.ezSheet
+            }}
+          >
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" aria-label="Цэс нээх" className="size-11 text-foreground hover:bg-foreground/5 hover:text-foreground">
                 <Menu />
