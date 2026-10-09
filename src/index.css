@@ -905,3 +905,30 @@ figure[data-card="link"] small {
     display: none;
   }
 }
+
+/*
+ * Rounded photo clips. A rounded box with overflow:hidden doesn't reliably clip
+ * children that the GPU draws on their own layer (a photo zooming on hover, a
+ * frosted-blur chip), so on real devices, Safari most of all, the corners come
+ * out square. clip-path clips those layers too. It goes on the photo layer, not
+ * the card, so the card's hover shadow stays visible.
+ */
+.ez-clip {
+  clip-path: inset(0 round var(--radius-lg));
+}
+.ez-clip-md {
+  clip-path: inset(0 round var(--radius-md));
+}
+/* Photo at the top of a bordered card: only the top corners round, 1px inside the border. */
+.ez-clip-top {
+  clip-path: inset(0 round calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0);
+}
+/* Letter cards: a row with the photo on the left on phones, a card with the photo on top from md. */
+.ez-clip-row {
+  clip-path: inset(0 round calc(var(--radius-lg) - 1px) 0 0 calc(var(--radius-lg) - 1px));
+}
+@media (min-width: 768px) {
+  .ez-clip-row {
+    clip-path: inset(0 round calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0);
+  }
+}
