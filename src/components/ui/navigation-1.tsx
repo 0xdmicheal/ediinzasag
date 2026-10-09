@@ -1,9 +1,8 @@
-import { useEffect, useRef, useState, type MouseEvent } from "react"
+import { useEffect, useRef, type MouseEvent } from "react"
 import { flushSync } from "react-dom"
 import { NavLink } from "react-router-dom"
 import {
   ArrowUpRight,
-  ChevronDown,
   Mail,
   Menu,
   Moon,
@@ -273,9 +272,9 @@ export function Navigation1({
               // Opening with a tap should not paint a focus ring on the first button.
               onOpenAutoFocus={(event) => event.preventDefault()}
               onCloseAutoFocus={(event) => event.preventDefault()}
-              className="data-[side=right]:w-full data-[side=right]:max-w-none w-full max-w-none gap-0 overflow-y-auto border-0 bg-background p-0 shadow-none outline-none transition-none focus:outline-none focus-visible:outline-none sm:max-w-none"
+              className="border-border data-[side=right]:w-[min(100%,22rem)] data-[side=right]:max-w-[22rem] ez-glass w-[min(100%,22rem)] max-w-[22rem] gap-0 overflow-y-auto bg-background/85 p-0 shadow-none outline-none focus:outline-none focus-visible:outline-none"
             >
-              <div className="border-foreground/10 flex h-14 shrink-0 items-center justify-between border-b px-4">
+              <div className="border-border flex h-14 shrink-0 items-center justify-between border-b px-4">
                 <SheetClose asChild>
                   <NavLink to="/" className="flex items-center" aria-label="Эдийн засаг">
                     <img src={publicUrl("brand/logo-black.png")} alt="" className="h-7 w-auto dark:hidden" />
@@ -320,9 +319,26 @@ export function Navigation1({
                 ))}
               </nav>
 
-              <PhoneLatest />
+              <div className="border-border border-t px-2 py-3">
+                <p className="text-muted-foreground px-3 pt-1 pb-1 text-xs tracking-wide uppercase">Сүүлийн тойм</p>
+                <div className="flex flex-col">
+                  {byDate().slice(0, 5).map((story) => (
+                    <SheetClose asChild key={story.slug}>
+                      <NavLink
+                        to={`/story/${story.slug}`}
+                        className="hover:bg-foreground/5 rounded-md px-3 py-2.5 text-[14px] leading-snug text-foreground no-underline"
+                      >
+                        <span className="text-muted-foreground block font-mono text-xs">
+                          {deskLabel[story.desk]} · {formatStoryDate(story.date)}
+                        </span>
+                        {story.title}
+                      </NavLink>
+                    </SheetClose>
+                  ))}
+                </div>
+              </div>
 
-              <div className="border-foreground/10 mt-auto flex flex-col gap-2 border-t p-4">
+              <div className="border-border mt-auto flex flex-col gap-2 border-t p-4">
                 <a
                   href={channels.youtube}
                   className="text-muted-foreground hover:text-foreground inline-flex h-10 items-center justify-center gap-1.5 text-[13px] font-medium transition-colors"
@@ -360,39 +376,6 @@ export function Navigation1({
         </div>
       </div>
     </header>
-  )
-}
-
-/** Latest stories inside the phone menu. Same rows as the links above, no underlines. */
-function PhoneLatest() {
-  const [open, setOpen] = useState(false)
-  const latest = byDate().slice(0, 5)
-  return (
-    <div className="px-2 py-2">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((value) => !value)}
-        className="text-muted-foreground hover:bg-foreground/5 hover:text-foreground flex h-11 w-full items-center justify-between rounded-md px-3 text-left text-[15px] font-medium outline-none focus:outline-none focus-visible:outline-none"
-      >
-        Сүүлийн тойм
-        <ChevronDown className={`size-4 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open ? (
-        <div className="bg-foreground/5 mt-1 flex flex-col rounded-lg p-1">
-          {latest.map((story) => (
-            <SheetClose asChild key={story.slug}>
-              <NavLink to={`/story/${story.slug}`} className="hover:bg-background rounded-md px-2.5 py-2 no-underline">
-                <span className="text-muted-foreground block text-[11px] font-medium tracking-wide">
-                  {deskLabel[story.desk]} · {formatStoryDate(story.date)}
-                </span>
-                <span className="text-foreground mt-0.5 block text-[14px] leading-snug font-medium">{story.title}</span>
-              </NavLink>
-            </SheetClose>
-          ))}
-        </div>
-      ) : null}
-    </div>
   )
 }
 
