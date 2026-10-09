@@ -15,7 +15,7 @@ const FIRES = "ez-reader-demo-fires"
 /** ["<commentId>:<readerId>", ...] */
 const LIKES = "ez-reader-demo-likes"
 
-interface Account extends Omit<Reader, "moderator" | "anonymous" | "phone" | "avatar" | "birthDate" | "gender" | "badge" | "memberNo"> {
+interface Account extends Omit<Reader, "moderator" | "anonymous" | "phone" | "avatar" | "birthDate" | "gender" | "region" | "badge" | "memberNo"> {
   badge?: string
   /** Bought badge ids. */
   badges?: string[]
@@ -24,6 +24,7 @@ interface Account extends Omit<Reader, "moderator" | "anonymous" | "phone" | "av
   avatar?: string
   birthDate?: string
   gender?: Reader["gender"]
+  region?: string
   passwordHash: string
 }
 
@@ -110,6 +111,7 @@ export function createDemoReader(): ReaderAuth {
             avatar: account.avatar ?? "",
             birthDate: account.birthDate ?? "",
             gender: account.gender ?? "",
+            region: account.region ?? "",
             badge: account.badge ?? "",
             // Demo: sign-up order in this browser.
             memberNo: accounts().findIndex((item) => item.id === account.id) + 1,

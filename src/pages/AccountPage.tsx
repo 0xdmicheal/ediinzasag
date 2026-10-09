@@ -83,9 +83,15 @@ export function AccountPage() {
     const notes: string[] = []
     if (next.name !== reader!.name) await auth!.updateName(next.name)
     if (next.anonymous !== reader!.anonymous) await auth!.setAnonymous(next.anonymous)
-    if (next.avatar !== reader!.avatar || next.birthDate !== reader!.birthDate || next.gender !== reader!.gender) {
+    if (
+      next.avatar !== reader!.avatar ||
+      next.birthDate !== reader!.birthDate ||
+      next.gender !== reader!.gender ||
+      next.region !== reader!.region
+    ) {
       await auth!.updateProfile({
         avatar: next.avatar,
+        region: next.region,
         ...(next.birthDate ? { birthDate: next.birthDate } : {}),
         ...(next.gender ? { gender: next.gender } : {}),
       })
@@ -141,7 +147,7 @@ export function AccountPage() {
             <button
               type="button"
               onClick={() => setEditing(true)}
-              className="animate-in fade-in bg-foreground/[0.07] text-muted-foreground hover:text-foreground mt-1 inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors duration-300"
+              className="animate-in fade-in bg-foreground/[0.07] text-muted-foreground hover:text-foreground ez-hit mt-1 inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors duration-300"
             >
               <VenetianMask className="size-3.5" />
               Зочин горим
@@ -285,6 +291,7 @@ export function AccountPage() {
           avatar: reader.avatar,
           birthDate: reader.birthDate,
           gender: reader.gender,
+          region: reader.region,
         }}
         phone={reader.phone ? formatPhone(reader.phone) : undefined}
         onSave={saveProfile}

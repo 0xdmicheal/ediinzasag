@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
 import { ArrowRight, X } from "lucide-react"
 
 import { buttonClass, Field, inputClass, Notice } from "@/admin/ui"
+import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { LoginShowcase, LoginShowcaseCompact } from "@/reader/LoginShowcase"
 import { useReader } from "@/reader/session"
 
@@ -170,7 +171,7 @@ export function LoginPanel({
           type="button"
           aria-label="Хаах"
           onClick={onClose}
-          className="bg-background/80 text-muted-foreground hover:text-foreground absolute top-3 right-3 z-10 grid size-9 place-items-center rounded-full border backdrop-blur transition-colors"
+          className="bg-background/80 text-muted-foreground hover:text-foreground absolute top-3 right-3 z-10 grid size-11 place-items-center rounded-full border backdrop-blur transition-colors"
         >
           <X className="size-4" />
         </button>
@@ -306,10 +307,17 @@ export function LoginPanel({
               ) : null}
 
               {error ? <Notice tone="error">{error}</Notice> : null}
-              <button type="submit" disabled={busy || !auth} className={buttonClass.primary}>
-                {busy ? "Түр хүлээнэ үү…" : submitLabel}
-                <ArrowRight className="size-4" />
-              </button>
+              {submitLabel === "Нэвтрэх" ? (
+                <ShimmerButton type="submit" disabled={busy || !auth} className="h-11 w-full text-[14px] font-medium">
+                  {busy ? "Түр хүлээнэ үү…" : submitLabel}
+                  <ArrowRight className="size-4" />
+                </ShimmerButton>
+              ) : (
+                <button type="submit" disabled={busy || !auth} className={buttonClass.primary}>
+                  {busy ? "Түр хүлээнэ үү…" : submitLabel}
+                  <ArrowRight className="size-4" />
+                </button>
+              )}
               {mode === "code" && codeTarget ? (
                 <div className="flex justify-between">
                   <button type="button" onClick={reset} className={linkButton}>

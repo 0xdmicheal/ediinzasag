@@ -1,5 +1,5 @@
-import { type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, ArrowUp, ArrowUpRight } from 'lucide-react';
+import { type ReactNode } from 'react';
+import { ArrowUp, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 import { publicUrl } from '@/lib/public-url';
@@ -30,12 +30,6 @@ export interface Footer12Notice {
 export interface Footer12Props {
   brandName?: string;
   description?: string;
-  newsletterLabel?: string;
-  newsletterTitle?: string;
-  newsletterNote?: string;
-  inputPlaceholder?: string;
-  subscribeText?: string;
-  onSubscribe?: (email: string) => void;
   columns?: Footer12Column[];
   socialLinks?: Footer12SocialLink[];
   notices?: Footer12Notice[];
@@ -48,86 +42,43 @@ const columnsDefault: Footer12Column[] = [];
 const socialLinksDefault: Footer12SocialLink[] = [];
 const noticesDefault: Footer12Notice[] = [];
 
+/** Brand colour for each social mark on hover. X is black in light and white in dark, which is the mark itself. */
+const socialHover: Record<string, string> = {
+  YouTube: 'hover:border-[#ff0000]/40 hover:bg-[#ff0000]/10 hover:text-[#ff0000]',
+  Facebook: 'hover:border-[#1877f2]/40 hover:bg-[#1877f2]/10 hover:text-[#1877f2]',
+  Instagram: 'hover:border-[#c13584]/40 hover:bg-[#c13584]/10 hover:text-[#c13584] dark:hover:border-[#e4405f]/40 dark:hover:text-[#e4405f]',
+  Telegram: 'hover:border-[#168acd]/40 hover:bg-[#168acd]/10 hover:text-[#168acd] dark:hover:border-[#2aabee]/40 dark:hover:text-[#2aabee]',
+  X: 'hover:border-foreground/30 hover:bg-foreground/8 hover:text-foreground',
+};
+
 /**
- * Corporate footer: a fixed dark surface in both themes, so it reads as the
- * site's base rather than flipping with light/dark mode. Four bands, top to
- * bottom: newsletter, brand and site map, data notices, legal line.
+ * Footer follows the page appearance: paper and black wordmark in light,
+ * near-black and white wordmark in dark. Bands: brand and site map, data notices, legal line.
  */
 export function Footer12({
   brandName = 'Эдийн засаг',
   description,
-  newsletterLabel = 'Нийтлэл',
-  newsletterTitle = 'Долоо хоногийн тоймыг и-мэйлээр аваарай.',
-  newsletterNote = 'Захиалга Substack дээр баталгаажна.',
-  inputPlaceholder = 'И-мэйл хаяг',
-  subscribeText = 'Subscribe',
-  onSubscribe,
   columns = columnsDefault,
   socialLinks = socialLinksDefault,
   notices = noticesDefault,
   copyright = '© EZ Эдийн засаг',
 }: Footer12Props) {
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const formData = new FormData(event.currentTarget);
-    const email = String(formData.get('email') ?? '');
-    onSubscribe?.(email);
-  }
-
   return (
-    <footer className="bg-studio text-photo-foreground w-full border-t-2 border-brand font-sans">
+    <footer className="bg-background text-foreground w-full border-t border-border font-sans">
       <div className="mx-auto w-full max-w-[1520px] px-4 sm:px-6 lg:px-8">
-        {/* Newsletter */}
-        <section
-          aria-labelledby="footer-newsletter-title"
-          className="grid gap-6 border-b border-photo-foreground/10 py-10 sm:py-12 lg:grid-cols-12 lg:items-center lg:gap-8"
-        >
-          <div className="lg:col-span-7">
-            <p className={`${headingClass} text-brand`}>{newsletterLabel}</p>
-            <h2
-              id="footer-newsletter-title"
-              className="mt-3 max-w-2xl text-2xl leading-tight font-semibold tracking-tight text-balance sm:text-[1.75rem]"
-            >
-              {newsletterTitle}
-            </h2>
-          </div>
-          <div className="lg:col-span-5">
-            <form onSubmit={handleSubmit} className="flex flex-col gap-2 sm:flex-row">
-              <label htmlFor="footer-email" className="sr-only">
-                {inputPlaceholder}
-              </label>
-              <input
-                id="footer-email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                placeholder={inputPlaceholder}
-                className="h-12 w-full min-w-0 rounded-md border border-photo-foreground/15 bg-photo-foreground/5 px-4 text-sm text-photo-foreground outline-none transition-colors placeholder:text-photo-foreground/45 focus:border-brand sm:flex-1"
-              />
-              <button
-                type="submit"
-                className="inline-flex h-12 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-md bg-brand px-6 text-sm font-semibold text-brand-foreground transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
-              >
-                {subscribeText}
-                <ArrowRight className="size-4" />
-              </button>
-            </form>
-            <p className="mt-3 text-xs text-photo-foreground/50">{newsletterNote}</p>
-          </div>
-        </section>
-
         {/* Brand + site map */}
-        <div className="grid gap-12 border-b border-photo-foreground/10 py-12 lg:grid-cols-12 lg:gap-8 lg:py-14">
+        <div className="grid gap-12 border-b border-border py-12 lg:grid-cols-12 lg:gap-8 lg:py-14">
           <div className="lg:col-span-4 lg:pr-8">
             <Link to="/" className="inline-block" aria-label={brandName}>
-              <img src={publicUrl('brand/logo-white.png')} alt="" className="h-8 w-auto" />
+              <img src={publicUrl('brand/logo-black.png')} alt="" className="h-8 w-auto dark:hidden" />
+              <img src={publicUrl('brand/logo-white.png')} alt="" className="hidden h-8 w-auto dark:block" />
             </Link>
             {description && (
-              <p className="mt-6 max-w-sm text-sm leading-relaxed text-photo-foreground/60">{description}</p>
+              <p className="mt-6 max-w-sm text-sm leading-relaxed text-muted-foreground">{description}</p>
             )}
             {socialLinks.length > 0 && (
               <div className="mt-8">
-                <p className={`${headingClass} text-photo-foreground/50`}>Биднийг дагах</p>
+                <p className={`${headingClass} text-muted-foreground`}>Биднийг дагах</p>
                 <ul className="mt-4 flex flex-wrap gap-2">
                   {socialLinks.map((link) => (
                     <li key={link.label}>
@@ -137,7 +88,7 @@ export function Footer12({
                         rel="noreferrer"
                         aria-label={link.label}
                         title={link.label}
-                        className="grid size-9 place-items-center rounded-md border border-photo-foreground/15 text-photo-foreground/75 transition-colors hover:border-photo-foreground/40 hover:bg-photo-foreground/5 hover:text-photo-foreground"
+                        className={`grid size-11 place-items-center rounded-md border border-border text-muted-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${socialHover[link.label] ?? 'hover:border-foreground/30 hover:text-foreground'}`}
                       >
                         <span className="block leading-none [&_svg]:size-4">{link.icon}</span>
                       </a>
@@ -158,7 +109,7 @@ export function Footer12({
                 key={column.title}
                 className={column.links.some((link) => link.description) ? 'col-span-2 sm:col-span-1' : undefined}
               >
-                <h3 className={`${headingClass} border-b border-photo-foreground/10 pb-3`}>{column.title}</h3>
+                <h3 className={`${headingClass} border-b border-border pb-3`}>{column.title}</h3>
                 <ul className="mt-5 space-y-4">
                   {column.links.map((link) => (
                     <li key={link.label}>
@@ -173,23 +124,28 @@ export function Footer12({
 
         {/* Notices */}
         {notices.length > 0 && (
-          <dl className="grid gap-6 border-b border-photo-foreground/10 py-8 text-xs leading-relaxed md:grid-cols-2 lg:gap-8">
+          <dl className="grid gap-6 border-b border-border py-8 text-xs leading-relaxed md:grid-cols-2 lg:gap-8">
             {notices.map((notice) => (
               <div key={notice.title}>
-                <dt className="font-semibold text-photo-foreground/70">{notice.title}</dt>
-                <dd className="mt-1.5 max-w-xl text-photo-foreground/55">{notice.body}</dd>
+                <dt className="font-semibold text-foreground">{notice.title}</dt>
+                <dd className="mt-1.5 max-w-xl text-muted-foreground">{notice.body}</dd>
               </div>
             ))}
           </dl>
         )}
 
         {/* Legal line */}
-        <div className="flex flex-col gap-4 py-6 text-xs text-photo-foreground/50 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 py-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>{copyright}</p>
           <button
             type="button"
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="inline-flex w-fit cursor-pointer items-center gap-1.5 transition-colors hover:text-photo-foreground"
+            onClick={() =>
+              window.scrollTo({
+                top: 0,
+                behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+              })
+            }
+            className="ez-hit inline-flex w-fit cursor-pointer items-center gap-1.5 transition-colors hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             Дээш буцах
             <ArrowUp className="size-3.5" />
@@ -204,12 +160,12 @@ function FooterLink({ link }: { link: Footer12Link }) {
   const external = !link.href.startsWith('/');
   const body = (
     <>
-      <span className="inline-flex items-center gap-1 text-sm text-photo-foreground/75 transition-colors group-hover:text-photo-foreground">
+      <span className="inline-flex items-center gap-1 text-sm text-foreground/80 transition-colors group-hover:text-foreground">
         {link.label}
         {external && <ArrowUpRight aria-hidden="true" className="size-3.5 opacity-50" />}
       </span>
       {link.description && (
-        <span className="mt-0.5 block text-xs text-photo-foreground/50">{link.description}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{link.description}</span>
       )}
       {external && <span className="sr-only"> (шинэ цонхонд нээгдэнэ)</span>}
     </>

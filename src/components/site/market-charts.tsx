@@ -73,7 +73,7 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
         {/* Gridlines + y ticks */}
         {ticks.map((tick) => (
           <div key={tick} className="absolute inset-x-0 flex items-center" style={{ bottom: `${y(tick)}%` }}>
-            <span className="text-muted-foreground w-9 shrink-0 pr-2 text-right text-[10px] tabular-nums sm:w-12">
+            <span className="text-muted-foreground w-9 shrink-0 pr-2 text-right text-[11px] tabular-nums sm:w-12">
               {tick === 0 ? "0" : `${tick / 1000}k`}
             </span>
             <span className="bg-border h-px flex-1" />
@@ -96,7 +96,7 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
               <div key={point.label} className="group relative flex h-full min-w-0 flex-col items-center justify-end">
                 <span
                   className={cn(
-                    "mb-1.5 text-[10px] font-semibold whitespace-nowrap tabular-nums sm:text-xs",
+                    "mb-1.5 text-[11px] font-semibold whitespace-nowrap tabular-nums sm:text-xs",
                     last ? "text-foreground" : "text-muted-foreground",
                   )}
                 >
@@ -122,7 +122,7 @@ export function CheckpointChart({ points, high }: { points: Checkpoint[]; high: 
           <span
             key={point.label}
             className={cn(
-              "px-0.5 text-center text-[10px] leading-tight sm:text-[11px]",
+              "px-0.5 text-center text-[11px] leading-tight sm:text-[11px]",
               index === points.length - 1 ? "text-foreground font-semibold" : "text-muted-foreground",
             )}
           >
@@ -166,7 +166,7 @@ export function IndexRanking({
             <span className="min-w-0">
               <span className="flex items-center gap-2">
                 <span className="font-semibold">{row.label}</span>
-                <span className="text-muted-foreground bg-foreground/[0.06] rounded-sm px-1.5 text-[10px] leading-5">
+                <span className="text-muted-foreground bg-foreground/[0.06] rounded-sm px-1.5 text-[11px] leading-5">
                   {region(row.id)}
                 </span>
               </span>

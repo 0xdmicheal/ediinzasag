@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process"
+import type { IncomingMessage, ServerResponse } from "node:http"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import tailwindcss from "@tailwindcss/vite"
@@ -38,9 +39,30 @@ function substackRss() {
   }
 }
 
+/** Dev only: GET /__link-preview?url=… for the editor's link cards (production: Edge Function link-preview). */
+function linkPreviewDev() {
+  return {
+    name: "link-preview-dev",
+    apply: "serve" as const,
+    configureServer(server: { middlewares: { use: (path: string, handler: (req: IncomingMessage, res: ServerResponse) => void) => void } }) {
+      server.middlewares.use("/__link-preview", async (req, res) => {
+        res.setHeader("content-type", "application/json; charset=utf-8")
+        try {
+          const target = new URL(req.url ?? "", "http://localhost").searchParams.get("url") ?? ""
+          const { linkPreview } = await import("./scripts/link-preview.mjs")
+          res.end(JSON.stringify(await linkPreview(target)))
+        } catch (error) {
+          res.statusCode = 400
+          res.end(JSON.stringify({ error: error instanceof Error ? error.message : "Урьдчилан харах боломжгүй" }))
+        }
+      })
+    },
+  }
+}
+
 export default defineConfig({
   base: process.env.VITE_BASE || "/",
-  plugins: [substackRss(), react(), tailwindcss()],
+  plugins: [substackRss(), linkPreviewDev(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(root, "./src"),

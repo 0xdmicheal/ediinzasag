@@ -212,7 +212,7 @@ function Reaction({
       aria-label={ariaLabel}
       title={title}
       onClick={click}
-      className={`relative inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-300 active:scale-95 ${active ? `${activeSurface} ${activeTone === "text-foreground" ? "" : activeTone}` : "border-foreground/20 hover:bg-foreground/5"}`}
+      className={`ez-hit relative inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-300 active:scale-95 ${active ? `${activeSurface} ${activeTone === "text-foreground" ? "" : activeTone}` : "border-foreground/20 hover:bg-foreground/5"}`}
     >
       <span className="relative grid place-items-center">
         {burst}

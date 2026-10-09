@@ -1,3 +1,4 @@
+import type { LinkPreview } from "@/admin/link-preview"
 export type Role = "writer" | "editor" | "admin"
 export type Status = "draft" | "in_review" | "changes_requested" | "approved" | "published"
 export type Desk = "mongolia" | "world"
@@ -20,7 +21,72 @@ export interface ReaderRecord {
   /** YYYY-MM-DD or empty. */
   birthDate: string
   gender: "female" | "male" | "unspecified" | ""
+  /** Region id from src/reader/regions.ts, or empty. */
+  region: string
   joinedAt: string
+}
+
+/** What one agent run did, stage by stage (news_runs.details). */
+export interface RunDetails {
+  provider?: string
+  feeds_ok?: number
+  feeds_total?: number
+  feeds_failed?: string[]
+  /** Stories in the feeds from the last day or two. */
+  fresh?: number
+  /** Of those, not already on the board. */
+  new?: number
+  picked?: { title: string; source: string; priority: number }[]
+  failures?: string[]
+}
+
+/** One run of the news agent. */
+export interface NewsRun {
+  id: string
+  startedAt: string
+  finishedAt: string | null
+  trigger: "cron" | "manual"
+  scanned: number
+  created: number
+  error: string
+  details: RunDetails
+}
+
+export interface AuthorStats {
+  id: string
+  name: string
+  role: Role
+  drafts: number
+  inProgress: number
+  changesRequested: number
+  published: number
+  published30d: number
+  /** Agent briefings this person claimed. */
+  claimed: number
+  /** Average hours from first draft to publication; null when nothing is published. */
+  hoursToPublish: number | null
+  reads: number
+  fires: number
+  /** Approvals, change requests and publications made as a reviewer. */
+  reviews: number
+  lastActive: string | null
+}
+
+/** Admin-only monitoring numbers (admin_insights() in schema.sql). Personal details arrive as counts only. */
+export interface Insights {
+  readers: {
+    total: number
+    new7: number
+    new30: number
+    active30: number
+    ages: Record<string, number>
+    genders: Record<string, number>
+    regions: Record<string, number>
+    weeks: { week: string; n: number }[]
+  }
+  reading: { day: string; reads: number; readers: number }[]
+  authors: AuthorStats[]
+  agent: { waiting: number; claimed: number; published: number; runs: NewsRun[] }
 }
 
 export interface Tag {
@@ -44,12 +110,27 @@ export interface ArticleDraft {
   tags: string[]
   coverUrl: string
   coverAlt: string
+  /** "Зураг: Reuters" style credit, shown under the cover. */
+  coverCredit: string
+  /** False until a person confirms we may use an agent-imported cover. */
+  coverRightsOk: boolean
   sources: ArticleSource[]
+  /** "EZ-ийн дүгнэлт": the newsroom's own analysis. Required (40+ words) before an agent briefing is published. */
+  take: string
 }
+
+/** "human" articles are written in the newsroom; "bot" ones come from the news agent. */
+export type Origin = "human" | "bot"
 
 export interface Article extends ArticleDraft {
   id: string
   status: Status
+  origin: Origin
+  /** The original story an agent briefing was translated from. */
+  sourceUrl: string
+  /** What the agent wants a person to verify before publishing. */
+  botNotes: string
+  /** Empty for an agent briefing nobody has claimed yet. */
   authorId: string
   authorName: string
   reviewNote: string
@@ -79,10 +160,13 @@ export interface Backend {
   getArticle(id: string): Promise<Article | null>
   createArticle(draft: ArticleDraft): Promise<Article>
   updateArticle(id: string, draft: ArticleDraft): Promise<Article>
-  setStatus(id: string, status: Status, note?: string): Promise<Article>
+  /** publishAt (ISO, future) schedules a publication; omitted, it publishes now. */
+  setStatus(id: string, status: Status, note?: string, publishAt?: string): Promise<Article>
   deleteArticle(id: string): Promise<void>
   listActivity(articleId: string): Promise<Activity[]>
   uploadCover(file: File): Promise<string>
+  /** Title, description and picture of a web page, for link cards in the editor. */
+  linkPreview(url: string): Promise<LinkPreview>
 
   listTags(): Promise<Tag[]>
   createTag(label: string): Promise<Tag>
@@ -99,4 +183,12 @@ export interface Backend {
 
   /** Public, no login: published articles for the site. */
   listPublished(): Promise<Article[]>
+
+  /** Takes an unclaimed agent briefing: you become its author and it returns to draft. */
+  claimArticle(id: string): Promise<Article>
+  /** Editors and admins: run the news agent now. Resolves with how many briefings were added. */
+  runNewsAgent(): Promise<{ created: number; scanned: number; details?: RunDetails }>
+  listNewsRuns(): Promise<NewsRun[]>
+  /** Admin only. */
+  insights(): Promise<Insights>
 }

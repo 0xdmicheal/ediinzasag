@@ -1,7 +1,7 @@
 import { useMemo } from "react"
 import { Link, useParams } from "react-router-dom"
 
-import { ArticleLayout, excerpt, proseClass, type TocItem } from "@/components/site/article"
+import { ArticleLayout, EndActions, excerpt, proseClass, type TocItem } from "@/components/site/article"
 import { SubstackShelf } from "@/components/site/SubstackShelf"
 import { articleAd } from "@/content/ads"
 import { formatStoryDate } from "@/content/stories"
@@ -81,6 +81,7 @@ export function LetterPage() {
       }}
       toc={toc}
       ad={articleAd}
+      progressEnd="letter-end"
       rail={(layout) => <ArticleActions slug={letterKey(post.slug)} fire={fire} layout={layout} />}
       after={
         more.length > 0 ? (
@@ -104,6 +105,10 @@ export function LetterPage() {
           байна.
         </p>
       )}
+      <EndActions>
+        <ArticleActions slug={letterKey(post.slug)} fire={fire} layout="horizontal" />
+      </EndActions>
+
       <p id="letter-end" className="text-muted-foreground mt-12 text-[13px]">
         Эх хувь:{" "}
         <a href={post.link} target="_blank" rel="noreferrer" className="text-brand-strong underline underline-offset-2">

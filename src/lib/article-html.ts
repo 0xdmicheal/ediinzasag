@@ -8,8 +8,61 @@ import DOMPurify from "dompurify"
  */
 
 const allowed = {
-  ALLOWED_TAGS: ["p", "h2", "h3", "strong", "em", "s", "u", "a", "blockquote", "ul", "ol", "li", "img", "hr", "br", "figure", "figcaption"],
-  ALLOWED_ATTR: ["href", "src", "alt", "title", "target", "rel"],
+  ALLOWED_TAGS: ["p", "h2", "h3", "strong", "em", "s", "u", "a", "blockquote", "ul", "ol", "li", "img", "hr", "br", "figure", "figcaption", "small"],
+  ALLOWED_ATTR: ["href", "src", "alt", "title", "target", "rel", "data-width", "data-card", "data-image"],
+}
+
+/** Image sizes offered in the editor (percent of the text column). */
+export const IMAGE_WIDTHS = [
+  { value: 50, label: "S" },
+  { value: 75, label: "M" },
+  { value: 100, label: "L" },
+] as const
+
+export const MIN_IMAGE_WIDTH = 25
+
+/**
+ * Turns <figure data-width="60"> into an inline width for display. The saved
+ * HTML keeps only the number, so the sanitiser never has to allow style="".
+ */
+function applyImageWidths(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>("figure[data-width]").forEach((figure) => {
+    const width = Number(figure.dataset.width)
+    if (!Number.isFinite(width) || width >= 100) return
+    figure.style.width = `${Math.max(MIN_IMAGE_WIDTH, width)}%`
+    figure.style.minWidth = "min(100%, 220px)"
+    figure.style.marginInline = "auto"
+  })
+}
+
+/**
+ * Link cards (pasted links, see EditorLinkCard):
+ *   <figure data-card="link" data-image="on|off"><a href><img><strong>title</strong><em>description</em><small>site</small></a></figure>
+ * The picture stays in the saved HTML so the writer can switch it back on; when
+ * it's off, it is removed here so readers never download it. Pictures come from
+ * other sites, so they load without a referrer.
+ */
+function applyLinkCards(root: HTMLElement) {
+  root.querySelectorAll<HTMLElement>('figure[data-card="link"]').forEach((card) => {
+    const image = card.querySelector("img")
+    if (image && card.dataset.image === "off") image.remove()
+    else if (image) {
+      image.setAttribute("referrerpolicy", "no-referrer")
+      image.setAttribute("loading", "lazy")
+    }
+    card.querySelector("a")?.setAttribute("target", "_blank")
+    card.querySelector("a")?.setAttribute("rel", "noreferrer")
+  })
+}
+
+/** Sanitised body HTML ready to display (image widths and link cards applied). */
+export function renderBody(body: string) {
+  const html = bodyToHtml(body)
+  if (typeof DOMParser === "undefined") return html
+  const root = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html").body.firstElementChild as HTMLElement
+  applyImageWidths(root)
+  applyLinkCards(root)
+  return root.innerHTML
 }
 
 export function sanitize(html: string) {
@@ -59,6 +112,8 @@ export function prepareArticle(body: string) {
       node.id = `section-${index}`
       return { id: node.id, label: node.textContent!.trim() }
     })
+  applyImageWidths(root)
+  applyLinkCards(root)
   root.querySelectorAll("a").forEach((link) => {
     link.setAttribute("target", "_blank")
     link.setAttribute("rel", "noreferrer")

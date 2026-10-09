@@ -56,7 +56,7 @@ export function formatMove(move: string, denom: Denomination) {
 }
 
 const chipBase =
-  "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[10px] leading-none font-semibold tracking-wide whitespace-nowrap"
+  "inline-flex h-5 shrink-0 items-center gap-1 rounded-sm px-1.5 text-[11px] leading-none font-semibold tracking-wide whitespace-nowrap"
 
 /**
  * Colour-coded tag: cobalt tint for tugrik, outlined for dollars, neutral for points / rates / %.

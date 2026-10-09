@@ -91,7 +91,7 @@ export function BadgeShop({ points }: { points: number }) {
               className={`bg-card relative flex flex-col items-center gap-2 rounded-2xl border p-4 text-center transition-colors ${wearing ? "border-foreground ring-foreground/10 ring-4" : ""} ${isFounder && mine ? "bg-[linear-gradient(160deg,rgb(167_139_250/0.14),rgb(56_189_248/0.1))]" : ""}`}
             >
               {wearing ? (
-                <span className="bg-foreground text-background absolute top-2 right-2 rounded-full px-2 py-0.5 text-[10px] font-semibold">Зүүсэн</span>
+                <span className="bg-foreground text-background absolute top-2 right-2 rounded-full px-2 py-0.5 text-[11px] font-semibold">Зүүсэн</span>
               ) : null}
               <BadgeArt id={badge.id} size={64} locked={!mine} />
               <span className="text-[14px] font-semibold">{badge.name}</span>
@@ -104,7 +104,7 @@ export function BadgeShop({ points }: { points: number }) {
                   type="button"
                   disabled={busy === badge.id}
                   onClick={() => wear(badge.id)}
-                  className={`mt-auto inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full text-[12px] font-semibold transition-colors disabled:opacity-60 ${wearing ? "border-foreground/20 hover:bg-foreground/5 border" : "bg-foreground text-background hover:bg-foreground/85"}`}
+                  className={`ez-hit mt-auto inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full text-[12px] font-semibold transition-colors disabled:opacity-60 ${wearing ? "border-foreground/20 hover:bg-foreground/5 border" : "bg-foreground text-background hover:bg-foreground/85"}`}
                 >
                   {wearing ? "Тайлах" : (
                     <>
@@ -123,7 +123,7 @@ export function BadgeShop({ points }: { points: number }) {
                   type="button"
                   disabled={!affordable || busy === badge.id || owned === null}
                   onClick={() => buy(badge.id)}
-                  className="border-foreground/20 hover:bg-foreground/5 mt-auto inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full border text-[12px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                  className="ez-hit border-foreground/20 hover:bg-foreground/5 mt-auto inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-full border text-[12px] font-semibold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {affordable ? null : <Lock className="size-3" />}
                   {badge.cost} оноо

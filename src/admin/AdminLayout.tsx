@@ -1,5 +1,5 @@
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router-dom"
-import { ExternalLink, FilePlus2, KanbanSquare, LogOut, Mail, Tags, Users } from "lucide-react"
+import { ChartNoAxesColumn, ExternalLink, FilePlus2, KanbanSquare, LogOut, Mail, Tags, Users } from "lucide-react"
 
 import { canManageTags, canManageTeam } from "@/admin/rules"
 import { useSession } from "@/admin/session"
@@ -25,35 +25,36 @@ export function AdminLayout() {
     { to: "/admin/tags", label: "Шошго", icon: Tags, end: false, show: canManageTags(member) },
     { to: "/admin/team", label: "Баг", icon: Users, end: false, show: canManageTeam(member) },
     { to: "/admin/readers", label: "Уншигчид", icon: Mail, end: false, show: canManageTeam(member) },
+    { to: "/admin/insights", label: "Хяналт", icon: ChartNoAxesColumn, end: false, show: canManageTeam(member) },
   ].filter((link) => link.show)
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex h-9 items-center gap-2.5 rounded-md px-3 text-[13px] font-medium transition-colors ${isActive ? "bg-foreground/[0.07] text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"}`
+    `flex h-10 items-center gap-3 rounded-lg px-3 text-[14px] font-medium transition-colors ${isActive ? "bg-foreground/[0.07] text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"}`
 
   return (
     <div className="bg-background text-foreground relative isolate flex min-h-svh flex-col lg:flex-row">
 
       {/* Sidebar on desktop, top bar + scrolling tabs on phones. */}
-      <aside className="bg-background/85 sticky top-0 z-30 flex shrink-0 flex-col border-b backdrop-blur-xl lg:h-svh lg:w-60 lg:border-r lg:border-b-0">
-        <div className="flex h-14 items-center justify-between gap-3 px-4">
+      <aside className="ez-glass bg-background/80 sticky top-0 z-30 flex shrink-0 flex-col border-b backdrop-blur-xl lg:h-svh lg:w-60 lg:border-r lg:border-b-0">
+        <div className="flex h-16 items-center justify-between gap-3 px-5 lg:h-20">
           <Link to="/admin" className="flex items-center gap-2" aria-label="Самбар">
             <img src={publicUrl("brand/logo-black.png")} alt="" className="h-6 w-auto dark:hidden" />
             <img src={publicUrl("brand/logo-white.png")} alt="" className="hidden h-6 w-auto dark:block" />
-            <span className="text-muted-foreground font-mono text-[10px] uppercase">Редакц</span>
+            <span className="text-muted-foreground font-mono text-[11px] uppercase">Редакц</span>
           </Link>
           <div className="flex items-center gap-2 lg:hidden">
             <Avatar name={member.name} size="sm" />
           </div>
         </div>
-        <nav aria-label="Админ цэс" className="flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] lg:flex-col lg:overflow-visible lg:pb-0">
+        <nav aria-label="Админ цэс" className="flex gap-1 overflow-x-auto px-3 pb-2 [scrollbar-width:none] lg:mt-2 lg:flex-col lg:gap-1 lg:overflow-visible lg:pb-0">
           {links.map(({ to, label, icon: Icon, end }) => (
             <NavLink key={to} to={to} end={end} className={linkClass}>
-              <Icon className="size-4" />
+              <Icon className="size-5 shrink-0" strokeWidth={1.75} />
               <span className="whitespace-nowrap">{label}</span>
             </NavLink>
           ))}
           <a href={`${import.meta.env.BASE_URL}`} target="_blank" rel="noreferrer" className={linkClass({ isActive: false })}>
-            <ExternalLink className="size-4" />
+            <ExternalLink className="size-5 shrink-0" strokeWidth={1.75} />
             <span className="whitespace-nowrap">Сайт харах</span>
           </a>
         </nav>

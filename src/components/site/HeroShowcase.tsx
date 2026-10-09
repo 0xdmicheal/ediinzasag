@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from "react"
 import { Link } from "react-router-dom"
-import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight } from "lucide-react"
+import { ArrowRight, ArrowUpRight, ChevronLeft, ChevronRight, Pause, Play } from "lucide-react"
 
 import { signedPct } from "@/components/site/market-marks"
 import { formatMove, formatValue } from "@/components/site/money"
@@ -14,12 +14,16 @@ const pulseIds = ["gold", "brent", "copper"]
 function inkTone(pct: number) {
   if (pct > 0) return "text-[var(--up-on-ink)]"
   if (pct < 0) return "text-[var(--down-on-ink)]"
-  return "text-ink-foreground/60"
+  return "text-ink-foreground/65"
 }
 
 export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
   const [index, setIndex] = useState(0)
-  const [paused, setPaused] = useState(false)
+  // Hover and focus pause for a moment; the Pause button stops autoplay until pressed again.
+  const [hovering, setHovering] = useState(false)
+  const [stopped, setStopped] = useState(false)
+  const paused = hovering || stopped
+  const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   const startX = useRef<number | null>(null)
   const dragged = useRef(false)
   const remaining = useRef(HOLD_MS)
@@ -63,11 +67,11 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
       aria-roledescription="carousel"
       aria-label="Онцлох"
       className="grid gap-3 lg:h-[clamp(38rem,calc(100svh-8rem),48rem)] lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]"
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
-      onFocus={() => setPaused(true)}
+      onMouseEnter={() => setHovering(true)}
+      onMouseLeave={() => setHovering(false)}
+      onFocus={() => setHovering(true)}
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setPaused(false)
+        if (!event.currentTarget.contains(event.relatedTarget)) setHovering(false)
       }}
       onKeyDown={onKeyDown}
     >
@@ -103,7 +107,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
               aria-label={`${itemIndex + 1}. ${item.tab}`}
               aria-current={itemIndex === index ? "true" : undefined}
               onClick={() => go(itemIndex)}
-              className="group flex h-5 flex-1 items-center"
+              className="group -my-3 flex h-11 flex-1 items-center"
             >
               <span
                 className={`relative block h-[3px] w-full overflow-hidden rounded-full ${isPartner ? "bg-brand-foreground/20" : "bg-photo-foreground/25"}`}
@@ -123,14 +127,27 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
           ))}
         </div>
 
-        {/* Counter */}
-        <p
-          className={`absolute top-12 right-5 z-10 font-mono text-sm sm:top-14 sm:right-8 lg:top-16 lg:right-12 ${isPartner ? "text-brand-foreground/70" : "text-photo-foreground/75"}`}
+        {/* Counter and autoplay control. Moving content needs a way to stop it (HIG accessibility.md › Cognitive). */}
+        <div
+          className={`absolute top-11 right-3 z-10 flex items-center gap-1 font-mono text-sm sm:top-13 sm:right-6 lg:top-15 lg:right-10 ${isPartner ? "text-brand-foreground/80" : "text-photo-foreground/85"}`}
         >
-          {String(index + 1).padStart(2, "0")}
-          <span className="mx-1 opacity-50">/</span>
-          {String(count).padStart(2, "0")}
-        </p>
+          <p>
+            {String(index + 1).padStart(2, "0")}
+            <span className="mx-1 opacity-60">/</span>
+            {String(count).padStart(2, "0")}
+          </p>
+          {count > 1 && !reducedMotion ? (
+            <button
+              type="button"
+              onClick={() => setStopped((value) => !value)}
+              aria-label={stopped ? "Автоматаар солихыг эхлүүлэх" : "Автоматаар солихыг зогсоох"}
+              aria-pressed={stopped}
+              className={`grid size-11 place-items-center rounded-full transition-colors ${isPartner ? "hover:bg-brand-foreground/10" : "hover:bg-black/30"}`}
+            >
+              {stopped ? <Play className="size-4" /> : <Pause className="size-4" />}
+            </button>
+          ) : null}
+        </div>
 
         {/* Copy */}
         <div
@@ -230,7 +247,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
                   </span>
                   <SlideThumb slide={item} />
                   <span className="min-w-0">
-                    <span className="text-muted-foreground block text-[10px] tracking-[0.14em] uppercase">
+                    <span className="text-muted-foreground block text-[11px] tracking-[0.12em] uppercase">
                       {item.tab}
                     </span>
                     <span className="mt-0.5 line-clamp-2 text-[13px] leading-snug font-medium">{item.title}</span>
@@ -352,8 +369,8 @@ function MarketPulse() {
       className="bg-ink text-ink-foreground group block rounded-xl p-5 transition-transform xl:p-6 hover:-translate-y-0.5"
     >
       <div className="flex items-center justify-between gap-3">
-        <p className="text-ink-foreground/60 font-mono text-[11px] uppercase">ТОП-20 · {sessionLabel.split(" · ")[0]}</p>
-        <span className="text-ink-foreground/60 group-hover:text-ink-foreground inline-flex items-center gap-1 text-[11px]">
+        <p className="text-ink-foreground/65 font-mono text-[11px] uppercase">ТОП-20 · {sessionLabel.split(" · ")[0]}</p>
+        <span className="text-ink-foreground/65 group-hover:text-ink-foreground inline-flex items-center gap-1 text-[11px]">
           Ханш
           <ArrowUpRight className="size-3.5" />
         </span>
@@ -361,14 +378,14 @@ function MarketPulse() {
       <div className="mt-2 flex items-baseline justify-between gap-3">
         <p className="font-news text-[2.6rem] leading-none tracking-tight xl:text-5xl">
           {top20.price}
-          <span className="text-ink-foreground/50 ml-1.5 font-sans text-xs tracking-normal">оноо</span>
+          <span className="text-ink-foreground/65 ml-1.5 font-sans text-xs tracking-normal">оноо</span>
         </p>
         <p className={`text-sm font-medium tabular-nums ${inkTone(top20.pct)}`}>{signedPct(top20.pct)}</p>
       </div>
       <dl className="border-ink-foreground/15 mt-4 grid grid-cols-3 gap-2 border-t pt-3">
         {rows.map((quote) => (
           <div key={quote.id} className="min-w-0">
-            <dt className="text-ink-foreground/60 text-[10px] tracking-[0.12em] uppercase">{quote.label}</dt>
+            <dt className="text-ink-foreground/65 text-[11px] tracking-[0.12em] uppercase">{quote.label}</dt>
             <dd className="font-news mt-1 truncate text-lg leading-none">{formatValue(quote.price, quote.denom)}</dd>
             <dd className={`mt-1 text-[11px] tabular-nums ${inkTone(quote.pct)}`}>{formatMove(quote.move, quote.denom)}</dd>
           </div>

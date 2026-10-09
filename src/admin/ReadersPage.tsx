@@ -8,6 +8,7 @@ import type { ReaderRecord } from "@/admin/types"
 import { buttonClass, inputClass, Notice } from "@/admin/ui"
 import { formatPhone } from "@/reader/phone"
 import { ReaderAvatar } from "@/reader/ReaderAvatar"
+import { regionLabel } from "@/reader/regions"
 import { genderLabel } from "@/reader/types"
 
 function csvCell(value: string) {
@@ -17,13 +18,14 @@ function csvCell(value: string) {
 /** Downloads the list as CSV. The BOM makes Excel read Cyrillic correctly. */
 function downloadCsv(readers: ReaderRecord[]) {
   const rows = [
-    ["Нэр", "И-мэйл", "Утас", "Төрсөн огноо", "Хүйс", "Бүртгүүлсэн"],
+    ["Нэр", "И-мэйл", "Утас", "Төрсөн огноо", "Хүйс", "Байршил", "Бүртгүүлсэн"],
     ...readers.map((reader) => [
       reader.name,
       reader.email,
       reader.phone,
       reader.birthDate,
       reader.gender ? genderLabel[reader.gender] : "",
+      reader.region ? regionLabel(reader.region) : "",
       reader.joinedAt.slice(0, 10),
     ]),
   ]
@@ -108,9 +110,11 @@ export function ReadersPage() {
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[14px] font-medium">
                   {reader.name || "—"}
-                  {reader.gender || reader.birthDate ? (
+                  {reader.gender || reader.birthDate || reader.region ? (
                     <span className="text-muted-foreground ml-2 text-[12px] font-normal">
-                      {[reader.gender ? genderLabel[reader.gender] : "", reader.birthDate].filter(Boolean).join(" · ")}
+                      {[reader.gender ? genderLabel[reader.gender] : "", reader.birthDate, reader.region ? regionLabel(reader.region) : ""]
+                        .filter(Boolean)
+                        .join(" · ")}
                     </span>
                   ) : null}
                 </p>

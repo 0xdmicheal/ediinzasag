@@ -63,7 +63,7 @@ export function HeaderLink({ to, children }: { to: string; children: ReactNode }
   return (
     <Link
       to={to}
-      className="group hover:bg-foreground hover:text-background inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-colors"
+      className="ez-hit group hover:bg-foreground hover:text-background inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-colors"
     >
       {children}
       <ArrowUpRight className="size-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -140,7 +140,7 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
         className="group ez-lift relative isolate flex min-h-[19rem] flex-col justify-end overflow-hidden rounded-lg sm:min-h-[22rem] md:col-span-2 lg:row-span-2"
       >
         <Cover src={feature.image} className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
-        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/90 via-black/45 to-black/5" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-25% via-black/70 via-55% to-black/15" />
         <div className="text-photo-foreground p-5 sm:p-6">
           <p className="text-photo-foreground/75 text-[11px] tracking-[0.16em] uppercase">
             Онцлох захидал · {letterDate(feature.date)}
@@ -177,7 +177,7 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
             <Cover src={post.image} className={`h-full w-full ${zoom}`} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col p-3 md:p-3.5">
-            <p className="text-muted-foreground text-[10px] tracking-[0.12em] uppercase">{letterDate(post.date)}</p>
+            <p className="text-muted-foreground text-[11px] tracking-[0.12em] uppercase">{letterDate(post.date)}</p>
             <h3 className="font-news mt-1.5 line-clamp-2 text-[17px] leading-snug">
               <span className="ez-underline">{post.title}</span>
             </h3>
@@ -322,7 +322,7 @@ export function StoryRail({
               className="group ez-lift relative isolate flex aspect-[4/5] w-[72%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-lg sm:w-[17rem] lg:w-[calc((100%-2.25rem)/4)]"
             >
               <img src={art.src} alt={art.alt} className={`absolute inset-0 -z-10 h-full w-full object-cover ${zoom}`} />
-              <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/90 via-black/30 to-black/10" />
+              <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-20% via-black/60 via-55% to-black/15" />
               <div className="flex items-start justify-between p-3.5">
                 <TopicChip topic={story.topic} onPhoto />
                 <span className="text-photo-foreground/70 text-[11px] tabular-nums">{formatStoryDate(story.date)}</span>
@@ -435,7 +435,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
       </Link>
 
       <div className="flex flex-col p-5 sm:p-6">
-        <p className="text-ink-foreground/60 text-[11px] tracking-[0.2em] uppercase">YouTube · @ediinzasag</p>
+        <p className="text-ink-foreground/65 text-[11px] tracking-[0.2em] uppercase">YouTube · @ediinzasag</p>
         <h2 className="font-news mt-1.5 text-4xl leading-none">EZ Talk</h2>
         <p className="text-ink-foreground/70 mt-3 max-w-md text-sm leading-relaxed">
           Эдийн засагч Nio, зах зээлийн шинжээч Ulemj. Сэдэв бүрийг тоогоор нь ярина.
@@ -448,7 +448,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
                   <EpisodeThumb episode={episode} quality="hq" className="h-full w-full" />
                 </span>
                 <span className="min-w-0">
-                  <span className="text-ink-foreground/55 block text-[11px] tracking-wide uppercase">
+                  <span className="text-ink-foreground/65 block text-[11px] tracking-wide uppercase">
                     {episode.date} · {minutes(episode.seconds)}
                   </span>
                   <span className="mt-0.5 line-clamp-1 block text-sm">{episode.title}</span>

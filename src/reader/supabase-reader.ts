@@ -77,7 +77,7 @@ export function createSupabaseReader(): ReaderAuth {
       const { data } = await client.auth.getUser()
       if (!data.user) return null
       const [{ data: row }, { data: staff }] = await Promise.all([
-        client.from("readers").select("name, comment_anonymous, avatar, birth_date, gender, badge, member_no").eq("id", data.user.id).maybeSingle(),
+        client.from("readers").select("name, comment_anonymous, avatar, birth_date, gender, region, badge, member_no").eq("id", data.user.id).maybeSingle(),
         // Only team members can read profiles, so this is empty for everyone else.
         client.from("profiles").select("role").eq("id", data.user.id).maybeSingle(),
       ])
@@ -93,6 +93,7 @@ export function createSupabaseReader(): ReaderAuth {
         avatar: row?.avatar ?? "",
         birthDate: row?.birth_date ?? "",
         gender: row?.gender ?? "",
+        region: row?.region ?? "",
         badge: row?.badge ?? "",
         memberNo: row?.member_no ?? null,
       } satisfies Reader
@@ -156,10 +157,11 @@ export function createSupabaseReader(): ReaderAuth {
     async updateProfile(patch) {
       const { data } = await client.auth.getUser()
       if (!data.user) throw new Error("Нэвтэрнэ үү")
-      const row: Record<string, string> = {}
+      const row: Record<string, string | null> = {}
       if (patch.avatar !== undefined) row.avatar = patch.avatar
       if (patch.birthDate !== undefined) row.birth_date = patch.birthDate
       if (patch.gender !== undefined) row.gender = patch.gender
+      if (patch.region !== undefined) row.region = patch.region || null
       const { error } = await client.from("readers").update(row).eq("id", data.user.id)
       if (error) fail(error.message.includes("birth_date") ? { message: "Төрсөн огноо буруу байна" } : error)
     },

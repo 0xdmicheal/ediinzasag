@@ -17,13 +17,18 @@ export function StatusPill({ status, className }: { status: Status; className?: 
 
 export function RoleBadge({ role }: { role: Role }) {
   return (
-    <span className="bg-foreground/[0.07] text-muted-foreground rounded-md px-1.5 py-0.5 font-mono text-[10px] uppercase">
+    <span
+      className={cn(
+        "rounded-md px-1.5 py-0.5 font-mono text-[11px] font-semibold uppercase",
+        role === "admin" ? "bg-foreground text-background" : "bg-foreground/[0.07] text-foreground/80",
+      )}
+    >
       {roleLabel[role]}
     </span>
   )
 }
 
-export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" }) {
+export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md" | "lg" }) {
   const initials = name
     .split(/\s+/)
     .map((part) => part[0])
@@ -34,8 +39,8 @@ export function Avatar({ name, size = "md" }: { name: string; size?: "sm" | "md"
   return (
     <span
       className={cn(
-        "bg-brand-soft text-brand-strong grid shrink-0 place-items-center rounded-full font-semibold",
-        size === "sm" ? "size-6 text-[10px]" : "size-8 text-[12px]",
+        "bg-foreground/[0.07] text-foreground grid shrink-0 place-items-center rounded-full font-semibold",
+        size === "sm" ? "size-6 text-[10px]" : size === "lg" ? "size-11 text-[14px]" : "size-8 text-[12px]",
       )}
       aria-hidden
     >
@@ -57,7 +62,7 @@ export function Field({ label, hint, htmlFor, children }: { label: string; hint?
 }
 
 export const inputClass =
-  "bg-card w-full rounded-md border px-3 py-2 text-[14px] outline-none transition-colors placeholder:text-muted-foreground/70 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
+  "bg-card w-full rounded-md border px-3 py-2 text-[14px] outline-none transition-colors placeholder:text-muted-foreground/80 focus:border-brand focus:ring-2 focus:ring-brand/20 disabled:opacity-60"
 
 export const buttonClass = {
   primary:
