@@ -145,7 +145,7 @@ export function TalkPage() {
             </a>
 
             <div className="border-photo-foreground/15 mt-6 border-t pt-4 lg:mt-auto">
-              <p className="text-photo-foreground/50 text-[10px] tracking-[0.18em] uppercase">Дараагийнх</p>
+              <p className="text-photo-foreground/70 text-[11px] tracking-[0.18em] uppercase">Дараагийнх</p>
               <ul className="mt-2">
                 {upNext.map((episode) => (
                   <li key={episode.href}>
@@ -161,7 +161,7 @@ export function TalkPage() {
                         </span>
                       </span>
                       <span className="min-w-0">
-                        <span className="text-photo-foreground/50 block text-[10px] tracking-wide uppercase">
+                        <span className="text-photo-foreground/70 block text-[11px] tracking-wide uppercase">
                           {episode.n != null ? `#${episode.n} · ` : ""}
                           {episode.date}
                         </span>
@@ -264,7 +264,7 @@ export function TalkPage() {
                       {clock(episode.seconds)}
                     </span>
                     {current ? (
-                      <span className="bg-brand text-brand-foreground absolute bottom-2 left-2 rounded-sm px-1.5 py-0.5 text-[10px] font-semibold tracking-wide uppercase">
+                      <span className="bg-brand text-brand-foreground absolute bottom-2 left-2 rounded-sm px-1.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
                         Тоглож байна
                       </span>
                     ) : null}

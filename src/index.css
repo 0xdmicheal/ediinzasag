@@ -20,6 +20,9 @@
     --font-body: "Onest Variable", "Segoe UI", sans-serif;
     --font-read: "Literata Variable", Georgia, serif;
     --font-mono: "JetBrains Mono Variable", Consolas, monospace;
+    /* Shimmer button: a light travels the rim. --speed is set on the button. */
+    --animate-shimmer-slide: shimmer-slide var(--speed) ease-in-out infinite alternate;
+    --animate-spin-around: spin-around calc(var(--speed) * 2) infinite linear;
     /* Extended palette: Blue and Gray 50-900 (500 = the primary colour). */
     --color-blue-50: #f6fcff;
     --color-blue-100: #ddf2ff;
@@ -61,7 +64,7 @@
     --color-brand-strong: var(--brand-strong);
     --color-brand-soft: var(--brand-soft);
     --color-brand-foreground: var(--brand-foreground);
-    /* Fixed surfaces that do not flip with the theme (ticker, footer, studio, photos). */
+    /* Fixed surfaces that do not flip with the theme (ticker, studio, photos). The footer uses background and foreground. */
     --color-photo-foreground: #eef0f3;
     --color-studio: #16181c;
     --color-desk-mongolia: var(--desk-mongolia);
@@ -95,8 +98,8 @@
 }
 
 /*
- * Primary colours: Gray 900 #131518 (soft black), off-white #F6F7F9, Gray 500 #6C7584, Blue 500 #298DFF.
- * Pure #000 / #FFF are avoided: text is Gray 900 on off-white, dark mode is #E8EAED on #0F1013.
+ * Primary colours: Gray 900 #131518 (soft black), page #E0E0E0, Gray 500 #6C7584, Blue 500 #298DFF.
+ * Pure #000 / #FFF are avoided: text is Gray 900 on #E0E0E0, dark mode is #E8EAED on #121212.
  * Accessibility: every text pairing meets WCAG AA (aim AAA). Measured ratios:
  *   black on white 21:1 · Gray 600 on white 7.99:1 · Blue 600 on white 6.44:1
  *   black on Blue 500 6.35:1 (buttons) · Blue 400 on black 8.57:1 (dark links)
@@ -104,9 +107,9 @@
  * Blue 500 on white is for graphics and large type only (3.31:1).
  */
 :root {
-    --background: #f6f7f9;
+    --background: #e0e0e0;
     --foreground: #131518;
-    --card: rgb(255 255 255 / 0.58);
+    --card: rgb(255 255 255 / 0.8);
     --card-foreground: #131518;
     --popover: #ffffff;
     --popover-foreground: #131518;
@@ -158,9 +161,9 @@
 
 .dark {
     color-scheme: dark;
-    --background: #0a0b0d;
+    --background: #121212;
     --foreground: #e8eaed;
-    --card: rgb(23 25 29 / 0.55);
+    --card: rgb(23 25 29 / 0.8);
     --card-foreground: #e8eaed;
     --popover: #17191d;
     --popover-foreground: #e8eaed;
@@ -268,6 +271,36 @@
   .price-ticker {
     -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
     mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+  }
+}
+
+@keyframes shimmer-slide {
+  to {
+    transform: translate(calc(100cqw - 100%), 0);
+  }
+}
+
+@keyframes spin-around {
+  0% {
+    transform: translateZ(0) rotate(0);
+  }
+  15%,
+  35% {
+    transform: translateZ(0) rotate(90deg);
+  }
+  65%,
+  85% {
+    transform: translateZ(0) rotate(270deg);
+  }
+  100% {
+    transform: translateZ(0) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer-slide,
+  .animate-spin-around {
+    animation: none;
   }
 }
 
@@ -588,129 +621,134 @@
 }
 
 /*
- * Ambient background: a slowly moving blue gradient, a different motion per
- * page (AmbientBackground sets data-variant). Built from the extended Blue
- * palette. Glass surfaces (.bg-card, nav, ticker) blur what passes behind them.
- *
- *   aurora  home      four fields drifting on separate paths
- *   flow    markets   wide bands sliding sideways, like a price line
- *   pulse   EZ Talk   a centre glow that breathes, with orbiting light
- *   calm    articles  one soft sweep across the header, quiet for reading
- *   orbit   other     fields circling the middle of the screen
+ * Whole-site field. In light, AmbientBackground paints four soft washes that
+ * drift, follow the pointer, and move with scroll, then a paper scrim. In dark
+ * the canvas is a flat #121212. Fractal noise sits on both. Reduced transparency
+ * hides the field (see below).
  */
-.ez-ambient {
-  --b1: rgb(188 226 255 / 0.70);  /* Blue 200 */
-  --b2: rgb(221 242 255 / 0.85);  /* Blue 100 */
-  --b3: rgb(143 203 255 / 0.40);  /* Blue 300 */
-  --b4: rgb(188 226 255 / 0.50);  /* Blue 200 */
-}
-
-.dark .ez-ambient {
-  --b1: rgb(52 57 64 / 0.55);     /* Gray 700 */
-  --b2: rgb(0 0 0 / 0.75);        /* Black */
-  --b3: rgb(34 37 41 / 0.70);     /* Gray 800 */
-  --b4: rgb(75 81 91 / 0.18);     /* Gray 600 */
-}
-
-.ez-ambient-stage {
+.ez-ambient-canvas {
   position: absolute;
   inset: 0;
-  filter: blur(110px) saturate(135%);
-  animation: ez-fade-in 1.2s ease both;
+  width: 100%;
+  height: 100%;
 }
 
-/* Lifts the page tone over the colour so text on the bare page stays crisp, with a faint frost. */
-.ez-ambient-veil {
-  position: absolute;
-  inset: 0;
-  -webkit-backdrop-filter: blur(24px);
-  backdrop-filter: blur(24px);
-  background: linear-gradient(to bottom, transparent, color-mix(in oklch, var(--background) 30%, transparent));
+/*
+ * Day/night reveal. The new theme expands in a circle from the toggle.
+ * The collapsed clip is pinned before the animation starts so the new
+ * theme does not flash full-frame. Percentages keep the origin on the
+ * button at fractional display scales.
+ */
+html[data-ez-theme-vt="active"]::view-transition-group(root) {
+  animation-duration: var(--ez-theme-duration, 400ms);
+}
+html[data-ez-theme-vt="active"]::view-transition-old(root),
+html[data-ez-theme-vt="active"]::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+html[data-ez-theme-vt="active"]::view-transition-old(root) {
+  z-index: 1;
+}
+html[data-ez-theme-vt="active"]::view-transition-new(root) {
+  z-index: 2;
+  clip-path: var(--ez-theme-clip-from);
 }
 
-.ez-layer {
-  position: absolute;
-  border-radius: 9999px;
-  will-change: transform;
-}
-
-@keyframes ez-fade-in {
-  from { opacity: 0; }
-}
-
-/* ---- aurora (home) ---- */
-[data-variant="aurora"] .ez-layer-1 { top: -20vh; left: -15vw; width: 60vw; height: 60vw; background: radial-gradient(circle, var(--b1), transparent 68%); animation: ez-aurora-1 34s ease-in-out infinite alternate; }
-[data-variant="aurora"] .ez-layer-2 { top: 15vh; right: -20vw; width: 55vw; height: 55vw; background: radial-gradient(circle, var(--b3), transparent 66%); animation: ez-aurora-2 42s ease-in-out infinite alternate; }
-[data-variant="aurora"] .ez-layer-3 { bottom: -25vh; left: 20vw; width: 50vw; height: 50vw; background: radial-gradient(circle, var(--b2), transparent 66%); animation: ez-aurora-3 50s ease-in-out infinite alternate; }
-[data-variant="aurora"] .ez-layer-4 { top: 50%; left: 50%; width: 140vmax; height: 140vmax; margin: -70vmax 0 0 -70vmax; background: conic-gradient(from 0deg, transparent, var(--b4), transparent 40%, var(--b4) 70%, transparent); opacity: 0.6; animation: ez-spin 90s linear infinite; }
-@keyframes ez-aurora-1 { to { transform: translate3d(22vw, 18vh, 0) scale(1.2); } }
-@keyframes ez-aurora-2 { to { transform: translate3d(-25vw, 20vh, 0) scale(0.85); } }
-@keyframes ez-aurora-3 { to { transform: translate3d(18vw, -22vh, 0) scale(1.15); } }
-
-/* ---- flow (markets) ---- */
-[data-variant="flow"] .ez-layer { border-radius: 50%; }
-[data-variant="flow"] .ez-layer-1 { top: 2vh; left: -40vw; width: 180vw; height: 36vh; background: radial-gradient(ellipse, var(--b1), transparent 70%); animation: ez-flow-a 26s ease-in-out infinite alternate; }
-[data-variant="flow"] .ez-layer-2 { top: 34vh; left: -40vw; width: 180vw; height: 30vh; background: radial-gradient(ellipse, var(--b3), transparent 70%); animation: ez-flow-b 34s ease-in-out infinite alternate; }
-[data-variant="flow"] .ez-layer-3 { top: 62vh; left: -40vw; width: 180vw; height: 34vh; background: radial-gradient(ellipse, var(--b2), transparent 70%); animation: ez-flow-a 40s ease-in-out infinite alternate-reverse; }
-[data-variant="flow"] .ez-layer-4 { top: 20vh; left: -40vw; width: 180vw; height: 20vh; background: radial-gradient(ellipse, var(--b4), transparent 70%); animation: ez-flow-b 22s ease-in-out infinite alternate-reverse; }
-@keyframes ez-flow-a { from { transform: translate3d(-18vw, 0, 0) rotate(-4deg); } to { transform: translate3d(18vw, 6vh, 0) rotate(3deg); } }
-@keyframes ez-flow-b { from { transform: translate3d(16vw, 4vh, 0) rotate(3deg); } to { transform: translate3d(-16vw, -4vh, 0) rotate(-3deg); } }
-
-/* ---- pulse (EZ Talk) ---- */
-[data-variant="pulse"] .ez-layer-1 { top: 50%; left: 50%; width: 70vw; height: 70vw; margin: -35vw 0 0 -35vw; background: radial-gradient(circle, var(--b1), transparent 65%); animation: ez-breathe 11s ease-in-out infinite; }
-[data-variant="pulse"] .ez-layer-2,
-[data-variant="pulse"] .ez-layer-3 { top: 50%; left: 50%; width: 34vw; height: 34vw; margin: -17vw 0 0 -17vw; }
-[data-variant="pulse"] .ez-layer-2 { background: radial-gradient(circle, var(--b3), transparent 65%); animation: ez-orbit-r 28s linear infinite; }
-[data-variant="pulse"] .ez-layer-3 { background: radial-gradient(circle, var(--b2), transparent 65%); animation: ez-orbit-l 36s linear infinite; }
-[data-variant="pulse"] .ez-layer-4 { top: -30vh; right: -20vw; width: 50vw; height: 50vw; background: radial-gradient(circle, var(--b4), transparent 65%); animation: ez-breathe 17s ease-in-out infinite reverse; }
-@keyframes ez-breathe { 0%, 100% { transform: scale(0.82); opacity: 0.75; } 50% { transform: scale(1.12); opacity: 1; } }
-@keyframes ez-orbit-r { from { transform: rotate(0deg) translateX(30vw) rotate(0deg); } to { transform: rotate(360deg) translateX(30vw) rotate(-360deg); } }
-@keyframes ez-orbit-l { from { transform: rotate(360deg) translateX(24vw) rotate(-360deg); } to { transform: rotate(0deg) translateX(24vw) rotate(0deg); } }
-
-/* ---- calm (stories, letters) ---- */
-[data-variant="calm"] .ez-layer-1 { top: -30vh; left: -10vw; width: 70vw; height: 60vh; border-radius: 50%; background: radial-gradient(ellipse, var(--b3), transparent 70%); animation: ez-sweep 40s ease-in-out infinite alternate; }
-[data-variant="calm"] .ez-layer-2 { top: -25vh; right: -15vw; width: 50vw; height: 50vh; border-radius: 50%; background: radial-gradient(ellipse, var(--b1), transparent 70%); opacity: 0.55; animation: ez-sweep 52s ease-in-out infinite alternate-reverse; }
-[data-variant="calm"] .ez-layer-3,
-[data-variant="calm"] .ez-layer-4 { display: none; }
-@keyframes ez-sweep { to { transform: translate3d(28vw, 4vh, 0) scale(1.1); } }
-
-/* ---- orbit (desks, about, newsletter, others) ---- */
-[data-variant="orbit"] .ez-layer { top: 50%; left: 50%; }
-[data-variant="orbit"] .ez-layer-1 { width: 48vw; height: 48vw; margin: -24vw 0 0 -24vw; background: radial-gradient(circle, var(--b1), transparent 66%); animation: ez-orbit-wide 60s linear infinite; }
-[data-variant="orbit"] .ez-layer-2 { width: 42vw; height: 42vw; margin: -21vw 0 0 -21vw; background: radial-gradient(circle, var(--b3), transparent 66%); animation: ez-orbit-wide 75s linear infinite reverse; }
-[data-variant="orbit"] .ez-layer-3 { width: 36vw; height: 36vw; margin: -18vw 0 0 -18vw; background: radial-gradient(circle, var(--b2), transparent 66%); animation: ez-orbit-tight 48s linear infinite; }
-[data-variant="orbit"] .ez-layer-4 { width: 60vw; height: 60vw; margin: -30vw 0 0 -30vw; background: radial-gradient(circle, var(--b4), transparent 66%); animation: ez-breathe 20s ease-in-out infinite; }
-@keyframes ez-orbit-wide { from { transform: rotate(0deg) translateX(32vw) rotate(0deg); } to { transform: rotate(360deg) translateX(32vw) rotate(-360deg); } }
-@keyframes ez-orbit-tight { from { transform: rotate(120deg) translateX(20vw) rotate(-120deg); } to { transform: rotate(480deg) translateX(20vw) rotate(-480deg); } }
-
-@keyframes ez-spin { to { transform: rotate(360deg); } }
-
-/* Glass surfaces: translucent fill, blur and a hairline highlight on the top edge. */
+/*
+ * Content surfaces (.bg-card) use a thick, quiet material: a mostly opaque fill
+ * and a light blur, no saturation boost or specular edge. Liquid-glass styling
+ * (strong blur, saturation, top highlight) is kept for the floating functional
+ * layer only: the header, the ☰ sheet, menus and popovers (.ez-glass).
+ * HIG materials.md › Liquid Glass: "Don't use Liquid Glass in the content layer."
+ */
 .bg-card {
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  backdrop-filter: blur(28px) saturate(160%);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.55);
-}
-.dark .bg-card {
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
-/* Phones: bigger fields relative to the screen, lighter blur for smooth scrolling. */
-@media (max-width: 640px) {
-  .ez-ambient-stage { filter: blur(70px) saturate(135%); }
-  [data-variant="aurora"] .ez-layer-1 { width: 110vw; height: 110vw; }
-  [data-variant="aurora"] .ez-layer-2 { width: 100vw; height: 100vw; }
-  [data-variant="aurora"] .ez-layer-3 { width: 95vw; height: 95vw; }
-  [data-variant="pulse"] .ez-layer-1 { width: 130vw; height: 130vw; margin: -65vw 0 0 -65vw; }
-  [data-variant="orbit"] .ez-layer-1 { width: 90vw; height: 90vw; margin: -45vw 0 0 -45vw; }
-  [data-variant="orbit"] .ez-layer-2 { width: 80vw; height: 80vw; margin: -40vw 0 0 -40vw; }
-  [data-variant="calm"] .ez-layer-1 { width: 130vw; }
+.ez-glass {
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(150%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.5);
+}
+.dark .ez-glass {
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ez-layer,
-  .ez-ambient-stage { animation: none !important; }
+/*
+ * Keyboard focus: one visible ring everywhere. Blue 500 on the page is 3.2:1,
+ * above the 3:1 needed for non-text indicators.
+ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
 }
+
+/*
+ * Touch targets: small pills and icon buttons keep their look, but on touch
+ * screens an invisible halo grows the hit area to 44×44 (HIG accessibility.md ›
+ * Mobility). Put .ez-hit on any control drawn smaller than 44px.
+ */
+@media (pointer: coarse) {
+  .ez-hit {
+    position: relative;
+  }
+  .ez-hit::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Reduce Transparency: every material becomes an opaque surface, the backdrop goes still. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --card: #ffffff;
+  }
+  .dark {
+    --card: #17191d;
+  }
+  .bg-card,
+  .ez-glass,
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .ez-glass {
+    background-color: var(--background) !important;
+  }
+  .ez-ambient {
+    display: none;
+  }
+}
+
+/* Increase Contrast: flat paper, darker secondary text, firmer borders, opaque cards. */
+@media (prefers-contrast: more) {
+  .ez-ambient {
+    display: none;
+  }
+  :root {
+    --muted-foreground: #343940;
+    --border: #a1a7b2;
+    --input: #6c7584;
+    --card: #ffffff;
+  }
+  .dark {
+    --muted-foreground: #c2c6cd;
+    --border: #6c7584;
+    --input: #89919f;
+    --card: #17191d;
+  }
+}
+
+
 
 
 /* Rich-text editor (admin): placeholder text and a quiet selection colour. */
@@ -731,4 +769,101 @@
   margin: 2.5rem auto;
   width: 30%;
   border-color: var(--border);
+}
+
+/*
+ * Link cards in articles (pasted links). Same markup in the editor, the preview
+ * and the public page; unlayered so it wins over the prose utilities.
+ * Picture on top at the usual 1.91:1 link-preview ratio, then title,
+ * description and site. With the picture switched off it is a compact text card.
+ */
+figure[data-card="link"] {
+  margin-block: 2rem;
+}
+figure[data-card="link"] > a {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 0.5rem);
+  background: var(--card);
+  color: var(--foreground);
+  text-decoration: none;
+  transition: border-color 200ms ease;
+}
+figure[data-card="link"] > a:hover {
+  border-color: color-mix(in oklch, var(--foreground) 30%, transparent);
+}
+figure[data-card="link"] img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.91 / 1;
+  object-fit: cover;
+  margin: 0;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+figure[data-card="link"][data-image="off"] img {
+  display: none;
+}
+figure[data-card="link"] strong {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 0.875rem 1rem 0;
+  font-family: var(--font-news);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+figure[data-card="link"] em {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  padding: 0.25rem 1rem 0;
+  font-style: normal;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+figure[data-card="link"] small {
+  display: block;
+  padding: 0.5rem 1rem 0.875rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--muted-foreground);
+}
+
+/* Reading progress: the small confetti burst when an article is read to the end (article.tsx › Confetti). */
+@keyframes ez-confetti {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  70% {
+    opacity: 1;
+    transform: translate3d(var(--dx), calc(var(--rise) * -1), 0) rotate(var(--rot));
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(calc(var(--dx) * 1.25), calc(var(--rise) * -0.8), 0) rotate(calc(var(--rot) * 1.4));
+  }
+}
+
+.ez-confetti {
+  position: absolute;
+  bottom: 0;
+  opacity: 0;
+  animation-name: ez-confetti;
+  animation-timing-function: cubic-bezier(0.2, 0.7, 0.3, 1);
+  animation-fill-mode: forwards;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ez-confetti {
+    display: none;
+  }
 }

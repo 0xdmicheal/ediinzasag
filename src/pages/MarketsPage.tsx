@@ -253,12 +253,12 @@ function Top20() {
           </div>
 
           <div className="bg-ink text-ink-foreground rounded-md p-4">
-            <p className="text-ink-foreground/60 text-[11px] tracking-[0.14em] uppercase">Энэ юу гэсэн үг вэ?</p>
+            <p className="text-ink-foreground/65 text-[11px] tracking-[0.14em] uppercase">Энэ юу гэсэн үг вэ?</p>
             <p className="mt-2 text-sm leading-relaxed">
               1 жилийн өмнө ТОП-20-той яг адил хөдөлсөн <strong>1,000,000₮</strong> одоо ойролцоогоор{" "}
               <strong>{money(grown.toLocaleString("en-US"), "MNT")}</strong> болох байсан.
             </p>
-            <p className="text-ink-foreground/50 mt-1 text-[11px]">Жишээ. Шимтгэл, ногдол ашгийг тооцоогүй.</p>
+            <p className="text-ink-foreground/65 mt-1 text-[11px]">Жишээ. Шимтгэл, ногдол ашгийг тооцоогүй.</p>
           </div>
 
           <p className="text-muted-foreground mt-auto text-[11px]">

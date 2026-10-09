@@ -1,5 +1,7 @@
-import { allowedTransitions, canDelete, canEdit, canManageTags, canManageTeam, slugify } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, Backend, Member, ReaderRecord, Role, Status, Tag } from "@/admin/types"
+import { demoBriefings, demoInsights } from "@/admin/demo-samples"
+import { devLinkPreview, plainPreview } from "@/admin/link-preview"
+import { allowedTransitions, canClaim, canDelete, canEdit, canManageTags, canManageTeam, isEditor, slugify, TAKE_MIN_WORDS, wordCount } from "@/admin/rules"
+import type { Activity, Article, ArticleDraft, Backend, Member, NewsRun, ReaderRecord, Role, Status, Tag } from "@/admin/types"
 
 /*
  * Demo backend: everything lives in this browser's localStorage, so you can
@@ -15,6 +17,17 @@ interface Store {
   tags: Tag[]
   articles: Article[]
   activity: Activity[]
+  runs?: NewsRun[]
+}
+
+/** Fields added after the first demo release, so older browser data keeps working. */
+const articleDefaults = {
+  coverCredit: "",
+  coverRightsOk: true,
+  take: "",
+  origin: "human" as const,
+  sourceUrl: "",
+  botNotes: "",
 }
 
 function seed(): Store {
@@ -34,7 +47,7 @@ function seed(): Store {
     { slug: "china", label: "Хятад" },
     { slug: "europe", label: "Европ" },
   ]
-  const base = { coverUrl: "", coverAlt: "", reviewNote: "", publishedAt: null, createdAt: now, updatedAt: now }
+  const base = { ...articleDefaults, coverUrl: "", coverAlt: "", reviewNote: "", publishedAt: null, createdAt: now, updatedAt: now }
   const articles: Article[] = [
     {
       ...base,
@@ -65,13 +78,17 @@ function seed(): Store {
       authorName: "Жишээ сэтгүүлч",
     },
   ]
-  return { members, tags, articles, activity: [] }
+  return { members, tags, articles: [...articles, ...demoBriefings(1)], activity: [], runs: [] }
 }
 
 function load(): Store {
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as Store
+    if (raw) {
+      const store = JSON.parse(raw) as Store
+      store.articles = store.articles.map((article) => ({ ...articleDefaults, ...article }))
+      return store
+    }
   } catch {
     // Storage blocked or corrupted: start over.
   }
@@ -125,7 +142,7 @@ function log(store: Store, articleId: string, actor: Member, action: string, not
 }
 
 const visibleTo = (member: Member, article: Article) =>
-  member.role !== "writer" || article.authorId === member.id || article.status === "published"
+  member.role !== "writer" || article.authorId === member.id || article.status === "published" || canClaim(article)
 
 export function createDemoBackend(): Backend {
   return {
@@ -167,7 +184,9 @@ export function createDemoBackend(): Backend {
       const member = requireMember(store)
       const now = new Date().toISOString()
       const article: Article = {
+        ...articleDefaults,
         ...draft,
+        coverRightsOk: true,
         slug: uniqueSlug(store, draft.slug || draft.title),
         id: `a-${Date.now()}`,
         status: "draft",
@@ -194,16 +213,21 @@ export function createDemoBackend(): Backend {
       save(store)
       return article
     },
-    async setStatus(id, status: Status, note = "") {
+    async setStatus(id, status: Status, note = "", publishAt) {
       const store = load()
       const member = requireMember(store)
       const article = store.articles.find((item) => item.id === id)
       if (!article) throw new Error("Нийтлэл олдсонгүй")
       if (!allowedTransitions(member, article).includes(status)) throw new Error("Энэ алхмыг хийх эрхгүй")
+      if (article.origin === "bot" && status === "published") {
+        if (wordCount(article.take) < TAKE_MIN_WORDS) throw new Error(`EZ-ийн дүгнэлт (${TAKE_MIN_WORDS}+ үг) бичсэний дараа нийтэлнэ`)
+        if (article.coverUrl && !article.coverRightsOk) throw new Error("Нүүр зургийн эрхийг шалгаж баталгаажуулна уу")
+      }
       article.status = status
       article.updatedAt = new Date().toISOString()
       if (status === "changes_requested") article.reviewNote = note
-      article.publishedAt = status === "published" ? new Date().toISOString() : null
+      const now = new Date().toISOString()
+      article.publishedAt = status === "published" ? (publishAt && publishAt > now ? publishAt : now) : null
       log(store, id, member, status, status === "changes_requested" ? note : "")
       save(store)
       return article
@@ -220,6 +244,9 @@ export function createDemoBackend(): Backend {
       return load()
         .activity.filter((item) => item.articleId === articleId)
         .sort((a, b) => b.at.localeCompare(a.at))
+    },
+    async linkPreview(url) {
+      return devLinkPreview(url).catch(() => plainPreview(url))
     },
     async uploadCover(file) {
       if (file.size > 1_500_000) throw new Error("Демо горимд 1.5MB-аас бага зураг оруулна уу")
@@ -283,7 +310,7 @@ export function createDemoBackend(): Backend {
     async listReaders() {
       if (!canManageTeam(requireMember(load()))) throw new Error("Зөвхөн админ харна")
       // Demo reader accounts (src/reader/demo-reader.ts) live in this browser; ids carry the sign-up time.
-      let accounts: { id: string; name: string; email: string; phone?: string; avatar?: string; birthDate?: string; gender?: ReaderRecord["gender"] }[] = []
+      let accounts: { id: string; name: string; email: string; phone?: string; avatar?: string; birthDate?: string; gender?: ReaderRecord["gender"]; region?: string }[] = []
       try {
         accounts = JSON.parse(localStorage.getItem("ez-reader-demo-v1") ?? "[]")
       } catch {
@@ -300,13 +327,65 @@ export function createDemoBackend(): Backend {
             avatar: account.avatar ?? "",
             birthDate: account.birthDate ?? "",
             gender: account.gender ?? "",
+            region: account.region ?? "",
             joinedAt: new Date(Number.isFinite(time) ? time : 0).toISOString() }
         })
         .sort((a, b) => b.joinedAt.localeCompare(a.joinedAt))
     },
 
     async listPublished() {
-      return load().articles.filter((article) => article.status === "published")
+      const now = new Date().toISOString()
+      return load().articles.filter((article) => article.status === "published" && (article.publishedAt ?? "") <= now)
+    },
+
+    async claimArticle(id) {
+      const store = load()
+      const member = requireMember(store)
+      const article = store.articles.find((item) => item.id === id)
+      if (!article || !canClaim(article)) throw new Error("Энэ мэдээг өөр хүн авсан байна")
+      Object.assign(article, { authorId: member.id, authorName: member.name, status: "draft", updatedAt: new Date().toISOString() })
+      log(store, id, member, "claimed")
+      save(store)
+      return article
+    },
+    async runNewsAgent() {
+      const store = load()
+      if (!isEditor(requireMember(store))) throw new Error("Редактор, админ л ажиллуулна")
+      // The real agent runs in a Supabase Edge Function; the demo adds ready-made sample briefings.
+      const known = new Set(store.articles.map((article) => article.sourceUrl).filter(Boolean))
+      const fresh = demoBriefings(3, known)
+      store.articles.push(...fresh)
+      const now = new Date().toISOString()
+      const run: NewsRun = {
+        id: `run-${Date.now()}`,
+        startedAt: now,
+        finishedAt: now,
+        trigger: "manual",
+        scanned: 42,
+        created: fresh.length,
+        error: "",
+        details: {
+          provider: "демо",
+          feeds_ok: 25,
+          feeds_total: 25,
+          feeds_failed: [],
+          fresh: 42,
+          new: 42 - known.size,
+          picked: fresh.map((article) => ({ title: article.title, source: "Жишээ эх сурвалж", priority: 7 })),
+          failures: [],
+        },
+      }
+      store.runs = [run, ...(store.runs ?? [])].slice(0, 10)
+      save(store)
+      return { created: fresh.length, scanned: run.scanned, details: run.details }
+    },
+    async listNewsRuns() {
+      return load().runs ?? []
+    },
+    async insights() {
+      const store = load()
+      if (!canManageTeam(requireMember(store))) throw new Error("Зөвхөн админ харна")
+      return demoInsights(store.members, store.articles, store.runs ?? [])
     },
   }
 }

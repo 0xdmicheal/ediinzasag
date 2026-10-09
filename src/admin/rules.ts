@@ -1,4 +1,4 @@
-import type { Article, ArticleDraft, Member, Role, Status } from "@/admin/types"
+import type { Article, ArticleDraft, Member, Origin, Role, Status } from "@/admin/types"
 import { countHeadings, countWords } from "@/lib/article-html"
 
 /*
@@ -40,6 +40,25 @@ export function transitionLabel(from: Status, to: Status) {
 }
 
 export const isEditor = (member: Member) => member.role === "editor" || member.role === "admin"
+
+/** Published with a time still ahead: readers will see it then. */
+export const isScheduled = (article: Pick<Article, "status" | "publishedAt">) =>
+  article.status === "published" && Boolean(article.publishedAt) && Date.parse(article.publishedAt!) > Date.now()
+
+/** "2026.10.09 08:00" in the reader's local time. */
+export function formatWhen(iso: string) {
+  const date = new Date(iso)
+  const pad = (value: number) => String(value).padStart(2, "0")
+  return `${date.getFullYear()}.${pad(date.getMonth() + 1)}.${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+/** An agent briefing nobody has claimed yet (writers must claim it before editing). */
+export const isUnclaimed = (article: Pick<Article, "origin" | "authorId">) => article.origin === "bot" && !article.authorId
+
+export const canClaim = (article: Pick<Article, "origin" | "authorId" | "status">) => isUnclaimed(article) && article.status !== "published"
+
+/** Minimum words in the EZ take before an agent briefing can go out. */
+export const TAKE_MIN_WORDS = 40
 
 export function canEdit(member: Member, article: Pick<Article, "authorId" | "status">) {
   if (isEditor(member)) return true
@@ -94,16 +113,27 @@ export function readMinutes(body: string) {
   return Math.max(1, Math.round(countWords(body) / 200))
 }
 
-export function readiness(draft: ArticleDraft): Check[] {
+export function readiness(draft: ArticleDraft, origin: Origin = "human"): Check[] {
   const words = wordCount(draft.body)
   const titleLength = draft.title.trim().length
+  const takeWords = wordCount(draft.take)
+  // Agent briefings also need a person's own analysis and a cleared photo (guard_article enforces both).
+  const agentChecks: Check[] =
+    origin === "bot"
+      ? [
+          { id: "take", label: `EZ-ийн дүгнэлт ${TAKE_MIN_WORDS}+ үг (${takeWords})`, ok: takeWords >= TAKE_MIN_WORDS, required: true },
+          { id: "rights", label: "Нүүр зургийн эрхийг шалгасан", ok: !draft.coverUrl || draft.coverRightsOk, required: true },
+        ]
+      : []
   return [
+    ...agentChecks,
     { id: "title", label: `Гарчиг 10–70 тэмдэгт (${titleLength})`, ok: titleLength >= 10 && titleLength <= 70, required: true },
     { id: "dek", label: "Товч тайлбар бичсэн", ok: draft.dek.trim().length >= 30, required: true },
     { id: "body", label: `Үндсэн текст 120+ үг (${words})`, ok: words >= 120, required: true },
     { id: "sources", label: "Тоо бүр эх сурвалжтай: 1+ эх сурвалж", ok: draft.sources.some((s) => s.label.trim()), required: true },
     { id: "tags", label: `1–5 шошго (${draft.tags.length})`, ok: draft.tags.length >= 1 && draft.tags.length <= 5, required: true },
-    { id: "cover", label: "Нүүр зураг ба тайлбар", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: true },
+    { id: "cover", label: "Нүүр зураг", ok: Boolean(draft.coverUrl), required: true },
+    { id: "cover-alt", label: "Нүүр зургийн тайлбар", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: false },
     {
       id: "calm",
       label: "Айдас биш, ойлголт: ШОК, !!! байхгүй",

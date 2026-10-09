@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { useLocation } from "react-router-dom"
 import { AnimatePresence, motion, MotionConfig } from "motion/react"
 
-import { BirthDateField, birthDateError, GenderField } from "@/reader/ProfileFields"
+import { BirthDateField, birthDateError, GenderField, RegionField } from "@/reader/ProfileFields"
 import { AvatarPicker } from "@/reader/ReaderAvatar"
 import { useReader } from "@/reader/session"
 import type { Gender } from "@/reader/types"
@@ -46,7 +46,7 @@ export function CompleteProfile() {
           <Step
             key={reader.id}
             name={reader.name}
-            initial={{ avatar: reader.avatar, birthDate: reader.birthDate, gender: reader.gender }}
+            initial={{ avatar: reader.avatar, birthDate: reader.birthDate, gender: reader.gender, region: reader.region }}
             onLater={postpone}
             onSave={async (values) => {
               await auth.updateProfile(values)
@@ -66,13 +66,14 @@ function Step({
   onSave,
 }: {
   name: string
-  initial: { avatar: string; birthDate: string; gender: Gender | "" }
+  initial: { avatar: string; birthDate: string; gender: Gender | ""; region: string }
   onLater: () => void
-  onSave: (values: { avatar: string; birthDate: string; gender: Gender }) => Promise<void>
+  onSave: (values: { avatar: string; birthDate: string; gender: Gender; region: string }) => Promise<void>
 }) {
   const [avatar, setAvatar] = useState(initial.avatar)
   const [birthDate, setBirthDate] = useState(initial.birthDate)
   const [gender, setGender] = useState<Gender | "">(initial.gender)
+  const [region, setRegion] = useState(initial.region)
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
 
@@ -94,7 +95,7 @@ function Step({
     setBusy(true)
     setError("")
     try {
-      await onSave({ avatar, birthDate, gender: gender as Gender })
+      await onSave({ avatar, birthDate, gender: gender as Gender, region })
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Хадгалж чадсангүй")
     } finally {
@@ -134,6 +135,7 @@ function Step({
           <div className="mt-5 space-y-4">
             <BirthDateField id="complete-birth" value={birthDate} onChange={setBirthDate} inputClass={fieldClass} labelClass={label} />
             <GenderField value={gender} onChange={setGender} labelClass={label} />
+            <RegionField id="complete-region" value={region} onChange={setRegion} inputClass={fieldClass} labelClass={label} />
             {error ? (
               <p role="alert" className="rounded-md bg-[color-mix(in_oklch,var(--down)_12%,transparent)] px-3 py-2 text-[13px] text-[var(--down)]">
                 {error}

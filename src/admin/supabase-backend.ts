@@ -1,5 +1,6 @@
 import { slugify } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, Backend, Member, ReaderRecord, Role, Status, Tag } from "@/admin/types"
+import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsRun, ReaderRecord, Role, RunDetails, Status, Tag } from "@/admin/types"
+import { devLinkPreview, plainPreview, type LinkPreview } from "@/admin/link-preview"
 import { supabaseClient } from "@/lib/supabase"
 
 /* Supabase backend. Permissions are enforced by the database (supabase/schema.sql). */
@@ -14,9 +15,15 @@ interface ArticleRow {
   tags: string[]
   cover_url: string
   cover_alt: string
+  cover_credit: string
+  cover_rights_ok: boolean
   sources: { label: string; href?: string }[]
+  take: string
   status: Status
-  author_id: string
+  origin: "human" | "bot"
+  source_url: string | null
+  bot_notes: string
+  author_id: string | null
   review_note: string
   published_at: string | null
   created_at: string
@@ -37,9 +44,15 @@ function toArticle(row: ArticleRow): Article {
     tags: row.tags ?? [],
     coverUrl: row.cover_url,
     coverAlt: row.cover_alt,
+    coverCredit: row.cover_credit ?? "",
+    coverRightsOk: row.cover_rights_ok ?? true,
     sources: row.sources ?? [],
+    take: row.take ?? "",
     status: row.status,
-    authorId: row.author_id,
+    origin: row.origin ?? "human",
+    sourceUrl: row.source_url ?? "",
+    botNotes: row.bot_notes ?? "",
+    authorId: row.author_id ?? "",
     authorName: row.author?.name ?? "",
     reviewNote: row.review_note,
     publishedAt: row.published_at,
@@ -58,7 +71,10 @@ function toRow(draft: ArticleDraft) {
     tags: draft.tags,
     cover_url: draft.coverUrl,
     cover_alt: draft.coverAlt,
+    cover_credit: draft.coverCredit,
+    cover_rights_ok: draft.coverRightsOk,
     sources: draft.sources,
+    take: draft.take,
   }
 }
 
@@ -118,8 +134,14 @@ export function createSupabaseBackend(): Backend {
       if (error) fail(error)
       return toArticle(data as ArticleRow)
     },
-    async setStatus(id, status, note = "") {
-      const patch = status === "changes_requested" ? { status, review_note: note } : { status }
+    async setStatus(id, status, note = "", publishAt) {
+      // published_at in the future schedules it (guard_article); null publishes now.
+      const patch =
+        status === "changes_requested"
+          ? { status, review_note: note }
+          : status === "published"
+            ? { status, published_at: publishAt ?? null }
+            : { status }
       const { data, error } = await client.from("articles").update(patch).eq("id", id).select(select).single()
       if (error) fail(error)
       return toArticle(data as ArticleRow)
@@ -145,6 +167,12 @@ export function createSupabaseBackend(): Backend {
           at: row.created_at,
         }),
       )
+    },
+    async linkPreview(url) {
+      const { data, error } = await client.functions.invoke("link-preview", { body: { url } })
+      if (!error) return data as LinkPreview
+      // Function not deployed yet: the dev server can still read the page; otherwise show the bare address.
+      return devLinkPreview(url).catch(() => plainPreview(url))
     },
     async uploadCover(file) {
       const { data: auth } = await client.auth.getUser()
@@ -193,7 +221,7 @@ export function createSupabaseBackend(): Backend {
     async listReaders() {
       const { data, error } = await client
         .from("readers")
-        .select("id, name, email, phone, avatar, birth_date, gender, created_at")
+        .select("id, name, email, phone, avatar, birth_date, gender, region, created_at")
         .order("created_at", { ascending: false })
       if (error) fail(error)
       type Row = {
@@ -204,6 +232,7 @@ export function createSupabaseBackend(): Backend {
         avatar: string | null
         birth_date: string | null
         gender: ReaderRecord["gender"] | null
+        region: string | null
         created_at: string
       }
       return (data as Row[]).map(
@@ -215,6 +244,7 @@ export function createSupabaseBackend(): Backend {
           avatar: row.avatar ?? "",
           birthDate: row.birth_date ?? "",
           gender: row.gender ?? "",
+          region: row.region ?? "",
           joinedAt: row.created_at,
         }),
       )
@@ -225,9 +255,102 @@ export function createSupabaseBackend(): Backend {
         .from("articles")
         .select(select)
         .eq("status", "published")
+        // Editors can read scheduled articles too; the site only shows ones whose time has come.
+        .lte("published_at", new Date().toISOString())
         .order("published_at", { ascending: false })
       if (error) fail(error)
       return (data as ArticleRow[]).map(toArticle)
     },
+
+    async claimArticle(id) {
+      const { error } = await client.rpc("claim_article", { aid: id })
+      if (error) fail(error)
+      const { data, error: readError } = await client.from("articles").select(select).eq("id", id).single()
+      if (readError) fail(readError)
+      return toArticle(data as ArticleRow)
+    },
+    async runNewsAgent() {
+      const { data, error } = await client.functions.invoke("news-agent", { body: { trigger: "manual" } })
+      if (error) {
+        // The function answers errors as { error: "..." }; show that rather than the generic HTTP text.
+        const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
+        throw new Error(detail?.error ?? "Мэдээ татаж чадсангүй. Edge Function суулгасан эсэхийг шалгана уу (ADMIN.md).")
+      }
+      return data as { created: number; scanned: number; details?: RunDetails }
+    },
+    async listNewsRuns() {
+      const { data, error } = await client.from("news_runs").select("*").order("started_at", { ascending: false }).limit(10)
+      if (error) fail(error)
+      return (data as RunRow[]).map(toRun)
+    },
+    async insights() {
+      const { data, error } = await client.rpc("admin_insights")
+      if (error) fail(error)
+      const raw = data as Omit<Insights, "authors" | "agent"> & {
+        authors: AuthorRow[]
+        agent: Omit<Insights["agent"], "runs"> & { runs: RunRow[] }
+      }
+      return {
+        ...raw,
+        authors: raw.authors.map(toAuthor),
+        agent: { ...raw.agent, runs: raw.agent.runs.map(toRun) },
+      }
+    },
   }
 }
+
+interface RunRow {
+  id: number
+  started_at: string
+  finished_at: string | null
+  trigger: NewsRun["trigger"]
+  scanned: number
+  created: number
+  error: string
+  details?: RunDetails | null
+}
+
+const toRun = (row: RunRow): NewsRun => ({
+  id: String(row.id),
+  startedAt: row.started_at,
+  finishedAt: row.finished_at,
+  trigger: row.trigger,
+  scanned: row.scanned,
+  created: row.created,
+  error: row.error,
+  details: row.details ?? {},
+})
+
+interface AuthorRow {
+  id: string
+  name: string
+  role: Role
+  drafts: number
+  in_progress: number
+  changes_requested: number
+  published: number
+  published_30d: number
+  claimed: number
+  hours_to_publish: number | null
+  reads: number
+  fires: number
+  reviews: number
+  last_active: string | null
+}
+
+const toAuthor = (row: AuthorRow): AuthorStats => ({
+  id: row.id,
+  name: row.name,
+  role: row.role,
+  drafts: row.drafts,
+  inProgress: row.in_progress,
+  changesRequested: row.changes_requested,
+  published: row.published,
+  published30d: row.published_30d,
+  claimed: row.claimed,
+  hoursToPublish: row.hours_to_publish,
+  reads: Number(row.reads),
+  fires: Number(row.fires),
+  reviews: row.reviews,
+  lastActive: row.last_active,
+})

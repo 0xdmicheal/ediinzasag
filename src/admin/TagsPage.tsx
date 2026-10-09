@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState, type FormEvent } from "react"
 import { Navigate } from "react-router-dom"
 import { Plus, Trash2 } from "lucide-react"
 
+import { useConfirm } from "@/admin/ConfirmDialog"
 import { canManageTags, slugify } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import { buttonClass, inputClass, Notice } from "@/admin/ui"
 import type { Article, Tag } from "@/admin/types"
 
 export function TagsPage() {
+  const confirm = useConfirm()
   const { backend, member } = useTeam()
   const [tags, setTags] = useState<Tag[]>([])
   const [articles, setArticles] = useState<Article[]>([])
@@ -50,7 +52,13 @@ export function TagsPage() {
 
   async function remove(tag: Tag) {
     const count = usage.get(tag.slug) ?? 0
-    if (!window.confirm(count ? `#${tag.label} ${count} нийтлэлд байна. Устгах уу?` : `#${tag.label} устгах уу?`)) return
+    const ok = await confirm({
+      title: `#${tag.label} шошгыг устгах уу?`,
+      message: count ? `${count} нийтлэлээс энэ шошго хасагдана. Буцаах боломжгүй.` : "Буцаах боломжгүй.",
+      confirmLabel: "Устгах",
+      destructive: true,
+    })
+    if (!ok) return
     await backend.deleteTag(tag.slug)
     setTags((current) => current.filter((item) => item.slug !== tag.slug))
   }

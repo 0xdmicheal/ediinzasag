@@ -14,6 +14,8 @@ export interface Reader {
   /** YYYY-MM-DD, empty until the reader fills in their profile. */
   birthDate: string
   gender: Gender | ""
+  /** Region id from regions.ts (aimag, Улаанбаатар or abroad); empty when not shared. */
+  region: string
   /** Worn badge id (see badges.tsx), empty for none. */
   badge: string
   /** Order of sign-up (1, 2, 3…); the first 3,000 get the founder badge. */
@@ -39,6 +41,8 @@ export interface ProfilePatch {
   avatar?: string
   birthDate?: string
   gender?: Gender
+  /** Region id, or "" to stop sharing it. */
+  region?: string
 }
 
 /** Readers must be at least this old (birth date check). */

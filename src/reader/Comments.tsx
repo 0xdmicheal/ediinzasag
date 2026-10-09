@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { Check, ChevronDown, MessageSquare, ThumbsUp, X } from "lucide-react"
 
 import { buttonClass, inputClass, Notice } from "@/admin/ui"
+import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { getReaderAuth } from "@/reader/auth"
 import { BadgeMark } from "@/reader/badges"
 import { ReaderAvatar } from "@/reader/ReaderAvatar"
@@ -202,9 +203,9 @@ export function Comments({ slug, id = "comments" }: { slug: string; id?: string 
       ) : (
         <div className="bg-muted/60 mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
           <p className="text-[14px]">Сэтгэгдэл үлдээх, таалагдсаныг тэмдэглэхийн тулд нэвтэрнэ үү.</p>
-          <button type="button" onClick={openLogin} className={buttonClass.primary}>
+          <ShimmerButton type="button" onClick={openLogin} className="h-9 px-4 text-[13px] font-medium">
             Нэвтрэх
-          </button>
+          </ShimmerButton>
         </div>
       )}
 

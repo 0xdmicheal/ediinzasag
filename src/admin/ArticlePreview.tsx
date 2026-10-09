@@ -1,54 +1,73 @@
-import { proseClass } from "@/components/site/article"
-import type { ArticleDraft, Tag } from "@/admin/types"
-import { readMinutes } from "@/admin/rules"
-import { bodyToHtml } from "@/lib/article-html"
+import { useEffect, useRef, useState } from "react"
 
-/** How the article will read on the site, rendered from the current draft. */
-export function ArticlePreview({ draft, tags, authorName }: { draft: ArticleDraft; tags: Tag[]; authorName: string }) {
-  const labels = new Map(tags.map((tag) => [tag.slug, tag.label]))
-  const html = bodyToHtml(draft.body)
+import type { ArticleDraft, Tag } from "@/admin/types"
+import { PREVIEW_DRAFT, PREVIEW_HEIGHT, PREVIEW_READY, type PreviewPayload } from "@/pages/PreviewFrame"
+
+/**
+ * How the article will read on the site: the public article page itself
+ * (pages/PreviewFrame.tsx, ArticleLayout) in an iframe, so its layout,
+ * breakpoints and styles are exactly the readers'. `width` renders at a fixed
+ * screen width (390 phone, 1280 desktop), scaled down to fit when the space is
+ * narrower; without it the frame takes the space it is given.
+ */
+export function ArticlePreview({
+  draft,
+  tags,
+  authorName,
+  date,
+  width,
+}: {
+  draft: ArticleDraft
+  tags: Tag[]
+  authorName: string
+  date: string
+  width?: number
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  const frame = useRef<HTMLIFrameElement>(null)
+  const [space, setSpace] = useState(0)
+  const [height, setHeight] = useState(800)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    const node = box.current
+    if (!node) return
+    const observer = new ResizeObserver(([entry]) => setSpace(entry.contentRect.width))
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow) return
+      if (event.data?.type === PREVIEW_READY) setReady(true)
+      if (event.data?.type === PREVIEW_HEIGHT) setHeight(Number(event.data.height) || 800)
+    }
+    window.addEventListener("message", onMessage)
+    return () => window.removeEventListener("message", onMessage)
+  }, [])
+
+  // Every edit is sent straight to the frame.
+  useEffect(() => {
+    if (!ready) return
+    const payload: PreviewPayload = { draft, tags, authorName, date, dark: document.documentElement.classList.contains("dark") }
+    frame.current?.contentWindow?.postMessage({ type: PREVIEW_DRAFT, payload }, window.location.origin)
+  }, [ready, draft, tags, authorName, date])
+
+  const frameWidth = width ?? space
+  const scale = width && space ? Math.min(1, space / width) : 1
 
   return (
-    <article className="bg-background text-foreground">
-      <div className="px-5 pt-6 pb-5 sm:px-8">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="bg-muted rounded-md border px-2 py-0.5 text-[11px]">{draft.desk === "mongolia" ? "Монгол" : "Дэлхий"}</span>
-          {draft.tags.map((slug) => (
-            <span key={slug} className="bg-muted rounded-md border px-2 py-0.5 text-[11px]">
-              #{labels.get(slug) ?? slug}
-            </span>
-          ))}
-          <span className="text-muted-foreground text-[11px]">{readMinutes(draft.body)} мин</span>
-        </div>
-        <h1 className="font-news mt-4 text-[1.75rem] leading-[1.12] text-balance sm:text-[2.25rem]">
-          {draft.title || <span className="text-muted-foreground">Гарчиг</span>}
-        </h1>
-        {draft.dek ? <p className="text-muted-foreground mt-3 text-[15px] leading-relaxed sm:text-lg">{draft.dek}</p> : null}
-        <p className="text-muted-foreground mt-3 text-[12px]">{authorName}</p>
-      </div>
-      {draft.coverUrl ? (
-        <figure>
-          <img src={draft.coverUrl} alt={draft.coverAlt} className="aspect-[16/9] w-full object-cover" />
-          {draft.coverAlt ? <figcaption className="text-muted-foreground px-5 py-2 text-[11px] sm:px-8">{draft.coverAlt}</figcaption> : null}
-        </figure>
+    <div ref={box} className="w-full overflow-hidden" style={{ height: height * scale }}>
+      {frameWidth > 0 ? (
+        <iframe
+          ref={frame}
+          title="Нийтлэлийн урьдчилсан харагдац"
+          src={`${import.meta.env.BASE_URL}preview-frame`}
+          className="block origin-top-left border-0"
+          style={{ width: frameWidth, height, transform: scale < 1 ? `scale(${scale})` : undefined }}
+        />
       ) : null}
-      {html ? (
-        <div className={`${proseClass} px-5 py-6 sm:px-8`} dangerouslySetInnerHTML={{ __html: html }} />
-      ) : (
-        <p className="text-muted-foreground px-5 py-6 text-[14px] sm:px-8">Текст энд харагдана.</p>
-      )}
-      {draft.sources.length > 0 ? (
-        <div className="bg-muted/60 mx-5 mb-6 rounded-lg border p-4 sm:mx-8">
-          <p className="text-[13px] font-semibold">Эх сурвалж</p>
-          <ul className="mt-2 space-y-1 text-[13px]">
-            {draft.sources.map((source, index) => (
-              <li key={index} className={source.href ? "text-brand-strong underline" : ""}>
-                {source.label}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
-    </article>
+    </div>
   )
 }

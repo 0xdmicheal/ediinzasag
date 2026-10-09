@@ -4,7 +4,8 @@ import { ArrowRight, LockKeyhole } from "lucide-react"
 
 import { roleLabel } from "@/admin/rules"
 import { useSession } from "@/admin/session"
-import { buttonClass, Field, inputClass, Notice } from "@/admin/ui"
+import { Field, inputClass, Notice } from "@/admin/ui"
+import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { publicUrl } from "@/lib/public-url"
 
 const demoAccounts = [
@@ -81,10 +82,10 @@ export function LoginPage() {
             />
           </Field>
           {error ? <Notice tone="error">{error}</Notice> : null}
-          <button type="submit" disabled={busy || !backend} className={buttonClass.primary}>
+          <ShimmerButton type="submit" disabled={busy || !backend} className="h-11 w-full text-[13px] font-medium">
             {busy ? "Нэвтэрч байна…" : "Нэвтрэх"}
             <ArrowRight className="size-4" />
-          </button>
+          </ShimmerButton>
           <p className="text-muted-foreground text-center text-[12px]">
             Бүртгэлийг зөвхөн админ урина. Нээлттэй бүртгэл байхгүй.
           </p>

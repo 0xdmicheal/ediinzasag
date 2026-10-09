@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react"
 import { Eye, EyeOff, VenetianMask, X } from "lucide-react"
 import { AnimatePresence, motion, MotionConfig } from "motion/react"
 
-import { BirthDateField, birthDateError, GenderField } from "@/reader/ProfileFields"
+import { BirthDateField, birthDateError, GenderField, RegionField } from "@/reader/ProfileFields"
 import { AvatarPicker } from "@/reader/ReaderAvatar"
 import type { Gender } from "@/reader/types"
 
@@ -23,6 +23,7 @@ export interface ProfileValues {
   avatar: string
   birthDate: string
   gender: Gender | ""
+  region: string
 }
 
 export function EditProfile({
@@ -72,6 +73,7 @@ function Dialog({
   const [avatar, setAvatar] = useState(values.avatar)
   const [birthDate, setBirthDate] = useState(values.birthDate)
   const [gender, setGender] = useState<Gender | "">(values.gender)
+  const [region, setRegion] = useState(values.region)
   const [showPassword, setShowPassword] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
@@ -92,7 +94,8 @@ function Dialog({
     anonymous !== values.anonymous ||
     avatar !== values.avatar ||
     birthDate !== values.birthDate ||
-    gender !== values.gender
+    gender !== values.gender ||
+    region !== values.region
 
   async function submit(event: FormEvent) {
     event.preventDefault()
@@ -105,7 +108,7 @@ function Dialog({
     setError("")
     setNote("")
     try {
-      const message = await onSave({ name: name.trim(), email: email.trim(), password, anonymous, avatar, birthDate, gender })
+      const message = await onSave({ name: name.trim(), email: email.trim(), password, anonymous, avatar, birthDate, gender, region })
       setPassword("")
       if (message) setNote(message)
       else onClose()
@@ -191,6 +194,7 @@ function Dialog({
 
               <BirthDateField id="edit-profile-birth" value={birthDate} onChange={setBirthDate} inputClass={fieldClass} labelClass={label} />
               <GenderField value={gender} onChange={setGender} labelClass={label} />
+              <RegionField id="edit-profile-region" value={region} onChange={setRegion} inputClass={fieldClass} labelClass={label} />
 
               {phone ? (
                 <div className="space-y-1.5">

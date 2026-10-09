@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState } from "react"
+import { useEffect, useLayoutEffect, useState } from "react"
 import { Outlet, useLocation } from "react-router-dom"
 import {
   FaFacebookF,
@@ -8,7 +8,7 @@ import {
   FaYoutube,
 } from "react-icons/fa6"
 
-import { channels, openSubstackSubscribe } from "@/content/channels"
+import { channels } from "@/content/channels"
 import { sessionLabel } from "@/content/markets"
 import { AmbientBackground } from "@/components/site/AmbientBackground"
 import { Footer12 } from "@/components/ui/footer-12"
@@ -40,6 +40,7 @@ const footerColumns = [
     title: "Бүтээгдэхүүн",
     links: [
       { label: "EZ Talk", href: "/ez-talk", description: "Nio, Ulemj нарын видео подкаст" },
+      { label: "EZ Edu", href: "/ez-edu", description: "Эдийн засгийн хичээл" },
       { label: "Нийтлэл", href: "/newsletter", description: "Долоо хоногийн захидал" },
       { label: "YouTube", href: channels.youtube, description: "Бүх дугаар" },
       { label: "Substack", href: channels.substack, description: "И-мэйл захиалга" },
@@ -81,6 +82,21 @@ export function Layout() {
     document.documentElement.classList.toggle("dark", theme === "dark")
   }, [theme])
 
+  // Until the reader picks a theme, follow the system appearance as it changes (HIG dark-mode.md).
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-color-scheme: dark)")
+    function follow(event: MediaQueryListEvent) {
+      try {
+        if (localStorage.getItem(THEME_KEY)) return
+      } catch {
+        // Storage blocked; treat as no saved choice.
+      }
+      setTheme(event.matches ? "dark" : "light")
+    }
+    query.addEventListener("change", follow)
+    return () => query.removeEventListener("change", follow)
+  }, [])
+
   function changeTheme(next: "light" | "dark") {
     setTheme(next)
     try {
@@ -104,10 +120,10 @@ export function Layout() {
   return (
     <ReaderProvider>
       <div className="bg-background text-foreground relative isolate flex min-h-svh flex-col">
-        <AmbientBackground />
+        <AmbientBackground theme={theme} />
         <a
           href="#content"
-          className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-background focus:px-3 focus:py-2"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-full focus:bg-foreground focus:px-4 focus:py-2.5 focus:text-[14px] focus:font-medium focus:text-background"
         >
           Агуулга руу
         </a>
@@ -118,7 +134,6 @@ export function Layout() {
         <Footer12
           brandName="ЭДИЙН ЗАСАГ"
           description="EZ Эдийн засаг Монголын эдийн засаг, дэлхийн зах зээлийн тоймыг нэг ширээн дээр тавьдаг."
-          onSubscribe={openSubstackSubscribe}
           columns={footerColumns}
           notices={footerNotices}
           copyright={footerCopyright}

@@ -28,6 +28,8 @@ function toStory(article: Article): Story {
     sources: article.sources,
     tags: article.tags,
     author: article.authorName,
+    take: article.take,
+    coverCredit: article.coverCredit,
   }
 }
 

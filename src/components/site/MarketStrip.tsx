@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Pause, Play } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { signedPct } from "@/components/site/market-marks"
@@ -105,17 +106,27 @@ function useEasedSpeed() {
 export function MarketStrip() {
   const loop = [...ticks, ...ticks]
   const { track, handlers } = useEasedSpeed()
+  // An endless crawl needs a way to stop it (HIG accessibility.md › Cognitive; WCAG 2.2.2).
+  const [stopped, setStopped] = useState(false)
+
+  useEffect(() => {
+    const animation = track.current?.getAnimations()[0]
+    if (!animation) return
+    if (stopped) animation.pause()
+    else animation.play()
+  }, [stopped, track])
 
   return (
     // A glass band on the page background: light in day mode, dark in night mode.
-    <section aria-label="Ханшийн зурвас" className="bg-card border-y font-mono">
-      <div className="price-ticker relative" {...handlers}>
+    <section aria-label="Ханшийн зурвас" className="bg-card relative flex border-y font-mono">
+      <div className="price-ticker relative min-w-0 flex-1" {...handlers}>
         <div ref={track} className="price-ticker-track flex h-10 w-max items-center sm:h-11">
           {loop.map((item, index) => (
             <Link
               key={`${item.id}-${index}`}
               to={`/markets#${item.id}`}
               tabIndex={index < ticks.length ? 0 : -1}
+              aria-hidden={index < ticks.length ? undefined : true}
               className="hover:bg-foreground/5 flex h-full items-center gap-2 px-3.5 text-[12px] sm:px-4 sm:text-[13px]"
             >
               <span className="text-muted-foreground uppercase">{item.label}</span>
@@ -128,6 +139,15 @@ export function MarketStrip() {
           ))}
         </div>
       </div>
+      <button
+        type="button"
+        onClick={() => setStopped((value) => !value)}
+        aria-label={stopped ? "Ханшийн зурвасыг үргэлжлүүлэх" : "Ханшийн зурвасыг зогсоох"}
+        aria-pressed={stopped}
+        className="ez-hit text-muted-foreground hover:text-foreground hover:bg-foreground/5 grid w-10 shrink-0 place-items-center border-l transition-colors motion-reduce:hidden sm:w-11"
+      >
+        {stopped ? <Play className="size-3.5" /> : <Pause className="size-3.5" />}
+      </button>
     </section>
   )
 }

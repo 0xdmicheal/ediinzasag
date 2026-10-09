@@ -56,6 +56,8 @@ alter table public.readers add column if not exists birth_date date check (birth
 alter table public.readers add column if not exists gender text check (gender in ('female', 'male', 'unspecified'));
 alter table public.readers add column if not exists badge text not null default '';
 alter table public.readers add column if not exists member_no bigint;
+-- Where the reader lives, chosen by them in their profile (see src/reader/regions.ts). Optional.
+alter table public.readers add column if not exists region text check (region ~ '^[a-z-]{2,24}$');
 
 -- Member numbers in sign-up order: new readers take the next one; existing ones are numbered once.
 create sequence if not exists public.reader_member_no;
@@ -71,9 +73,9 @@ create policy "reader reads self" on public.readers for select to authenticated 
 drop policy if exists "reader updates self" on public.readers;
 create policy "reader updates self" on public.readers for update to authenticated
   using (id = auth.uid()) with check (id = auth.uid());
--- Readers may change their name, comment setting, picture, birth date and gender, nothing else.
+-- Readers may change their name, comment setting, picture, birth date, gender and region, nothing else.
 revoke update on public.readers from anon, authenticated;
-grant update (name, comment_anonymous, avatar, birth_date, gender, badge) on public.readers to authenticated;
+grant update (name, comment_anonymous, avatar, birth_date, gender, badge, region) on public.readers to authenticated;
 
 -- Reader library: stories finished (scrolled to the end) and saved, by slug.
 -- Slugs cover both admin articles and the stories built into the site, so
@@ -345,6 +347,32 @@ create table if not exists public.articles (
 create index if not exists articles_status_idx on public.articles (status, published_at desc);
 create index if not exists articles_tags_idx on public.articles using gin (tags);
 
+-- News automation (supabase/functions/news-agent). The agent writes translated
+-- briefings with origin 'bot' and no author, straight into review. A team member
+-- claims one (claim_article) and becomes its author; it can only be published
+-- once a person has written the EZ take and cleared the cover image's rights.
+alter table public.articles add column if not exists origin text not null default 'human' check (origin in ('human', 'bot'));
+alter table public.articles add column if not exists source_url text;
+alter table public.articles add column if not exists bot_notes text not null default '';   -- what the agent wants a person to verify
+alter table public.articles add column if not exists take text not null default '';        -- "EZ-ийн дүгнэлт": the newsroom's own analysis
+alter table public.articles add column if not exists cover_credit text not null default '';
+alter table public.articles add column if not exists cover_rights_ok boolean not null default true;
+alter table public.articles add column if not exists claimed_by uuid references public.profiles (id);
+alter table public.articles alter column author_id drop not null;   -- null = unclaimed bot article
+create unique index if not exists articles_source_url_idx on public.articles (source_url) where source_url is not null;
+
+-- True for requests made with the service_role key (the news agent), never for browsers.
+create or replace function public.is_service() returns boolean
+language sql stable as $$
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', '') = 'service_role'
+$$;
+
+-- Words in a text or HTML string, close to countWords() in src/lib/article-html.ts.
+create or replace function public.word_count(t text) returns integer
+language sql immutable as $$
+  select coalesce(array_length(regexp_split_to_array(nullif(btrim(regexp_replace(coalesce(t, ''), '<[^>]+>|&nbsp;', ' ', 'g')), ''), '\s+'), 1), 0)
+$$;
+
 create table if not exists public.article_activity (
   id bigint generated always as identity primary key,
   article_id uuid not null references public.articles (id) on delete cascade,
@@ -360,13 +388,35 @@ create or replace function public.guard_article() returns trigger
 language plpgsql security definer set search_path = public as $$
 declare
   r public.team_role := public.current_team_role();
+  claiming boolean := coalesce(current_setting('ez.claiming', true), '') = 'on';
 begin
+  -- The news agent (service_role) only adds unclaimed briefings to the review queue.
+  if public.is_service() then
+    if tg_op <> 'INSERT' then
+      raise exception 'Агент зөвхөн шинэ мэдээ нэмнэ';
+    end if;
+    new.origin := 'bot';
+    new.status := 'in_review';
+    new.author_id := null;
+    new.claimed_by := null;
+    new.reviewer_id := null;
+    new.published_at := null;
+    new.take := '';
+    new.cover_rights_ok := coalesce(new.cover_url, '') = '';
+    return new;
+  end if;
+
   if r is null then
     raise exception 'Багийн гишүүн биш байна';
   end if;
 
   if tg_op = 'INSERT' then
     new.author_id := auth.uid();
+    new.origin := 'human';
+    new.source_url := null;
+    new.bot_notes := '';
+    new.claimed_by := null;
+    new.cover_rights_ok := true;
     if new.status not in ('draft', 'in_review') and r = 'writer' then
       raise exception 'Сэтгүүлч зөвхөн ноорог үүсгэнэ';
     end if;
@@ -376,10 +426,19 @@ begin
 
   -- UPDATE
   new.updated_at := now();
+  new.origin := old.origin;
+  new.source_url := old.source_url;
+  new.bot_notes := old.bot_notes;
+  if claiming then
+    -- claim_article() hands an unclaimed bot article to the caller as a draft.
+    new.claimed_by := auth.uid();
+    return new;
+  end if;
   new.author_id := old.author_id;
+  new.claimed_by := old.claimed_by;
 
   if r = 'writer' then
-    if old.author_id <> auth.uid() then
+    if old.author_id is distinct from auth.uid() then
       raise exception 'Өөрийн нийтлэлийг л засна';
     end if;
     if new.status is distinct from old.status and not (
@@ -389,9 +448,11 @@ begin
       raise exception 'Энэ алхмыг редактор хийнэ';
     end if;
     if old.status in ('in_review', 'approved', 'published') and (
-      new.title, new.dek, new.body, new.desk, new.tags, new.cover_url, new.cover_alt, new.sources, new.slug
+      new.title, new.dek, new.body, new.desk, new.tags, new.cover_url, new.cover_alt, new.sources, new.slug,
+      new.take, new.cover_credit, new.cover_rights_ok
     ) is distinct from (
-      old.title, old.dek, old.body, old.desk, old.tags, old.cover_url, old.cover_alt, old.sources, old.slug
+      old.title, old.dek, old.body, old.desk, old.tags, old.cover_url, old.cover_alt, old.sources, old.slug,
+      old.take, old.cover_credit, old.cover_rights_ok
     ) then
       raise exception 'Хянагдаж буй нийтлэлийг засах боломжгүй';
     end if;
@@ -402,10 +463,28 @@ begin
     if new.status is distinct from old.status and new.status in ('approved', 'changes_requested', 'published') then
       new.reviewer_id := auth.uid();
     end if;
+    -- Scheduling: published_at in the future means "goes live then" (readers see it
+    -- only from that moment, see the select policy). Anything else publishes now.
     if new.status = 'published' and old.status <> 'published' then
-      new.published_at := now();
-    elsif new.status <> 'published' then
+      new.published_at := case when new.published_at > now() then new.published_at else now() end;
+    elsif new.status = 'published' then
+      if old.published_at > now() and new.published_at is distinct from old.published_at then
+        new.published_at := greatest(coalesce(new.published_at, now()), now());   -- move a schedule, never into the past
+      else
+        new.published_at := old.published_at;                                     -- live articles keep their date
+      end if;
+    else
       new.published_at := null;
+    end if;
+  end if;
+
+  -- Raw agent output never goes live: a person adds the EZ take and clears the photo first.
+  if new.origin = 'bot' and new.status = 'published' and old.status <> 'published' then
+    if public.word_count(new.take) < 40 then
+      raise exception 'EZ-ийн дүгнэлт (40+ үг) бичсэний дараа нийтэлнэ';
+    end if;
+    if coalesce(new.cover_url, '') <> '' and not new.cover_rights_ok then
+      raise exception 'Нүүр зургийн эрхийг шалгаж баталгаажуулна уу';
     end if;
   end if;
   return new;
@@ -419,7 +498,10 @@ create or replace function public.log_article() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
   if tg_op = 'INSERT' then
-    insert into public.article_activity (article_id, actor_id, action) values (new.id, auth.uid(), 'created');
+    insert into public.article_activity (article_id, actor_id, action, note)
+    values (new.id, auth.uid(), 'created', case when new.origin = 'bot' then 'agent' else '' end);
+  elsif coalesce(current_setting('ez.claiming', true), '') = 'on' then
+    insert into public.article_activity (article_id, actor_id, action) values (new.id, auth.uid(), 'claimed');
   elsif new.status is distinct from old.status then
     insert into public.article_activity (article_id, actor_id, action, note)
     values (new.id, auth.uid(), new.status::text, case when new.status = 'changes_requested' then new.review_note else '' end);
@@ -437,7 +519,30 @@ alter table public.articles enable row level security;
 
 drop policy if exists "public reads published" on public.articles;
 create policy "public reads published" on public.articles for select
-  using (status = 'published' or author_id = auth.uid() or public.is_editor());
+  using (
+    (status = 'published' and published_at <= now()) or author_id = auth.uid() or public.is_editor()
+    -- Unclaimed agent briefings are visible to the whole team, so anyone can pick one up.
+    or (origin = 'bot' and author_id is null and public.current_team_role() is not null)
+  );
+
+-- Takes an unclaimed agent briefing: the caller becomes its author and it returns to draft.
+create or replace function public.claim_article(aid uuid) returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if public.current_team_role() is null then
+    raise exception 'Багийн гишүүн биш байна';
+  end if;
+  perform set_config('ez.claiming', 'on', true);
+  update public.articles set author_id = auth.uid(), status = 'draft'
+  where id = aid and origin = 'bot' and author_id is null and status <> 'published';
+  if not found then
+    raise exception 'Энэ мэдээг өөр хүн авсан байна';
+  end if;
+  perform set_config('ez.claiming', '', true);
+end $$;
+
+revoke execute on function public.claim_article(uuid) from public, anon;
+grant execute on function public.claim_article(uuid) to authenticated;
 
 drop policy if exists "team creates" on public.articles;
 create policy "team creates" on public.articles for insert to authenticated
@@ -730,6 +835,113 @@ drop trigger if exists guard_reader_badge on public.readers;
 create trigger guard_reader_badge before update on public.readers
   for each row execute function public.guard_reader_badge();
 
+-- ---------------------------------------------------------------- news agent runs
+-- One row per run of supabase/functions/news-agent (daily cron or "Мэдээ татах").
+create table if not exists public.news_runs (
+  id bigint generated always as identity primary key,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  trigger text not null default 'cron' check (trigger in ('cron', 'manual')),
+  scanned integer not null default 0,     -- feed items looked at
+  created integer not null default 0,     -- briefings added to review
+  error text not null default ''
+);
+-- What each run did: feeds read/failed, stories seen, picks with priority, failures (shown on the board).
+alter table public.news_runs add column if not exists details jsonb not null default '{}';
+
+alter table public.news_runs enable row level security;
+drop policy if exists "team reads runs" on public.news_runs;
+create policy "team reads runs" on public.news_runs for select to authenticated
+  using (public.current_team_role() is not null);
+
+-- ---------------------------------------------------------------- admin insights
+-- Everything /admin/insights shows, computed here so personal details (age,
+-- region, gender) only leave the database as counts, and only for admins.
+create or replace function public.admin_insights() returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare
+  result jsonb;
+begin
+  if not public.is_admin() then
+    raise exception 'Зөвхөн админ харна';
+  end if;
+
+  with
+  r as (
+    select id, created_at, gender, region,
+           case when birth_date is null then null else extract(year from age(birth_date))::int end as years
+    from public.readers
+    where id not in (select id from public.profiles)
+  ),
+  ages as (
+    select bucket, count(*) as n from (
+      select case
+        when years is null then 'unknown'
+        when years < 18 then '13-17'
+        when years < 25 then '18-24'
+        when years < 35 then '25-34'
+        when years < 45 then '35-44'
+        when years < 55 then '45-54'
+        else '55+' end as bucket
+      from r
+    ) b group by bucket
+  ),
+  weeks as (
+    select to_char(w, 'YYYY-MM-DD') as week,
+           (select count(*) from r where r.created_at >= w and r.created_at < w + interval '7 days') as n
+    from generate_series(date_trunc('week', now()) - interval '11 weeks', date_trunc('week', now()), interval '7 days') w
+  ),
+  days as (
+    select to_char(d, 'YYYY-MM-DD') as day,
+           (select count(*) from public.reader_reads rr where rr.read_at >= d and rr.read_at < d + interval '1 day') as reads,
+           (select count(distinct rr.reader_id) from public.reader_reads rr where rr.read_at >= d and rr.read_at < d + interval '1 day') as readers
+    from generate_series(date_trunc('day', now()) - interval '29 days', date_trunc('day', now()), interval '1 day') d
+  ),
+  authors as (
+    select p.id, p.name, p.role,
+      count(a.id) filter (where a.status = 'draft') as drafts,
+      count(a.id) filter (where a.status in ('in_review', 'changes_requested', 'approved')) as in_progress,
+      count(a.id) filter (where a.status = 'changes_requested') as changes_requested,
+      count(a.id) filter (where a.status = 'published') as published,
+      count(a.id) filter (where a.status = 'published' and a.published_at between now() - interval '30 days' and now()) as published_30d,
+      count(a.id) filter (where a.origin = 'bot') as claimed,
+      round(avg(extract(epoch from a.published_at - a.created_at) / 3600) filter (where a.status = 'published'))::int as hours_to_publish,
+      coalesce(sum((select count(*) from public.reader_reads rr where rr.slug = a.slug)) filter (where a.status = 'published'), 0) as reads,
+      coalesce(sum((select fire_count from public.article_stats s where s.slug = a.slug)) filter (where a.status = 'published'), 0) as fires,
+      (select max(created_at) from public.article_activity aa where aa.actor_id = p.id) as last_active,
+      (select count(*) from public.article_activity aa
+        where aa.actor_id = p.id and aa.action in ('approved', 'changes_requested', 'published')) as reviews
+    from public.profiles p
+    left join public.articles a on a.author_id = p.id
+    group by p.id, p.name, p.role
+  )
+  select jsonb_build_object(
+    'readers', jsonb_build_object(
+      'total', (select count(*) from r),
+      'new7', (select count(*) from r where created_at > now() - interval '7 days'),
+      'new30', (select count(*) from r where created_at > now() - interval '30 days'),
+      'active30', (select count(distinct reader_id) from public.reader_reads where read_at > now() - interval '30 days'),
+      'ages', coalesce((select jsonb_object_agg(bucket, n) from ages), '{}'),
+      'genders', coalesce((select jsonb_object_agg(coalesce(gender, 'unknown'), n) from (select gender, count(*) n from r group by gender) g), '{}'),
+      'regions', coalesce((select jsonb_object_agg(coalesce(region, 'unknown'), n) from (select region, count(*) n from r group by region) g), '{}'),
+      'weeks', coalesce((select jsonb_agg(jsonb_build_object('week', week, 'n', n) order by week) from weeks), '[]')
+    ),
+    'reading', coalesce((select jsonb_agg(jsonb_build_object('day', day, 'reads', reads, 'readers', readers) order by day) from days), '[]'),
+    'authors', coalesce((select jsonb_agg(to_jsonb(authors) order by published_30d desc, published desc) from authors), '[]'),
+    'agent', jsonb_build_object(
+      'waiting', (select count(*) from public.articles where origin = 'bot' and author_id is null and status <> 'published'),
+      'claimed', (select count(*) from public.articles where origin = 'bot' and author_id is not null and status <> 'published'),
+      'published', (select count(*) from public.articles where origin = 'bot' and status = 'published'),
+      'runs', coalesce((select jsonb_agg(to_jsonb(x) order by x.started_at desc)
+                        from (select * from public.news_runs order by started_at desc limit 10) x), '[]')
+    )
+  ) into result;
+  return result;
+end $$;
+
+revoke execute on function public.admin_insights() from public, anon;
+grant execute on function public.admin_insights() to authenticated;
+
 -- ---------------------------------------------------------------- cover images
 insert into storage.buckets (id, name, public) values ('covers', 'covers', true)
 on conflict (id) do nothing;
@@ -744,3 +956,15 @@ create policy "team uploads covers" on storage.objects for insert to authenticat
 -- Before inviting yourself, add your e-mail as the first admin (or run this
 -- after you already have an account; it then applies immediately):
 --   insert into public.team_invites (email, role) values ('you@example.com', 'admin');
+
+-- ---------------------------------------------------------------- daily news agent
+-- After deploying supabase/functions/news-agent (see ADMIN.md), schedule it once.
+-- Database → Extensions: enable pg_cron and pg_net, then run (fill in the two values):
+--   select cron.schedule('ez-news-agent', '0 0 * * *', $cron$
+--     select net.http_post(
+--       url := 'https://<project-ref>.supabase.co/functions/v1/news-agent',
+--       headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<NEWS_CRON_SECRET>'),
+--       body := '{"trigger":"cron"}'::jsonb,
+--       timeout_milliseconds := 300000)
+--   $cron$);
+-- 00:00 UTC is 08:00 in Ulaanbaatar. Remove with: select cron.unschedule('ez-news-agent');

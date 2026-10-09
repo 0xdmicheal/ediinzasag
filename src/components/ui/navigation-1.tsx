@@ -1,3 +1,5 @@
+import { useRef, type MouseEvent } from "react"
+import { flushSync } from "react-dom"
 import { NavLink } from "react-router-dom"
 import {
   ArrowUpRight,
@@ -26,6 +28,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Badge } from "@/components/ui/badge"
+import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { Button } from "@/components/ui/button"
 import {
   NavigationMenu,
@@ -46,13 +49,75 @@ import {
 const primary = [
   { to: "/mongolia", label: "Монгол" },
   { to: "/world", label: "Дэлхий" },
-  { to: "/markets", label: "Ханш" },
+  { to: "/ez-edu", label: "EZ Edu" },
   { to: "/ez-talk", label: "EZ Talk" },
+  { to: "/markets", label: "Ханш" },
   { to: "/about", label: "Бид" },
 ]
 
+// The current page is the darker word. No underline, and no blue ring on click.
 const linkClass =
-  "bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-transparent hover:text-foreground"
+  "relative bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground transition-colors outline-none hover:bg-transparent hover:text-foreground focus:bg-transparent focus-visible:ring-0 focus-visible:outline-none data-active:bg-transparent aria-[current=page]:text-foreground"
+
+/** Circle reveal from the button. Percentages stay put at 150% display scale. */
+function revealTheme(
+  event: MouseEvent<HTMLButtonElement>,
+  theme: "light" | "dark",
+  onThemeChange: (theme: "light" | "dark") => void,
+  lock: { current: boolean },
+) {
+  if (lock.current) return
+  const next = theme === "dark" ? "light" : "dark"
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  if (reduced || typeof document.startViewTransition !== "function") {
+    onThemeChange(next)
+    return
+  }
+
+  const rect = event.currentTarget.getBoundingClientRect()
+  const x = rect.left + rect.width / 2
+  const y = rect.top + rect.height / 2
+  const width = window.innerWidth
+  const height = window.innerHeight
+  const radius = Math.hypot(Math.max(x, width - x), Math.max(y, height - y))
+  const at = `${(x / width) * 100}% ${(y / height) * 100}%`
+  const end = `${(radius / (Math.hypot(width, height) / Math.SQRT2)) * 100}%`
+  const clip = [`circle(0% at ${at})`, `circle(${end} at ${at})`]
+  const root = document.documentElement
+  root.dataset.ezThemeVt = "active"
+  root.style.setProperty("--ez-theme-duration", "400ms")
+  root.style.setProperty("--ez-theme-clip-from", clip[0])
+  lock.current = true
+
+  const done = () => {
+    lock.current = false
+    delete root.dataset.ezThemeVt
+    root.style.removeProperty("--ez-theme-duration")
+    root.style.removeProperty("--ez-theme-clip-from")
+  }
+
+  try {
+    const transition = document.startViewTransition(() => {
+      flushSync(() => onThemeChange(next))
+    })
+    transition.finished.finally(done)
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        { clipPath: clip },
+        {
+          duration: 400,
+          easing: "ease-in-out",
+          fill: "forwards",
+          pseudoElement: "::view-transition-new(root)",
+        },
+      )
+    }).catch(done)
+  } catch {
+    lock.current = false
+    onThemeChange(next)
+    done()
+  }
+}
 
 function Brand() {
   return (
@@ -71,13 +136,14 @@ export function Navigation1({
   onThemeChange: (theme: "light" | "dark") => void
 }) {
   const { reader, openLogin } = useReader()
+  const themeLock = useRef(false)
   const lead = byDate()[0]
   const mongolia = storiesByDesk("mongolia").slice(0, 3)
   const world = storiesByDesk("world").slice(0, 3)
 
   return (
     <header className="sticky top-0 z-40 text-foreground">
-      <div className="pointer-events-none absolute inset-0 border-y border-border bg-background/85 backdrop-blur-md" />
+      <div className="pointer-events-none absolute inset-0 ez-glass border-y border-border bg-background/80" />
       <div className="relative mx-auto flex h-14 w-full max-w-[1520px] items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex min-w-0 flex-1 items-center">
           <Brand />
@@ -93,10 +159,10 @@ export function Navigation1({
                   </NavigationMenuItem>
                 ))}
                 <NavigationMenuItem value="toim">
-                  <NavigationMenuTrigger className="h-auto bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground data-open:bg-transparent data-open:text-foreground">
+                  <NavigationMenuTrigger className="h-auto bg-transparent px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground outline-none hover:bg-transparent hover:text-foreground focus:bg-transparent focus-visible:ring-0 focus-visible:outline-none data-open:bg-transparent data-open:text-foreground data-popup-open:bg-transparent">
                     Тойм
                   </NavigationMenuTrigger>
-                  <NavigationMenuContent className="left-1/2 w-max -translate-x-1/2 rounded-lg! border! border-border! bg-background/90! p-0! shadow-none! ring-0! backdrop-blur-xl!">
+                  <NavigationMenuContent className="left-1/2 w-max -translate-x-1/2 rounded-lg! border! border-border! ez-glass bg-background/90! p-0! shadow-none! ring-0!">
                     <div className="grid grid-cols-[10.5rem_10.5rem_8.5rem_13rem] gap-5 p-5">
                       <StoryColumn title="Монгол" stories={mongolia} />
                       <StoryColumn title="Дэлхий" stories={world} />
@@ -119,6 +185,9 @@ export function Navigation1({
                           </NavLink>
                           <NavLink className="hover:text-foreground" to="/ez-talk">
                             EZ Talk
+                          </NavLink>
+                          <NavLink className="hover:text-foreground" to="/ez-edu">
+                            EZ Edu
                           </NavLink>
                         </div>
                       </div>
@@ -158,8 +227,8 @@ export function Navigation1({
           <button
             type="button"
             aria-label={theme === "dark" ? "Гэрэл горим" : "Харанхуй горим"}
-            onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
-            className="flex size-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            onClick={(event) => revealTheme(event, theme, onThemeChange, themeLock)}
+            className="flex size-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-foreground/5 hover:text-foreground"
           >
             {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
           </button>
@@ -167,7 +236,7 @@ export function Navigation1({
             href={channels.substackSubscribe}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-8 items-center gap-1.5 rounded-full border border-foreground/20 px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-foreground hover:text-background"
+            className="ez-hit inline-flex h-8 items-center gap-1.5 rounded-full border border-foreground/20 px-3 text-[13px] font-medium text-foreground transition-colors hover:bg-foreground hover:text-background"
           >
             <Mail className="size-3.5" />
             Subscribe
@@ -179,7 +248,7 @@ export function Navigation1({
           <AccountButton compact />
           <Sheet>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label="Цэс нээх" className="text-foreground hover:bg-foreground/5 hover:text-foreground">
+              <Button variant="ghost" size="icon" aria-label="Цэс нээх" className="size-11 text-foreground hover:bg-foreground/5 hover:text-foreground">
                 <Menu />
               </Button>
             </SheetTrigger>
@@ -189,7 +258,7 @@ export function Navigation1({
               showCloseButton={false}
               // Opening with a tap should not paint a focus ring on the first button.
               onOpenAutoFocus={(event) => event.preventDefault()}
-              className="border-border w-[min(100%,22rem)] gap-0 overflow-y-auto bg-background/85 p-0 shadow-none backdrop-blur-xl"
+              className="border-border w-[min(100%,22rem)] ez-glass gap-0 overflow-y-auto bg-background/85 p-0 shadow-none"
             >
               <div className="border-border flex h-14 shrink-0 items-center justify-between border-b px-4">
                 <SheetClose asChild>
@@ -203,8 +272,8 @@ export function Navigation1({
                   <button
                     type="button"
                     aria-label={theme === "dark" ? "Гэрэл горим" : "Харанхуй горим"}
-                    onClick={() => onThemeChange(theme === "dark" ? "light" : "dark")}
-                    className="text-muted-foreground hover:text-foreground flex size-9 items-center justify-center transition-colors"
+                    onClick={(event) => revealTheme(event, theme, onThemeChange, themeLock)}
+                    className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center transition-colors"
                   >
                     {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
                   </button>
@@ -212,7 +281,7 @@ export function Navigation1({
                     <button
                       type="button"
                       aria-label="Цэс хаах"
-                      className="text-muted-foreground hover:text-foreground flex size-9 items-center justify-center transition-colors"
+                      className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center transition-colors"
                     >
                       <X className="size-5" />
                     </button>
@@ -245,8 +314,8 @@ export function Navigation1({
                     <AccordionContent className="flex flex-col gap-1 px-1">
                       {byDate().slice(0, 5).map((story) => (
                         <SheetClose asChild key={story.slug}>
-                          <NavLink to={`/story/${story.slug}`} className="hover:bg-foreground/5 rounded-md px-2 py-2 text-[13px] leading-snug">
-                            <span className="text-muted-foreground block font-mono text-[11px]">
+                          <NavLink to={`/story/${story.slug}`} className="hover:bg-foreground/5 rounded-md px-2 py-2.5 text-[14px] leading-snug">
+                            <span className="text-muted-foreground block font-mono text-xs">
                               {deskLabel[story.desk]} · {formatStoryDate(story.date)}
                             </span>
                             {story.title}
@@ -285,13 +354,9 @@ export function Navigation1({
                       {reader.name || "Миний бүртгэл"}
                     </NavLink>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={openLogin}
-                      className="bg-primary text-primary-foreground hover:bg-primary/85 inline-flex h-10 items-center justify-center rounded-full text-[13px] font-medium transition-colors"
-                    >
+                    <ShimmerButton type="button" onClick={openLogin} className="h-10 w-full text-[13px] font-medium">
                       Нэвтрэх
-                    </button>
+                    </ShimmerButton>
                   )}
                 </SheetClose>
               </div>
@@ -316,7 +381,7 @@ function AccountButton({ compact = false }: { compact?: boolean }) {
       <NavLink
         to="/account"
         aria-label="Миний бүртгэл"
-        className="inline-flex h-8 items-center gap-2 rounded-full border border-foreground/20 py-0.5 pr-3 pl-0.5 text-[13px] font-medium transition-colors hover:bg-foreground/5"
+        className="ez-hit inline-flex h-8 items-center gap-2 rounded-full border border-foreground/20 py-0.5 pr-3 pl-0.5 text-[13px] font-medium transition-colors hover:bg-foreground/5"
       >
         <span className="relative">
           <ReaderAvatar name={reader.name || reader.email || reader.phone} avatar={reader.avatar} size="sm" />
@@ -334,13 +399,9 @@ function AccountButton({ compact = false }: { compact?: boolean }) {
     )
   }
   return (
-    <button
-      type="button"
-      onClick={openLogin}
-      className={`inline-flex h-8 items-center rounded-full bg-primary text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary/85 ${compact ? "px-3" : "px-3.5"}`}
-    >
+    <ShimmerButton type="button" onClick={openLogin} className={`ez-hit h-8 text-[13px] font-medium ${compact ? "px-3" : "px-3.5"}`}>
       Нэвтрэх
-    </button>
+    </ShimmerButton>
   )
 }
 
