@@ -1,6 +1,7 @@
 import { youtubeId } from "@/components/site/YoutubeFrame"
-import { channels, episodes } from "@/content/channels"
-import { byDate, deskLabel, formatStoryDate, storyArt, topicLabel } from "@/content/stories"
+import { publicUrl } from "@/lib/public-url"
+import { channels, type Episode } from "@/content/channels"
+import { deskLabel, formatStoryDate, storyArt, topicLabel, type Story } from "@/content/stories"
 import { substackPosts } from "@/content/substack.posts"
 
 export interface HeroSlide {
@@ -35,11 +36,18 @@ export const partnerSlide: HeroSlide = {
 }
 
 function minutes(seconds: number) {
+  if (seconds <= 0) return "" // live feed items carry no duration.
   return `${Math.round(seconds / 60)} мин`
 }
 
-export function heroSlides(): HeroSlide[] {
-  const stories = byDate()
+/**
+ * The hero showcase, built from live content: the newest articles (admin-
+ * published and built-in, whichever are most recent) and the latest YouTube
+ * upload. Pass the already-sorted story list (newest first) and the newest
+ * episode. New uploads flow in automatically; no manual hero editing.
+ */
+export function heroSlides(stories: Story[], episode: Episode | undefined): HeroSlide[] {
+  const storySlides = stories
     .slice(0, 3)
     .map<HeroSlide>((story) => {
       const art = storyArt(story.slug)
@@ -51,26 +59,28 @@ export function heroSlides(): HeroSlide[] {
         title: story.title,
         dek: story.dek,
         image: art.src,
+        imageFallback: publicUrl("og.png"), // admin article without a cover: degrade to the brand image.
         imageAlt: art.alt,
         cta: { label: "Унших", to: `/story/${story.slug}` },
       }
     })
 
-  const episode = episodes[0]
-  const videoId = youtubeId(episode.href)
-  const talk: HeroSlide = {
-    id: "talk",
-    kind: "talk",
-    tab: "EZ Talk",
-    kicker: `EZ Talk · ${episode.date} · ${minutes(episode.seconds)}`,
-    title: episode.title,
-    dek: "Nio, Ulemj. Шинэ дугаар YouTube дээр.",
-    image: videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : undefined,
-    imageFallback: videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : undefined,
-    imageAlt: "",
-    cta: { label: "Үзэх", to: "/ez-talk" },
-    secondary: { label: "YouTube", href: episode.href },
-  }
+  const videoId = episode ? youtubeId(episode.href) : ""
+  const talk: HeroSlide | null = episode
+    ? {
+        id: "talk",
+        kind: "talk",
+        tab: "EZ Talk",
+        kicker: `EZ Talk · ${episode.date}${episode.seconds > 0 ? ` · ${minutes(episode.seconds)}` : ""}`,
+        title: episode.title,
+        dek: "Nio, Ulemj. Шинэ дугаар YouTube дээр.",
+        image: videoId ? `https://i.ytimg.com/vi/${videoId}/maxresdefault.jpg` : undefined,
+        imageFallback: videoId ? `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg` : undefined,
+        imageAlt: "",
+        cta: { label: "Үзэх", to: "/ez-talk" },
+        secondary: { label: "YouTube", href: episode.href },
+      }
+    : null
 
   const post = substackPosts[0]
   const letter: HeroSlide | null = post
@@ -88,7 +98,7 @@ export function heroSlides(): HeroSlide[] {
       }
     : null
 
-  return [stories[0], talk, stories[1], letter, stories[2], partnerSlide].filter(
+  return [storySlides[0], talk, storySlides[1], letter, storySlides[2], partnerSlide].filter(
     (slide): slide is HeroSlide => Boolean(slide),
   )
 }

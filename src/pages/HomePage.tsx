@@ -48,7 +48,7 @@ export function HomePage() {
   return (
     <>
       <div className={`${container} pt-5`}>
-        <HeroShowcase slides={heroSlides()} />
+        <HeroShowcase slides={heroSlides(all, episodes[0])} />
       </div>
       {/* The ticker sits with equal space above and below: hero → 40px → ticker → 40px → Нийтлэл. */}
       <div className="mt-8 sm:mt-10">
