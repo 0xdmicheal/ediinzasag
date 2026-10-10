@@ -26,7 +26,7 @@ jobs:
       - run: npm ci
       - run: npm run build
         env:
-          VITE_BASE: /ediinzasag/
+          VITE_BASE: /
           # Repo → Settings → Secrets and variables → Actions → Variables. Without them the site runs in demo mode.
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
