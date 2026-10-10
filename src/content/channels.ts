@@ -179,3 +179,57 @@ export const episodes: Episode[] = [
     href: "https://www.youtube.com/watch?v=Suur3H2WQtY",
   },
 ]
+
+/*
+ * Live feed. The list above is the curated archive; new uploads come from the
+ * youtube-feed Edge Function (YouTube's public RSS). fetchLatestEpisodes pulls
+ * them and mergeEpisodes layers them on top, so new videos appear instantly
+ * without a redeploy. Durations aren't in the RSS feed, so live items get
+ * seconds: 0 and the UI hides the duration for those. See useEpisodes.ts.
+ */
+export const youtubeChannelId = "UCAwrfICkC-LbV51GU0zMgXg"
+
+type FeedVideo = { id: string; title: string; href: string; date: string; thumb: string }
+
+/** Latest uploads from the youtube-feed Edge Function. Returns [] on any failure. */
+export async function fetchLatestEpisodes(): Promise<Episode[]> {
+  const base = import.meta.env.VITE_SUPABASE_URL as string | undefined
+  const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+  if (!base || !key) return [] // demo mode: no backend, keep the curated list only.
+  try {
+    const res = await fetch(`${base}/functions/v1/youtube-feed`, {
+      headers: { apikey: key, authorization: `Bearer ${key}` },
+    })
+    if (!res.ok) return []
+    const data = (await res.json()) as { videos?: FeedVideo[] }
+    return (data.videos ?? []).map((video) => ({
+      n: null,
+      title: video.title,
+      date: video.date,
+      seconds: 0, // unknown: YouTube's RSS omits duration; the UI hides it.
+      href: video.href,
+    }))
+  } catch {
+    return []
+  }
+}
+
+/** Curated list with live uploads layered on top, newest first, deduped by video id. */
+export function mergeEpisodes(curated: Episode[], live: Episode[]): Episode[] {
+  const known = new Set(curated.map((episode) => youtubeIdOf(episode.href)))
+  const fresh = live
+    .filter((episode) => {
+      const id = youtubeIdOf(episode.href)
+      return id && !known.has(id)
+    })
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+  return [...fresh, ...curated]
+}
+
+function youtubeIdOf(href: string) {
+  try {
+    return new URL(href).searchParams.get("v") ?? ""
+  } catch {
+    return ""
+  }
+}

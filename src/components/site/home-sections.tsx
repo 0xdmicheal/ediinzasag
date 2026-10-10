@@ -410,6 +410,7 @@ export function CompactGrid({ stories }: { stories: Story[] }) {
 /* ------------------------------------------------------------------ */
 
 function minutes(seconds: number) {
+  if (seconds <= 0) return "" // live feed items have no duration.
   return `${Math.round(seconds / 60)} мин`
 }
 
@@ -449,7 +450,8 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
         </span>
         <div className="text-photo-foreground absolute inset-x-0 bottom-0 p-4 sm:p-5">
           <p className="text-photo-foreground/75 text-[11px] tracking-[0.16em] uppercase">
-            Шинэ дугаар · {latest.date} · {minutes(latest.seconds)}
+            Шинэ дугаар · {latest.date}
+            {latest.seconds > 0 ? ` · ${minutes(latest.seconds)}` : ""}
           </p>
           <h3 className="font-news mt-1.5 max-w-lg text-xl leading-tight sm:text-2xl">{latest.title}</h3>
         </div>

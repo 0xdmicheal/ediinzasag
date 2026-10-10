@@ -9,7 +9,7 @@ import {
   TalkBand,
 } from "@/components/site/home-sections"
 import { MarketStrip } from "@/components/site/MarketStrip"
-import { episodes } from "@/content/channels"
+import { useEpisodes } from "@/content/useEpisodes"
 import { heroSlides } from "@/content/hero"
 import { sortByDate, useStories } from "@/content/live"
 import { byDate } from "@/content/stories"
@@ -23,6 +23,7 @@ const MORE_LIMIT = 6
 export function HomePage() {
   // The hero shows the three newest built-in stories; lists include admin-published ones too.
   const { stories } = useStories()
+  const episodes = useEpisodes()
   const all = sortByDate(stories)
   const heroSlugs = new Set(byDate().slice(0, 3).map((story) => story.slug))
   const mongoliaDesk = all.filter((story) => story.desk === "mongolia")

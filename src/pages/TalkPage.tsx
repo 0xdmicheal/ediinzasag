@@ -1,11 +1,12 @@
-import { useRef, useState } from "react"
+import { useMemo, useRef, useState } from "react"
 import { Link } from "react-router-dom"
 import { ArrowRight, ArrowUpRight, Play } from "lucide-react"
 import { FaTelegram, FaYoutube } from "react-icons/fa6"
 
 import { SectionHeader } from "@/components/site/home-sections"
 import { YoutubeFrame, youtubeId } from "@/components/site/YoutubeFrame"
-import { channels, episodes, type Episode } from "@/content/channels"
+import { channels, type Episode } from "@/content/channels"
+import { useEpisodes } from "@/content/useEpisodes"
 
 const wide = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
 const narrow = "mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8"
@@ -24,15 +25,13 @@ const filters = [
 
 type FilterId = (typeof filters)[number]["id"]
 
-const series = episodes.filter((episode) => episode.n != null).sort((a, b) => (a.n ?? 0) - (b.n ?? 0))
-const totalHours = Math.round(episodes.reduce((sum, episode) => sum + episode.seconds, 0) / 3600)
-const firstYear = episodes.reduce((year, episode) => (episode.date < year ? episode.date : year), "9999").slice(0, 4)
-
 function minutes(seconds: number) {
+  if (seconds <= 0) return "" // live feed items have no duration; hide it.
   return `${Math.round(seconds / 60)} мин`
 }
 
 function clock(seconds: number) {
+  if (seconds <= 0) return ""
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
   const s = seconds % 60
@@ -46,10 +45,15 @@ function thumb(href: string, quality: "hq" | "mq" = "hq") {
 }
 
 export function TalkPage() {
+  const episodes = useEpisodes()
   const [href, setHref] = useState<string>(episodes[0].href)
   const [picked, setPicked] = useState(false)
   const [filter, setFilter] = useState<FilterId>("all")
   const player = useRef<HTMLDivElement>(null)
+
+  const series = useMemo(() => episodes.filter((episode) => episode.n != null).sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [episodes])
+  const totalHours = useMemo(() => Math.round(episodes.reduce((sum, episode) => sum + episode.seconds, 0) / 3600), [episodes])
+  const firstYear = useMemo(() => episodes.reduce((year, episode) => (episode.date < year ? episode.date : year), "9999").slice(0, 4), [episodes])
 
   const activeIndex = Math.max(
     0,
@@ -260,9 +264,11 @@ export function TalkPage() {
                         #{episode.n}
                       </span>
                     ) : null}
-                    <span className="absolute right-2 bottom-2 rounded-sm bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
-                      {clock(episode.seconds)}
-                    </span>
+                    {episode.seconds > 0 ? (
+                      <span className="absolute right-2 bottom-2 rounded-sm bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
+                        {clock(episode.seconds)}
+                      </span>
+                    ) : null}
                     {current ? (
                       <span className="bg-brand text-brand-foreground absolute bottom-2 left-2 rounded-sm px-1.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
                         Тоглож байна
