@@ -38,32 +38,10 @@ function letterDate(value: string) {
  * leaves it out). On phones the title steps down and stays on one row with its
  * action button, so every section header lines up the same way.
  */
-export function SectionHeader({
-  index,
-  kicker,
-  title,
-  children,
-}: {
-  index?: string
-  kicker?: string
-  title: string
-  children?: ReactNode
-}) {
+export function SectionHeader({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    // With a label line above the title, the button sits on the title's baseline row; without one, it centres on the title.
-    <header
-      className={`mb-5 flex justify-between gap-3 border-b pb-3 sm:mb-6 sm:pb-4 ${index || kicker ? "items-end" : "items-center"}`}
-    >
-      <div className="min-w-0">
-        {index || kicker ? (
-          <p className="text-brand-strong mb-1.5 flex items-center gap-2.5 font-mono text-[12px] tracking-[0.04em] uppercase">
-            {index ? <span>{index}</span> : null}
-            {index && kicker ? <span aria-hidden>—</span> : null}
-            {kicker}
-          </p>
-        ) : null}
-        <h2 className="font-news text-2xl leading-none sm:text-4xl">{title}</h2>
-      </div>
+    <header className="mb-5 flex items-center justify-between gap-3 border-b pb-3 sm:mb-6 sm:pb-4">
+      <h2 className="font-news min-w-0 text-2xl leading-none sm:text-4xl">{title}</h2>
       {children ? <div className="flex shrink-0 items-center gap-2">{children}</div> : null}
     </header>
   )
@@ -292,15 +270,11 @@ export function DeskSpread({ stories }: { stories: Story[] }) {
  * the layout where it was.
  */
 export function StoryRail({
-  index,
-  kicker,
   title,
   ctaText,
   ctaTo,
   stories,
 }: {
-  index?: string
-  kicker?: string
   title: string
   ctaText: string
   ctaTo: string
@@ -319,7 +293,7 @@ export function StoryRail({
 
   return (
     <>
-      <SectionHeader index={index} kicker={kicker} title={title}>
+      <SectionHeader title={title}>
         <button type="button" aria-label="Өмнөх" onClick={() => scroll(-1)} className={`${arrowClass} hidden sm:grid`}>
           <ChevronLeft className="size-4" />
         </button>

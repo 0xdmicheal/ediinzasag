@@ -262,7 +262,7 @@ function Mongolia() {
 
   return (
     <section id="mongolia" className="scroll-mt-28">
-      <SectionHeader index="05" kicker="Монголын хөрөнгийн бирж" title="Монголын хувьцаа">
+      <SectionHeader title="Монголын хувьцаа">
         <UnitChip denom={{ kind: "money", currency: "MNT" }} />
       </SectionHeader>
       <Lead>
@@ -336,7 +336,7 @@ function Mongolia() {
 function World() {
   return (
     <section id="world" className="scroll-mt-28">
-      <SectionHeader index="03" kicker="Индекс · оноогоор" title="Дэлхийн хувьцаа">
+      <SectionHeader title="Дэлхийн хувьцаа">
         <UnitChip denom={{ kind: "index" }} />
       </SectionHeader>
       <Lead>Сүүлийн өдрийн өөрчлөлтөөр эрэмбэлэв. Баруун тийш цэнхэр нь өссөн, зүүн тийш саарал нь буурсан.</Lead>
@@ -362,7 +362,7 @@ function Commodities() {
 
   return (
     <section id="commodities" className="scroll-mt-28">
-      <SectionHeader index="04" kicker="Ам.доллараар" title="Түүхий эд">
+      <SectionHeader title="Түүхий эд">
         <UnitChip denom={{ kind: "money", currency: "USD" }} />
       </SectionHeader>
       <Lead>Монголын экспортын орлого, таны шатахууны үнэ эдгээр үнээс хамаардаг. Бүгд ам.доллараар.</Lead>
@@ -442,7 +442,7 @@ function CommodityCard({ item }: { item: Quote }) {
 function Currency() {
   return (
     <section id="currency" className="scroll-mt-28">
-      <SectionHeader index="06" kicker="Ханш, хүү" title="Валют ба хүү" />
+      <SectionHeader title="Валют ба хүү" />
       <Lead>Төгрөг, гол валютын ханш ба дэлхийн зээлийн хүүний жишиг.</Lead>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {fx.map((item) => (
@@ -516,7 +516,7 @@ function Macro() {
 
   return (
     <section id="macro" className="scroll-mt-28">
-      <SectionHeader index="01" kicker="Монголын эдийн засаг" title="Макро самбар" />
+      <SectionHeader title="Макро самбар" />
       <Lead>Ханш, хувьцааны ард байгаа үндсэн тоонууд. Тус бүр өөрийн огноо, эх сурвалжтай.</Lead>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -627,7 +627,7 @@ function Performance() {
 
   return (
     <section id="performance" className="scroll-mt-28">
-      <SectionHeader index="02" kicker="Харьцуулалт" title="Гүйцэтгэл" />
+      <SectionHeader title="Гүйцэтгэл" />
       <Lead>
         Бүх зах зээл нэг хэмжүүрээр. Хугацаагаа сонгоно уу. Валютын хувьд өсөлт нь ам.доллар чангарсныг (эсвэл евро) илтгэнэ.
       </Lead>
@@ -643,7 +643,7 @@ function Performance() {
 function Glossary() {
   return (
     <section id="glossary" className="scroll-mt-28">
-      <SectionHeader index="07" kicker="Ойлгомжтой болгох" title="Үгийн тайлбар" />
+      <SectionHeader title="Үгийн тайлбар" />
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <Accordion type="single" collapsible defaultValue={glossary[0].term} className="bg-card rounded-lg border px-5">
           {glossary.map((item) => (

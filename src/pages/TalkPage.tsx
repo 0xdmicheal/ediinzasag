@@ -185,7 +185,7 @@ export function TalkPage() {
       <div className={`${narrow} mt-20 flex flex-col gap-20`}>
         {/* Series timeline */}
         <section>
-          <SectionHeader index="01" kicker={`Дугаар #1–#${series.length}`} title="Цуврал" />
+          <SectionHeader title="Цуврал" />
           <div className="-mx-4 overflow-x-auto px-4 pb-2 [mask-image:linear-gradient(to_right,black_88%,transparent)] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 [&::-webkit-scrollbar]:hidden">
             <ol className="flex min-w-max">
               {series.map((episode, index) => {
@@ -215,7 +215,7 @@ export function TalkPage() {
 
         {/* Library */}
         <section>
-          <SectionHeader index="02" kicker={`${episodes.length} бичлэг`} title="Бүх бичлэг">
+          <SectionHeader title="Бүх бичлэг">
             <div role="tablist" aria-label="Шүүлтүүр" className="bg-muted flex flex-wrap gap-1 rounded-full p-1">
               {filters.map((item) => {
                 const selected = item.id === filter
