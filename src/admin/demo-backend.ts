@@ -188,7 +188,7 @@ export function createDemoBackend(): Backend {
         ...draft,
         coverRightsOk: true,
         slug: uniqueSlug(store, draft.slug || draft.title),
-        id: `a-${Date.now()}`,
+        id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, // unique even when several are made in one millisecond
         status: "draft",
         authorId: member.id,
         authorName: member.name,

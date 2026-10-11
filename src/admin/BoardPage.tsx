@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
 import { Link, useNavigate } from "react-router-dom"
-import { ArrowUpRight, Bot, CalendarClock, CalendarDays, ChevronDown, Eye, FilePlus2, Hand, Lock, Megaphone, PenLine, RefreshCw, Search, Sparkles, Tag as TagIcon, UserRound } from "lucide-react"
+import { ArrowUpRight, Bot, Download, CalendarClock, CalendarDays, ChevronDown, Eye, FilePlus2, Hand, Lock, Megaphone, PenLine, RefreshCw, Search, Sparkles, Tag as TagIcon, UserRound } from "lucide-react"
 import { cn } from "cn"
 
+import { importBuiltins, pendingBuiltins } from "@/admin/import-builtin"
 import { canClaim, canManageTeam, formatWhen, isEditor, isScheduled, readiness, statusMeta, statusOrder, timeAgo } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import { Select } from "@/admin/Select"
@@ -410,6 +411,8 @@ export function BoardPage() {
   const [agentOpen, setAgentOpen] = useState(readAgentOpen)
   const isAdmin = canManageTeam(member)
   const [weekAgo] = useState(() => Date.now() - 7 * 86_400_000)
+  const [importing, setImporting] = useState<{ done: number; total: number } | null>(null)
+  const [importResult, setImportResult] = useState<{ tone: "success" | "error"; text: string } | null>(null)
 
   useEffect(() => {
     Promise.all([backend.listArticles(), backend.listTags()])
@@ -458,6 +461,26 @@ export function BoardPage() {
     } catch (failure) {
       setAgentResult({ text: failure instanceof Error ? failure.message : "Авч чадсангүй", problem: "" })
       setArticles(await backend.listArticles())
+    }
+  }
+
+  const builtins = useMemo(
+    () => (articles === null ? [] : pendingBuiltins(new Set(articles.map((article) => article.slug)))),
+    [articles],
+  )
+
+  async function importSiteArticles() {
+    const list = builtins
+    setImporting({ done: 0, total: list.length })
+    setImportResult(null)
+    try {
+      const done = await importBuiltins(backend, list, (count) => setImporting({ done: count, total: list.length }))
+      setImportResult({ tone: "success", text: `${done} нийтлэл "Хянагдаж буй" баганад орлоо. Нийтэлсний дараа сайтад гарна.` })
+    } catch (failure) {
+      setImportResult({ tone: "error", text: failure instanceof Error ? failure.message : "Оруулж чадсангүй" })
+    } finally {
+      setImporting(null)
+      setArticles(await backend.listArticles().catch(() => articles))
     }
   }
 
@@ -625,6 +648,31 @@ export function BoardPage() {
             <Lock className="size-3" />
             Зөвхөн админ
           </p>
+          {builtins.length > 0 || importing || importResult ? (
+            <div className="bg-card flex flex-wrap items-center justify-between gap-4 rounded-xl border p-4">
+              <div className="min-w-0">
+                <p className="text-[14px] font-semibold">Сайтад суулгасан нийтлэлүүд</p>
+                <p className="text-muted-foreground mt-0.5 text-[13px]">
+                  {importing
+                    ? `Оруулж байна… ${importing.done}/${importing.total}`
+                    : builtins.length > 0
+                      ? `${builtins.length} нийтлэл кодонд байгаа ч админд алга. Сайтад харагдахгүй байна. Хяналтад оруулаад, нийтэлбэл сайтад гарна, хэрэггүйг нь устгана.`
+                      : "Бүх нийтлэл админд орсон."}
+                </p>
+              </div>
+              {builtins.length > 0 ? (
+                <button type="button" onClick={importSiteArticles} disabled={importing !== null} className={buttonClass.primary}>
+                  <Download className="size-4" />
+                  {importing ? "Оруулж байна…" : `${builtins.length} нийтлэлийг хяналтад оруулах`}
+                </button>
+              ) : null}
+              {importResult ? (
+                <div className="basis-full">
+                  <Notice tone={importResult.tone}>{importResult.text}</Notice>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <AgentInbox
             items={inbox}
             tracked={agentTracked}

@@ -22,12 +22,8 @@ import { desks } from "@/design/desks"
 import { publicUrl } from "@/lib/public-url"
 import { ReaderAvatar } from "@/reader/ReaderAvatar"
 import { useReader } from "@/reader/session"
-import {
-  byDate,
-  deskLabel,
-  formatStoryDate,
-  storiesByDesk,
-} from "@/content/stories"
+import { sortByDate, useStories } from "@/content/live"
+import { deskLabel, formatStoryDate, type Story } from "@/content/stories"
 import { Badge } from "@/components/ui/badge"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { Button } from "@/components/ui/button"
@@ -169,14 +165,17 @@ export function Navigation1({
   const { reader, openLogin } = useReader()
   const { pathname } = useLocation()
   const themeLock = useRef(false)
-  const lead = byDate()[0]
+  // The live list, so the menu shows only published articles.
+  const { stories } = useStories()
+  const sorted = sortByDate(stories)
+  const lead = sorted[0]
   useEffect(() => {
     return () => {
       delete document.documentElement.dataset.ezSheet
     }
   }, [])
-  const mongolia = storiesByDesk("mongolia").slice(0, 3)
-  const world = storiesByDesk("world").slice(0, 3)
+  const mongolia = sorted.filter((story) => story.desk === "mongolia").slice(0, 3)
+  const world = sorted.filter((story) => story.desk === "world").slice(0, 3)
 
   return (
     <header className="sticky top-0 z-40 text-foreground">
@@ -228,21 +227,23 @@ export function Navigation1({
                           </NavLink>
                         </div>
                       </div>
-                      <div className="border-l border-border pl-6">
-                        <Badge variant="secondary" className="mb-3">
-                          {deskLabel[lead.desk]}
-                        </Badge>
-                        <p className="font-news text-lg leading-snug font-medium">
-                          {lead.title}
-                        </p>
-                        <p className="text-muted-foreground mt-2 line-clamp-3 text-sm">{lead.dek}</p>
-                        <Button asChild className="mt-4" size="sm">
-                          <NavLink to={`/story/${lead.slug}`}>
-                            Унших
-                            <ArrowUpRight />
-                          </NavLink>
-                        </Button>
-                      </div>
+                      {lead ? (
+                        <div className="border-l border-border pl-6">
+                          <Badge variant="secondary" className="mb-3">
+                            {deskLabel[lead.desk]}
+                          </Badge>
+                          <p className="font-news text-lg leading-snug font-medium">
+                            {lead.title}
+                          </p>
+                          <p className="text-muted-foreground mt-2 line-clamp-3 text-sm">{lead.dek}</p>
+                          <Button asChild className="mt-4" size="sm">
+                            <NavLink to={`/story/${lead.slug}`}>
+                              Унших
+                              <ArrowUpRight />
+                            </NavLink>
+                          </Button>
+                        </div>
+                      ) : null}
                     </div>
                   </NavigationMenuContent>
                 </NavigationMenuItem>
@@ -445,7 +446,7 @@ function StoryColumn({
   stories,
 }: {
   title: string
-  stories: ReturnType<typeof storiesByDesk>
+  stories: Story[]
 }) {
   return (
     <div>

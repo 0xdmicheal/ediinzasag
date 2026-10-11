@@ -12,7 +12,6 @@ import { MarketStrip } from "@/components/site/MarketStrip"
 import { useEpisodes } from "@/content/useEpisodes"
 import { heroSlides } from "@/content/hero"
 import { sortByDate, useStories } from "@/content/live"
-import { byDate } from "@/content/stories"
 import { substackPosts } from "@/content/substack.posts"
 
 const container = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
@@ -21,11 +20,11 @@ const sectionContainer = "mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8"
 const MORE_LIMIT = 6
 
 export function HomePage() {
-  // The hero shows the three newest built-in stories; lists include admin-published ones too.
+  // Only published articles (built-in ones too in the demo build); the hero leads with the newest three.
   const { stories } = useStories()
   const episodes = useEpisodes()
   const all = sortByDate(stories)
-  const heroSlugs = new Set(byDate().slice(0, 3).map((story) => story.slug))
+  const heroSlugs = new Set(all.slice(0, 3).map((story) => story.slug)) // the hero's three stories
   const mongoliaDesk = all.filter((story) => story.desk === "mongolia")
   const mongolia = [
     ...mongoliaDesk.filter((story) => !heroSlugs.has(story.slug)),

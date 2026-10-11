@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 
 import type { Article, Tag } from "@/admin/types"
 import { countWords } from "@/lib/article-html"
+import { hasSupabase } from "@/lib/supabase-env"
 import { deskLabel, registerCover, stories as staticStories, topicLabel, type Story, type Topic } from "@/content/stories"
 
 /*
@@ -11,6 +12,11 @@ import { deskLabel, registerCover, stories as staticStories, topicLabel, type St
  */
 
 const topics = Object.keys(topicLabel) as Topic[]
+
+// On the live site every article goes through the newsroom: the stories built into the
+// code are imported from the admin board and appear only once published there
+// (src/admin/import-builtin.ts). The demo build still shows them, since it has no newsroom data.
+const builtins = hasSupabase ? [] : staticStories
 
 function toStory(article: Article): Story {
   if (article.coverUrl) registerCover(article.slug, { src: article.coverUrl, alt: article.coverAlt })
@@ -48,12 +54,12 @@ function loadPublished() {
 
 function merge(remote: Story[]) {
   const slugs = new Set(remote.map((story) => story.slug))
-  return [...remote, ...staticStories.filter((story) => !slugs.has(story.slug))]
+  return [...remote, ...builtins.filter((story) => !slugs.has(story.slug))]
 }
 
-/** All stories readers can see: admin-published first (by slug), then built-in ones. */
+/** All stories readers can see: admin-published, plus the built-in ones in the demo build. */
 export function useStories() {
-  const [list, setList] = useState<Story[]>(staticStories)
+  const [list, setList] = useState<Story[]>(builtins)
   const [ready, setReady] = useState(false)
   useEffect(() => {
     let cancelled = false
