@@ -441,7 +441,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
   return (
     <section className="ez-clip bg-ink text-ink-foreground grid overflow-hidden rounded-lg lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <Link to="/ez-talk" className="group relative isolate block aspect-video self-center overflow-hidden">
-        <EpisodeThumb episode={latest} quality="max" className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
+        <EpisodeThumb key={latest.href} episode={latest} quality="max" className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-15% via-black/45 via-45% to-black/5" />
         <span className="absolute inset-0 grid place-items-center">
           <span className="bg-brand text-brand-foreground grid size-14 place-items-center rounded-full shadow-[0_0_0_8px_oklch(1_0_0/0.12)] transition-transform duration-300 group-hover:scale-110 sm:size-16">
@@ -468,7 +468,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
             <li key={episode.href} className="border-ink-foreground/15 border-b">
               <Link to="/ez-talk" className="group hover:bg-ink-foreground/5 -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors">
                 <span className="relative h-10 w-16 shrink-0 overflow-hidden rounded-sm">
-                  <EpisodeThumb episode={episode} quality="hq" className="h-full w-full" />
+                  <EpisodeThumb key={episode.href} episode={episode} quality="hq" className="h-full w-full" />
                 </span>
                 <span className="min-w-0">
                   <span className="text-ink-foreground/65 block text-[11px] tracking-wide uppercase">

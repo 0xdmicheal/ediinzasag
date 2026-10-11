@@ -30,6 +30,13 @@ export type Episode = {
 export const episodes: Episode[] = [
   {
     n: null,
+    title: "Доллар яагаад ноёлдог вэ? Petrodollar-ийн түүх",
+    date: "2026.10.10",
+    seconds: 1277,
+    href: "https://www.youtube.com/watch?v=gQb_s5mDMHk",
+  },
+  {
+    n: null,
     title: "Монгол Улс ХК-ийн хувьцаа яагаад унаад байна вэ?",
     date: "2026.09.30",
     seconds: 1510,
@@ -189,7 +196,7 @@ export const episodes: Episode[] = [
  */
 export const youtubeChannelId = "UCAwrfICkC-LbV51GU0zMgXg"
 
-type FeedVideo = { id: string; title: string; href: string; date: string; thumb: string }
+type FeedVideo = { id: string; title: string; href: string; date: string; thumb: string; seconds?: number }
 
 /** Latest uploads from the youtube-feed Edge Function. Returns [] on any failure. */
 export async function fetchLatestEpisodes(): Promise<Episode[]> {
@@ -206,7 +213,7 @@ export async function fetchLatestEpisodes(): Promise<Episode[]> {
       n: null,
       title: video.title,
       date: video.date,
-      seconds: 0, // unknown: YouTube's RSS omits duration; the UI hides it.
+      seconds: video.seconds ?? 0, // RSS omits duration (the UI hides 0); the channel-page fallback has it.
       href: video.href,
     }))
   } catch {

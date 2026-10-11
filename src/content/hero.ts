@@ -68,7 +68,8 @@ export function heroSlides(stories: Story[], episode: Episode | undefined): Hero
   const videoId = episode ? youtubeId(episode.href) : ""
   const talk: HeroSlide | null = episode
     ? {
-        id: "talk",
+        // Per-video id: the live feed swaps the episode after load, and a fixed id kept the old thumbnail.
+        id: `talk-${videoId || episode.href}`,
         kind: "talk",
         tab: "EZ Talk",
         kicker: `EZ Talk · ${episode.date}${episode.seconds > 0 ? ` · ${minutes(episode.seconds)}` : ""}`,

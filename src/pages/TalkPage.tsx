@@ -46,7 +46,8 @@ function thumb(href: string, quality: "hq" | "mq" = "hq") {
 
 export function TalkPage() {
   const episodes = useEpisodes()
-  const [href, setHref] = useState<string>(episodes[0].href)
+  // null until the reader picks one, so the player follows the newest video when live uploads arrive.
+  const [href, setHref] = useState<string | null>(null)
   const [picked, setPicked] = useState(false)
   const [filter, setFilter] = useState<FilterId>("all")
   const player = useRef<HTMLDivElement>(null)
@@ -55,9 +56,10 @@ export function TalkPage() {
   const totalHours = useMemo(() => Math.round(episodes.reduce((sum, episode) => sum + episode.seconds, 0) / 3600), [episodes])
   const firstYear = useMemo(() => episodes.reduce((year, episode) => (episode.date < year ? episode.date : year), "9999").slice(0, 4), [episodes])
 
+  const latest = episodes[0]
   const activeIndex = Math.max(
     0,
-    episodes.findIndex((episode) => episode.href === href),
+    episodes.findIndex((episode) => episode.href === (href ?? latest.href)),
   )
   const active = episodes[activeIndex]
   const upNext = [1, 2, 3].map((step) => episodes[(activeIndex + step) % episodes.length])
@@ -122,7 +124,7 @@ export function TalkPage() {
                 <span className="bg-brand absolute inline-flex size-full animate-ping rounded-full opacity-60 motion-reduce:animate-none" />
                 <span className="bg-brand relative inline-flex size-2 rounded-full" />
               </span>
-              Одоо үзэж байна
+              {active.href === latest.href ? "Шинэ дугаар" : "Одоо үзэж байна"}
             </p>
             <div className="mt-4 flex items-end gap-4">
               <p className="font-news text-brand text-6xl leading-[0.8] sm:text-7xl">
@@ -259,11 +261,18 @@ export function TalkPage() {
                         <Play className="ml-0.5 size-5 fill-current" />
                       </span>
                     </span>
-                    {episode.n != null ? (
-                      <span className="bg-brand text-brand-foreground font-news absolute top-2 left-2 rounded-sm px-1.5 py-0.5 text-sm leading-none">
-                        #{episode.n}
-                      </span>
-                    ) : null}
+                    <span className="absolute top-2 left-2 flex gap-1">
+                      {episode.n != null ? (
+                        <span className="bg-brand text-brand-foreground font-news rounded-sm px-1.5 py-0.5 text-sm leading-none">
+                          #{episode.n}
+                        </span>
+                      ) : null}
+                      {episode.href === latest.href ? (
+                        <span className="bg-brand text-brand-foreground rounded-sm px-1.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase">
+                          Шинэ
+                        </span>
+                      ) : null}
+                    </span>
                     {episode.seconds > 0 ? (
                       <span className="absolute right-2 bottom-2 rounded-sm bg-black/75 px-1.5 py-0.5 text-[11px] font-medium text-white tabular-nums">
                         {clock(episode.seconds)}
