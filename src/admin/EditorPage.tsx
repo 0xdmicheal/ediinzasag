@@ -18,6 +18,8 @@ import {
   Smartphone,
   Trash2,
   X,
+  TriangleAlert,
+  Wand2,
 } from "lucide-react"
 import { cn } from "cn"
 
@@ -27,6 +29,7 @@ import { PosterDialog } from "@/admin/PosterDialog"
 import type { PosterInput } from "@/admin/posters"
 import { RichEditor } from "@/admin/RichEditor"
 import { scheduleDayValue, ScheduleDate } from "@/admin/ScheduleDate"
+import { lintStyle, type StyleHit } from "@/admin/style-lint"
 import {
   allowedTransitions,
   canClaim,
@@ -215,10 +218,20 @@ export function EditorPage() {
   const unclaimed = article ? canClaim(article) : false
   const editable = article ? canEdit(member, article) : true
   const checks = useMemo(() => readiness(draft, article?.origin), [draft, article?.origin])
+  const styleHits = useMemo(() => lintStyle(draft), [draft])
   const required = checks.filter((check) => check.required)
   const requiredOk = required.every((check) => check.ok)
   const transitions = article ? allowedTransitions(member, article) : []
   const takeWords = wordCount(draft.take)
+
+  /** A style fix rewrites the text; the body editor is remounted so it shows the fixed HTML. */
+  function applyFix(hit: StyleHit) {
+    if (!hit.fix) return
+    const next = hit.fix(draft)
+    setDraft(next)
+    setDirty(true)
+    if (next.body !== draft.body) setEditorKey((key) => `${key.split("#")[0]}#${Date.now()}`)
+  }
 
   function update<K extends keyof ArticleDraft>(key: K, value: ArticleDraft[K]) {
     setDraft((current) => {
@@ -721,6 +734,33 @@ export function EditorPage() {
                   ))}
                 </ul>
               </section>
+
+              {/* House style: EZ Mongolian Writing Style Book. Errors block publishing. */}
+              {styleHits.length ? (
+                <section aria-label="Хэв маяг">
+                  <p className="text-[13px] font-semibold">Хэв маяг</p>
+                  <p className="text-muted-foreground mt-0.5 text-[12px]">EZ-ийн бичгийн дүрэм. Улаан нь нийтлэхийг хаана, бусад нь зөвлөмж.</p>
+                  <ul className="mt-3 flex flex-col gap-2.5">
+                    {styleHits.map((hit) => (
+                      <li key={hit.rule} className={cn("rounded-lg border p-2.5 text-[12.5px]", hit.severity === "error" ? "border-[var(--down)]/40 bg-[color-mix(in_oklch,var(--down)_6%,transparent)]" : "bg-muted/40")}>
+                        <p className="flex items-start gap-1.5">
+                          <TriangleAlert className={cn("mt-0.5 size-3.5 shrink-0", hit.severity === "error" ? "text-[var(--down)]" : "text-muted-foreground")} />
+                          <span>
+                            {hit.message} <span className="text-muted-foreground font-mono text-[10px]">{hit.rule}</span>
+                          </span>
+                        </p>
+                        {hit.sample ? <p className="text-muted-foreground mt-1 pl-5 italic">{hit.sample}</p> : null}
+                        {hit.fix && editable ? (
+                          <button type="button" onClick={() => applyFix(hit)} className={cn(buttonClass.ghost, "mt-2 ml-5 h-7 px-2.5 text-[12px]")}>
+                            <Wand2 className="size-3.5" />
+                            {hit.fixLabel ?? "Засах"}
+                          </button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
 
               <Field
                 label="Шошго"

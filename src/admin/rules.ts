@@ -1,5 +1,6 @@
 import type { Article, ArticleDraft, Member, Origin, Role, Status } from "@/admin/types"
 import { countHeadings, countWords } from "@/lib/article-html"
+import { lintStyle } from "@/admin/style-lint"
 
 /*
  * Workflow rules for the admin UI. They mirror the database trigger in
@@ -141,6 +142,11 @@ export function readiness(draft: ArticleDraft, origin: Origin = "human"): Check[
       required: true,
     },
     { id: "headings", label: "2+ дэд гарчиг", ok: countHeadings(draft.body) >= 2, required: false },
+    // House style (EZ Mongolian Writing Style Book): errors block publishing; details and fixes in the editor panel.
+    ...(() => {
+      const errors = lintStyle(draft).filter((hit) => hit.severity === "error").length
+      return [{ id: "style", label: errors ? `Хэв маягийн ${errors} алдаа засах` : "Хэв маягийн дүрэм", ok: errors === 0, required: true }]
+    })(),
   ]
 }
 
