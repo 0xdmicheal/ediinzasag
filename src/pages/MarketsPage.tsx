@@ -222,7 +222,7 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
               </span>
               <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
                 {tile.pct === null ? null : (
-                  <span className={cn("font-mono font-semibold tabular-nums", Math.abs(tile.pct) < 0.005 ? "text-ink-foreground/60" : tile.pct > 0 ? "text-[#4ade80]" : "text-[#f87171]")}>
+                  <span className={cn("font-mono font-semibold tabular-nums", Math.abs(tile.pct) < 0.005 ? "text-ink-foreground/60" : tile.pct > 0 ? "text-[var(--up-on-ink)]" : "text-[var(--down-on-ink)]")}>
                     {Math.abs(tile.pct) < 0.005 ? "0.00%" : `${tile.pct > 0 ? "▲" : "▼"} ${signedPct(tile.pct).replace(/^[+-]/, "")}`}
                   </span>
                 )}

@@ -23,10 +23,9 @@ import { commodities, fx, sessionShort, worldIndices, type Quote } from "@/conte
 
 const TZ = "Asia/Ulaanbaatar"
 const UB_OFFSET = "+08:00"
-const STUDIO = "#16181c"
-const UP = "text-[#2fae74]"
-const DOWN = "text-[#f0643f]"
-const HOT = "#f0643f"
+const UP = "text-[var(--up)]"
+const DOWN = "text-[var(--down)]"
+const HOT = "var(--brand)"
 const weekdays = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"]
 const shortWeekdays = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"]
 
@@ -236,7 +235,7 @@ function clusters(events: EconEvent[]) {
 function Change({ pct }: { pct: number }) {
   const Icon = Math.abs(pct) < 0.005 ? Minus : pct > 0 ? ArrowUp : ArrowDown
   return (
-    <span className={cn("inline-flex items-center gap-0.5 text-[11.5px] font-semibold tabular-nums", Math.abs(pct) < 0.005 ? "text-white/50" : pct > 0 ? UP : DOWN)}>
+    <span className={cn("inline-flex items-center gap-0.5 text-[11.5px] font-semibold tabular-nums", Math.abs(pct) < 0.005 ? "text-muted-foreground" : pct > 0 ? UP : DOWN)}>
       <Icon className="size-3" strokeWidth={2.75} />
       {signedPct(pct).replace("-", "−")}
     </span>
@@ -245,10 +244,10 @@ function Change({ pct }: { pct: number }) {
 
 function Impact({ high, compact = false }: { high: boolean; compact?: boolean }) {
   return (
-    <span className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium", high ? "text-[#f0643f]" : "text-white/55")}>
+    <span className={cn("inline-flex items-center gap-1.5 text-[11px] font-medium", high ? "text-brand-strong" : "text-muted-foreground")}>
       <span className="flex gap-0.5" aria-hidden>
         {[0, 1, 2].map((dot) => (
-          <span key={dot} className={cn("size-1.5 rounded-full", dot < (high ? 3 : 2) ? "bg-current" : "bg-white/15")} />
+          <span key={dot} className={cn("size-1.5 rounded-full", dot < (high ? 3 : 2) ? "bg-current" : "bg-gray-200 dark:bg-gray-700")} />
         ))}
       </span>
       <span className={compact ? "hidden sm:inline" : ""}>{high ? "Өндөр нөлөө" : "Дунд нөлөө"}</span>
@@ -256,10 +255,10 @@ function Impact({ high, compact = false }: { high: boolean; compact?: boolean })
   )
 }
 
-const panel = "rounded-xl border border-white/10 bg-white/[0.03]"
-const label = "text-[10.5px] font-medium tracking-[0.14em] text-white/45 uppercase"
+const panel = "rounded-xl border bg-card"
+const label = "text-[10.5px] font-medium tracking-[0.14em] text-muted-foreground uppercase"
 const weekArrow =
-  "grid size-7 place-items-center rounded-full border border-white/15 text-[15px] leading-none transition-colors hover:bg-white/10 disabled:pointer-events-none disabled:opacity-25"
+  "grid size-7 place-items-center rounded-full border border-border text-[15px] leading-none transition-colors hover:bg-foreground/[0.06] disabled:pointer-events-none disabled:opacity-25"
 
 /* ------------------------------------------------------------------ */
 /* Desk                                                                */
@@ -350,11 +349,11 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
   const canForward = addDays(week, 7) <= lastDay
 
   return (
-    <section ref={root} id="desk" aria-labelledby="desk-title" className="bg-studio text-photo-foreground scroll-mt-14">
+    <section ref={root} id="desk" aria-labelledby="desk-title" className="scroll-mt-14">
       <span id="chart" className="block scroll-mt-14" aria-hidden />
       <span id="calendar" className="block scroll-mt-14" aria-hidden />
       <div className="px-[10px] pt-2">
-        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-white/10 px-1 pt-8">
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-border px-1 pt-8">
           <div className="flex items-center gap-3">
             <span className="bg-brand text-brand-foreground grid size-9 place-items-center rounded-lg">
               <CandlestickChart className="size-5" strokeWidth={2.25} />
@@ -363,16 +362,16 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
               <h2 id="desk-title" className="font-news text-2xl leading-none sm:text-3xl">
                 EZ Desk
               </h2>
-              <p className="mt-1 text-[13px] text-white/55">Мэдээ хэзээ гарах, юуг хөдөлгөхийг нэг дор. Мэдээг дарвал график тэр зах зээл рүү шилжинэ.</p>
+              <p className="mt-1 text-[13px] text-muted-foreground">Мэдээ хэзээ гарах, юуг хөдөлгөхийг нэг дор. Мэдээг дарвал график тэр зах зээл рүү шилжинэ.</p>
             </div>
           </div>
-          <p className="font-mono text-[12px] text-white/55 tabular-nums">
-            <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-[#2fae74] align-middle" aria-hidden />
+          <p className="font-mono text-[12px] text-muted-foreground tabular-nums">
+            <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-[var(--up)] align-middle" aria-hidden />
             Улаанбаатар {ubParts(now).time}
           </p>
         </header>
 
-        {failed ? <p className="mt-6 text-sm text-white/60">Календарийг ачаалж чадсангүй. Дараа дахин оролдоно уу.</p> : null}
+        {failed ? <p className="mt-6 text-sm text-muted-foreground">Календарийг ачаалж чадсангүй. Дараа дахин оролдоно уу.</p> : null}
 
 
       </div>
@@ -403,9 +402,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
         <TradingViewChart
           symbol={chart.symbol}
           title={chart.label}
-          theme="dark"
-          background={STUDIO}
-          className="h-[480px] rounded-xl border border-white/10 sm:h-[640px] xl:h-[820px]"
+          className="bg-card h-[480px] rounded-xl border sm:h-[640px] xl:h-[820px]"
         />
         <PairRail
           current={chart}
@@ -419,7 +416,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
       </div>
 
       <div className="px-[10px] pb-10">
-        <p className="mt-6 text-[11px] leading-relaxed text-white/45">
+        <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
           Календарь: Forex Factory, Yahoo Finance (шинжээчдийн дундаж таамаг); тайлбарыг хиймэл оюун ухаанаар бэлдэв
           {data?.updatedAt ? `, шинэчилсэн ${ubParts(data.updatedAt).day.slice(5).replace("-", ".")} ${ubParts(data.updatedAt).time}` : ""}
           {data?.demo ? " (демо: жишээ өгөгдөл)" : ""}. График: TradingView (шууд эсвэл хоцрогдолтой), индексийг CFD хэлбэрээр харуулав. Жагсаалтын үнэ: эх сурвалжийн{" "}
@@ -445,12 +442,12 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
 
   return (
     <aside aria-label="Зах зээлүүд" className={cn(panel, "flex min-w-0 flex-col xl:h-0 xl:min-h-full")}>
-      <div className="border-b border-white/10 px-3 pt-3 pb-2.5">
-        <p className={label}>{linked ? <span className="text-brand">Мэдээтэй холбоотой</span> : "Графикт"}</p>
+      <div className="border-b border-border px-3 pt-3 pb-2.5">
+        <p className={label}>{linked ? <span className="text-brand-strong">Мэдээтэй холбоотой</span> : "Графикт"}</p>
         <p className="mt-1 truncate text-[14px] font-semibold">{current.label}</p>
-        <p className="font-mono text-[11px] text-white/40">{current.code}</p>
+        <p className="font-mono text-[11px] text-muted-foreground">{current.code}</p>
       </div>
-      <div role="tablist" aria-label="Бүлэг" className="grid grid-cols-2 gap-1 border-b border-white/10 p-1.5">
+      <div role="tablist" aria-label="Бүлэг" className="grid grid-cols-2 gap-1 border-b border-border p-1.5">
         {groups.map((entry) => (
           <button
             key={entry.id}
@@ -461,7 +458,7 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
             onClick={() => setOpen(entry.id)}
             className={cn(
               "flex h-8 items-center justify-between rounded-md px-2.5 text-[12px] font-medium transition-colors",
-              entry.id === open ? "bg-white text-[#16181c]" : "text-white/60 hover:bg-white/8 hover:text-white",
+              entry.id === open ? "bg-foreground text-background" : "text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground",
             )}
           >
             {short[entry.id] ?? entry.title}
@@ -480,16 +477,16 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
                 onClick={() => onPick(item, group.id === "companies")}
                 className={cn(
                   "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-md border-l-2 px-2.5 py-2 text-left transition-colors",
-                  active ? "border-brand bg-white/10" : "border-transparent hover:bg-white/6",
+                  active ? "border-brand bg-blue-100 dark:bg-blue-800" : "border-transparent hover:bg-foreground/[0.04]",
                 )}
               >
                 <span className="min-w-0">
                   <span className="block truncate text-[13px] font-medium">{item.label}</span>
-                  <span className="block font-mono text-[10.5px] text-white/40">{item.code}</span>
+                  <span className="block font-mono text-[10.5px] text-muted-foreground">{item.code}</span>
                 </span>
                 {item.quote ? (
                   <span className="flex flex-col items-end gap-0.5">
-                    <span className="text-[12px] text-white/75 tabular-nums">{item.quote.denom.kind === "index" || item.quote.denom.kind === "percent" ? item.quote.price : formatValue(item.quote.price, item.quote.denom)}</span>
+                    <span className="text-[12px] text-foreground/80 tabular-nums">{item.quote.denom.kind === "index" || item.quote.denom.kind === "percent" ? item.quote.price : formatValue(item.quote.price, item.quote.denom)}</span>
                     {item.quote.pct !== 0 ? <Change pct={item.quote.pct} /> : null}
                   </span>
                 ) : null}
@@ -498,7 +495,7 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
           )
         })}
       </ul>
-      <p className="border-t border-white/10 px-3 py-2 text-[10.5px] leading-snug text-white/40">Үнэ: эх сурвалжийн сүүлийн хаалт. График дээрх хайлтаар бусад зах зээлийг нээнэ.</p>
+      <p className="border-t border-border px-3 py-2 text-[10.5px] leading-snug text-muted-foreground">Үнэ: эх сурвалжийн сүүлийн хаалт. График дээрх хайлтаар бусад зах зээлийг нээнэ.</p>
     </aside>
   )
 }
@@ -509,7 +506,7 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
 
 function Focus({ data, econ, pick, now, chart, linked, onPick }: { data: CalendarData | null; econ: Cluster[]; pick: Pick | null; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
   if (!data) return <div className={cn(panel, "h-[340px] animate-pulse")} />
-  if (!pick) return <div className={cn(panel, "p-5 text-sm text-white/60")}>Ойрын хугацаанд чухал мэдээ алга.</div>
+  if (!pick) return <div className={cn(panel, "p-5 text-sm text-muted-foreground")}>Ойрын хугацаанд чухал мэдээ алга.</div>
   if (pick.kind === "earn") {
     const item = data.earnings.find((row) => row.symbol === pick.symbol)
     if (!item) return null
@@ -528,11 +525,11 @@ function When({ ms, now, allDay }: { ms: number; now: number; allDay?: boolean }
   const left = allDay ? (day === today ? { text: "Өнөөдөр", live: true, past: false } : day < today ? { text: "Гарсан", live: false, past: true } : countdown(ms, now)) : countdown(ms, now)
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-      <p className="text-[13px] text-white/70">
+      <p className="text-[13px] text-foreground/80">
         {dayName(day, today)}
-        {allDay ? "" : <span className="ml-1.5 font-mono text-white tabular-nums">{time}</span>}
+        {allDay ? "" : <span className="ml-1.5 font-mono text-foreground tabular-nums">{time}</span>}
       </p>
-      <p className={cn("font-mono text-[12px] font-semibold tabular-nums", left.live ? "text-[#2fae74]" : left.past ? "text-white/40" : "text-brand")}>
+      <p className={cn("font-mono text-[12px] font-semibold tabular-nums", left.live ? "text-[var(--up)]" : left.past ? "text-muted-foreground" : "text-brand-strong")}>
         {left.live ? <span className="mr-1 inline-block size-1.5 animate-pulse rounded-full bg-current align-middle" /> : null}
         {left.text}
       </p>
@@ -543,10 +540,10 @@ function When({ ms, now, allDay }: { ms: number; now: number; allDay?: boolean }
 function LinkedNote({ chart, linked }: { chart: ChartPick; linked: boolean }) {
   if (!linked) return null
   return (
-    <p className="mt-4 flex items-center gap-2 rounded-lg bg-white/[0.05] px-3 py-2 text-[12px] text-white/70">
-      <CandlestickChart className="text-brand size-4 shrink-0" />
+    <p className="mt-4 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-foreground/80 dark:bg-blue-800/50">
+      <CandlestickChart className="text-brand-strong size-4 shrink-0" />
       <span>
-        Графикт: <strong className="text-white">{chart.label}</strong>. Мэдээ гарахаас өмнө ба дараа нь хэрхэн хөдөлснийг харна уу.
+        Графикт: <strong className="text-foreground">{chart.label}</strong>. Мэдээ гарахаас өмнө ба дараа нь хэрхэн хөдөлснийг харна уу.
       </span>
     </p>
   )
@@ -557,49 +554,49 @@ function EconFocus({ event, cluster, now, chart, linked, onPick }: { event: Econ
   const forecast = figure(event.forecast)
   const verdict = actual === null || forecast === null ? null : actual > forecast ? "Таамгаас өндөр" : actual < forecast ? "Таамгаас доогуур" : "Таамагтай тэнцүү"
   return (
-    <article className="mx-1 mb-2 rounded-lg border border-white/10 bg-white/[0.04] p-4" aria-live="polite">
+    <article className="border-brand mx-1 mb-2 border-l-2 py-2 pr-2 pl-4" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
-        <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11.5px] font-medium">{event.country}</span>
+        <span className="rounded-md bg-foreground/[0.06] px-2 py-0.5 text-[11.5px] font-medium">{event.country}</span>
         <Impact high={event.impact === "High"} />
       </div>
       <h3 className="mt-2.5 text-[17px] leading-snug font-semibold">{event.mnTitle || event.title}</h3>
-      {event.mnTitle ? <p className="mt-0.5 font-mono text-[11px] text-white/40">{event.title}</p> : null}
+      {event.mnTitle ? <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{event.title}</p> : null}
       <div className="mt-3">
         <When ms={Date.parse(event.startsAt)} now={now} />
       </div>
 
-      <dl className="mt-4 grid grid-cols-3 divide-x divide-white/10 rounded-lg border border-white/10">
+      <dl className="mt-4 grid grid-cols-3 divide-x divide-border rounded-lg border border-border">
         {[
           ["Таамаг", event.forecast],
           ["Өмнөх", event.previous],
           ["Бодит", event.actual],
         ].map(([name, value]) => (
           <div key={name} className="px-3 py-2.5">
-            <dt className="text-[10.5px] text-white/45">{name}</dt>
-            <dd className={cn("mt-0.5 font-mono text-[17px] font-semibold tabular-nums", value ? "" : "text-white/25", name === "Бодит" && value ? "text-brand" : "")}>{value || "–"}</dd>
+            <dt className="text-[10.5px] text-muted-foreground">{name}</dt>
+            <dd className={cn("mt-0.5 font-mono text-[17px] font-semibold tabular-nums", value ? "" : "text-muted-foreground", name === "Бодит" && value ? "text-brand-strong" : "")}>{value || "–"}</dd>
           </div>
         ))}
       </dl>
       {verdict ? (
-        <p className="mt-2 text-[11.5px] text-white/55">
-          <strong className="text-white">{verdict}</strong> гарлаа. Өндөр нь үргэлж сайн гэсэн үг биш: ажилгүйдэл, инфляцын хувьд эсрэгээрээ.
+        <p className="mt-2 text-[11.5px] text-muted-foreground">
+          <strong className="text-foreground">{verdict}</strong> гарлаа. Өндөр нь үргэлж сайн гэсэн үг биш: ажилгүйдэл, инфляцын хувьд эсрэгээрээ.
         </p>
       ) : null}
 
-      {event.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-white/80">{event.mnSummary}</p> : null}
+      {event.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-foreground/80">{event.mnSummary}</p> : null}
       <LinkedNote chart={chart} linked={linked} />
 
       {cluster.events.length > 1 ? (
-        <div className="mt-4 border-t border-white/10 pt-3">
+        <div className="mt-4 border-t border-border pt-3">
           <p className={label}>Яг энэ цагт бас</p>
           <ul className="mt-2 flex flex-col gap-1">
             {cluster.events
               .filter((entry) => entry.id !== event.id)
               .map((entry) => (
                 <li key={entry.id}>
-                  <button type="button" onClick={() => onPick({ kind: "econ", id: entry.id })} className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-white/6">
+                  <button type="button" onClick={() => onPick({ kind: "econ", id: entry.id })} className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left text-[12.5px] hover:bg-foreground/[0.04]">
                     <span className="truncate">{entry.mnTitle || entry.title}</span>
-                    <span className="font-mono text-[11px] text-white/45 tabular-nums">{entry.forecast || "–"}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{entry.forecast || "–"}</span>
                   </button>
                 </li>
               ))}
@@ -619,27 +616,27 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
   const pos = (value: number) => `${Math.min(100, Math.max(0, ((value - low!) / (high! - low!)) * 100))}%`
   const rating = RATINGS.indexOf(item.recommendation)
   return (
-    <article className="mx-1 mb-2 rounded-lg border border-white/10 bg-white/[0.04] p-4" aria-live="polite">
+    <article className="border-brand mx-1 mb-2 border-l-2 py-2 pr-2 pl-4" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
-        <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11.5px] font-medium">
+        <span className="rounded-md bg-foreground/[0.06] px-2 py-0.5 text-[11.5px] font-medium">
           {item.countryName} · <span className="font-mono">{item.symbol}</span>
         </span>
-        <span className="text-[11px] font-medium text-white/55">Ашгийн тайлан</span>
+        <span className="text-[11px] font-medium text-muted-foreground">Ашгийн тайлан</span>
       </div>
       <h3 className="mt-2.5 text-[17px] leading-snug font-semibold">{item.name}</h3>
       <div className="mt-2">
         <When ms={dayStartMs(item.reportDate)} now={now} allDay />
       </div>
 
-      <dl className="mt-4 grid grid-cols-[1fr_1.8fr_0.9fr] divide-x divide-white/10 rounded-lg border border-white/10">
+      <dl className="mt-4 grid grid-cols-[1fr_1.8fr_0.9fr] divide-x divide-border rounded-lg border border-border">
         {[
           ["EPS таамаг", item.epsEstimate !== null ? plainNumber(item.epsEstimate) : ""],
           ["Орлогын таамаг", item.revenueEstimate !== null ? bigMoney(item.revenueEstimate, item.currency) : ""],
           ["Шинжээч", item.analysts ? String(item.analysts) : ""],
         ].map(([name, value]) => (
           <div key={name} className="min-w-0 px-3 py-2.5">
-            <dt className="truncate text-[10.5px] text-white/45">{name}</dt>
-            <dd className={cn("mt-0.5 truncate font-mono text-[14px] font-semibold tabular-nums", value ? "" : "text-white/25")}>{value || "–"}</dd>
+            <dt className="truncate text-[10.5px] text-muted-foreground">{name}</dt>
+            <dd className={cn("mt-0.5 truncate font-mono text-[14px] font-semibold tabular-nums", value ? "" : "text-muted-foreground")}>{value || "–"}</dd>
           </div>
         ))}
       </dl>
@@ -647,7 +644,7 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
       {range ? (
         <div className="mt-5">
           <div className="flex items-baseline justify-between text-[12px]">
-            <span className="text-white/55">Шинжээчдийн зорилтот үнэ</span>
+            <span className="text-muted-foreground">Шинжээчдийн зорилтот үнэ</span>
             {upside !== null ? (
               <span className={cn("font-mono font-semibold tabular-nums", upside >= 0 ? UP : DOWN)}>
                 {upside >= 0 ? "▲ +" : "▼ "}
@@ -655,17 +652,17 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
               </span>
             ) : null}
           </div>
-          <div className="relative mt-5 h-2 rounded-full bg-gradient-to-r from-white/10 via-white/20 to-white/10">
-            <span className="bg-brand absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-4 ring-[#16181c]" style={{ left: pos(mean!) }}>
-              <span className="text-brand absolute -top-5 left-1/2 -translate-x-1/2 font-mono text-[10.5px] font-semibold whitespace-nowrap">{plainNumber(mean!)}</span>
+          <div className="relative mt-5 h-2 rounded-full bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700">
+            <span className="bg-brand absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-4 ring-card" style={{ left: pos(mean!) }}>
+              <span className="text-brand-strong absolute -top-5 left-1/2 -translate-x-1/2 font-mono text-[10.5px] font-semibold whitespace-nowrap">{plainNumber(mean!)}</span>
             </span>
             {price !== null ? (
-              <span className="absolute top-1/2 h-5 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-white" style={{ left: pos(price) }}>
-                <span className="absolute top-5 left-1/2 -translate-x-1/2 font-mono text-[10px] whitespace-nowrap text-white/70">одоо {plainNumber(price)}</span>
+              <span className="absolute top-1/2 h-5 w-0.5 -translate-x-1/2 -translate-y-1/2 bg-foreground" style={{ left: pos(price) }}>
+                <span className="absolute top-5 left-1/2 -translate-x-1/2 font-mono text-[10px] whitespace-nowrap text-foreground/80">одоо {plainNumber(price)}</span>
               </span>
             ) : null}
           </div>
-          <div className="mt-6 flex justify-between font-mono text-[10px] text-white/40 tabular-nums">
+          <div className="mt-6 flex justify-between font-mono text-[10px] text-muted-foreground tabular-nums">
             <span>Доод {plainNumber(low!)}</span>
             <span>{item.currency}</span>
             <span>Дээд {plainNumber(high!)}</span>
@@ -675,36 +672,36 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
 
       {rating >= 0 ? (
         <div className="mt-4">
-          <p className="text-[11px] text-white/45">Шинжээчдийн зөвлөмж</p>
+          <p className="text-[11px] text-muted-foreground">Шинжээчдийн зөвлөмж</p>
           <div className="mt-1.5 grid grid-cols-5 gap-1">
             {RATINGS.map((key, index) => (
-              <span key={key} className={cn("h-1.5 rounded-full", index === rating ? (index >= 3 ? "bg-[#2fae74]" : index === 2 ? "bg-white" : "bg-[#f0643f]") : "bg-white/10")} />
+              <span key={key} className={cn("h-1.5 rounded-full", index === rating ? (index >= 3 ? "bg-[var(--up)]" : index === 2 ? "bg-gray-500" : "bg-[var(--down)]") : "bg-foreground/[0.06]")} />
             ))}
           </div>
           <p className="mt-1 text-[12.5px] font-semibold">{recommendationLabel[item.recommendation]}</p>
         </div>
       ) : null}
 
-      {item.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-white/80">{item.mnSummary}</p> : null}
+      {item.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-foreground/80">{item.mnSummary}</p> : null}
       {stockChart(item) ? (
         <LinkedNote chart={chart} linked={linked && chart.code === item.symbol} />
       ) : (
-        <p className="mt-4 rounded-lg bg-white/[0.05] px-3 py-2 text-[12px] text-white/70">
+        <p className="mt-4 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-foreground/80 dark:bg-blue-800/50">
           Энэ биржийн график TradingView-ийн нээлттэй хувилбарт байхгүй.{" "}
-          <a className="text-brand underline" href={`https://finance.yahoo.com/quote/${encodeURIComponent(item.symbol)}`} target="_blank" rel="noreferrer">
+          <a className="text-brand-strong underline" href={`https://finance.yahoo.com/quote/${encodeURIComponent(item.symbol)}`} target="_blank" rel="noreferrer">
             Yahoo Finance дээр харах
           </a>
         </p>
       )}
 
       {sameDay.length > 1 ? (
-        <div className="mt-4 border-t border-white/10 pt-3">
+        <div className="mt-4 border-t border-border pt-3">
           <p className={label}>Мөн энэ өдөр</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {sameDay
               .filter((row) => row.symbol !== item.symbol)
               .map((row) => (
-                <button key={row.symbol} type="button" onClick={() => onPick({ kind: "earn", symbol: row.symbol })} className="rounded-full border border-white/15 px-2.5 py-1 text-[12px] hover:bg-white/8">
+                <button key={row.symbol} type="button" onClick={() => onPick({ kind: "earn", symbol: row.symbol })} className="rounded-full border border-border px-2.5 py-1 text-[12px] hover:bg-foreground/[0.05]">
                   {row.name}
                 </button>
               ))}
@@ -770,7 +767,7 @@ function DayRail(props: {
           </button>
         </div>
       </div>
-      <div role="tablist" aria-label="Өдөр" className="grid grid-cols-7 gap-0.5 border-b border-white/10 p-1.5">
+      <div role="tablist" aria-label="Өдөр" className="grid grid-cols-7 gap-0.5 border-b border-border p-1.5">
         {days.map((target) => {
           const count = releasesOf(target).length + reportsOf(target).length
           const selected = target === day
@@ -784,26 +781,26 @@ function DayRail(props: {
               onClick={() => onDay(target)}
               className={cn(
                 "flex min-w-0 flex-col items-center rounded-md py-1 transition-colors",
-                selected ? "bg-white text-[#16181c]" : "hover:bg-white/8",
+                selected ? "bg-foreground text-background" : "hover:bg-foreground/[0.05]",
                 !selected && target < today ? "opacity-45" : "",
               )}
             >
-              <span className={cn("text-[10.5px]", selected ? "" : target === today ? "text-brand font-semibold" : "text-white/55")}>
+              <span className={cn("text-[10.5px]", selected ? "" : target === today ? "text-brand-strong font-semibold" : "text-muted-foreground")}>
                 {target === today ? "Өнөө" : shortWeekdays[weekdayOf(target)]}
               </span>
               <span className="text-[13px] leading-tight font-semibold tabular-nums">{Number(target.slice(8))}</span>
-              <span className={cn("font-mono text-[9.5px] tabular-nums", selected ? "opacity-60" : "text-white/35")}>{count || "·"}</span>
+              <span className={cn("font-mono text-[9.5px] tabular-nums", selected ? "opacity-60" : "text-muted-foreground")}>{count || "·"}</span>
             </button>
           )
         })}
       </div>
       <p className="flex items-baseline justify-between px-3 pt-2.5 pb-1">
         <span className="text-[12.5px] font-semibold">{dayName(day, today)}</span>
-        <span className="font-mono text-[10.5px] text-white/40">{releases.length + reports.length}</span>
+        <span className="font-mono text-[10.5px] text-muted-foreground">{releases.length + reports.length}</span>
       </p>
       <ul ref={list} className="relative max-h-[560px] min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1.5 [scrollbar-width:thin] xl:max-h-none">
-        {props.loading ? <li className="mx-2 my-2 h-40 animate-pulse rounded-lg bg-white/[0.05]" /> : null}
-        {!props.loading && !releases.length && !reports.length ? <li className="px-2 py-6 text-center text-[12px] text-white/40">Энэ өдөр мэдээ алга.</li> : null}
+        {props.loading ? <li className="mx-2 my-2 h-40 animate-pulse rounded-lg bg-muted" /> : null}
+        {!props.loading && !releases.length && !reports.length ? <li className="px-2 py-6 text-center text-[12px] text-muted-foreground">Энэ өдөр мэдээ алга.</li> : null}
         {releases.map((event) => {
           const selected = pick?.kind === "econ" && pick.id === event.id
           const past = Date.parse(event.startsAt) < now - 5 * 60_000
@@ -815,12 +812,12 @@ function DayRail(props: {
                 aria-expanded={selected && !collapsed}
                 onClick={() => toggle({ kind: "econ", id: event.id }, selected)}
                 title={`${event.mnTitle || event.title} · ${event.country}`}
-                className={cn(row, selected ? "bg-brand/25" : "hover:bg-white/6", past && !selected ? "opacity-50" : "")}
+                className={cn(row, selected ? "bg-blue-100 dark:bg-blue-800" : "hover:bg-foreground/[0.04]", past && !selected ? "opacity-50" : "")}
               >
-                <span className="font-mono text-[11.5px] text-white/60 tabular-nums">{ubParts(event.startsAt).time}</span>
-                <span className={cn("size-1.5 rounded-full", high ? "" : "bg-white/25")} style={high ? { background: HOT } : undefined} />
+                <span className="font-mono text-[11.5px] text-muted-foreground tabular-nums">{ubParts(event.startsAt).time}</span>
+                <span className={cn("size-1.5 rounded-full", high ? "" : "bg-gray-300 dark:bg-gray-600")} style={high ? { background: HOT } : undefined} />
                 <span className="truncate text-[12.5px]">{event.mnTitle || event.title}</span>
-                <span className="font-mono text-[11px] text-white/50 tabular-nums">{event.actual ? <span className="text-brand font-semibold">{event.actual}</span> : event.forecast}</span>
+                <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{event.actual ? <span className="text-brand-strong font-semibold">{event.actual}</span> : event.forecast}</span>
               </button>
               {selected && !collapsed ? <div className="pt-1">{detail}</div> : null}
             </li>
@@ -836,12 +833,12 @@ function DayRail(props: {
                 aria-expanded={selected && !collapsed}
                 onClick={() => toggle({ kind: "earn", symbol: item.symbol }, selected)}
                 title={`${item.name} · ${item.countryName}`}
-                className={cn(row, selected ? "bg-brand/25" : "hover:bg-white/6", day < today && !selected ? "opacity-50" : "")}
+                className={cn(row, selected ? "bg-blue-100 dark:bg-blue-800" : "hover:bg-foreground/[0.04]", day < today && !selected ? "opacity-50" : "")}
               >
-                <span className="text-[10px] text-white/40">Тайлан</span>
-                <span className="size-1.5 rounded-sm bg-white/80" />
+                <span className="text-[10px] text-muted-foreground">Тайлан</span>
+                <span className="size-1.5 rounded-sm bg-foreground/70" />
                 <span className="truncate text-[12.5px]">{item.name}</span>
-                <span className={cn("font-mono text-[11px] font-semibold tabular-nums", upside === null ? "text-white/30" : upside >= 0 ? UP : DOWN)}>
+                <span className={cn("font-mono text-[11px] font-semibold tabular-nums", upside === null ? "text-muted-foreground" : upside >= 0 ? UP : DOWN)}>
                   {upside === null ? "–" : `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`}
                 </span>
               </button>
