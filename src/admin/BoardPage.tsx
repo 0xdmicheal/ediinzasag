@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { Link, useNavigate, useSearchParams } from "react-router-dom"
-import { ArrowUpRight, Bot, Download, CalendarDays, ChevronDown, Eye, FilePlus2, Hand, Lock, Megaphone, PenLine, RefreshCw, Sparkles } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { ArrowUpRight, Bot, Download, CalendarDays, ChevronDown, FilePlus2, Hand, Lock, RefreshCw } from "lucide-react"
 import { cn } from "cn"
 
-import { BoardList, type BoardTab } from "@/admin/BoardList"
+import { BoardList } from "@/admin/BoardList"
 import { importBuiltins, pendingBuiltins } from "@/admin/import-builtin"
-import { canClaim, canManageTeam, isEditor, isScheduled, timeAgo } from "@/admin/rules"
+import { canClaim, canManageTeam, isEditor, timeAgo } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import { Avatar, buttonClass, Notice, StatusPill } from "@/admin/ui"
 import type { Article, NewsRun, Tag } from "@/admin/types"
@@ -14,26 +14,6 @@ const weekdays = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пү�
 
 function mongolianDate(date = new Date()) {
   return `${date.getFullYear()} оны ${date.getMonth() + 1}-р сарын ${date.getDate()}, ${weekdays[date.getDay()]}`
-}
-
-function StatTile({ icon, label, value, emphasis, onClick }: { icon: ReactNode; label: string; value: number; emphasis?: boolean; onClick?: () => void }) {
-  const body = (
-    <>
-      <span className="bg-muted text-muted-foreground grid size-10 shrink-0 place-items-center rounded-lg border">{icon}</span>
-      <span className="min-w-0 text-left">
-        <span className="font-news block text-2xl leading-none tabular-nums">{value}</span>
-        <span className="text-muted-foreground mt-1 block truncate text-[12px]">{label}</span>
-      </span>
-    </>
-  )
-  const className = cn("bg-card flex items-center gap-3 rounded-xl border p-3", emphasis && value > 0 && "border-foreground/60")
-  return onClick ? (
-    <button type="button" onClick={onClick} className={cn(className, "hover:border-foreground/30 transition-colors")}>
-      {body}
-    </button>
-  ) : (
-    <div className={className}>{body}</div>
-  )
 }
 
 const AGENT_OPEN_KEY = "ez-admin-agent-open"
@@ -323,7 +303,6 @@ export function BoardPage() {
   const [error, setError] = useState("")
   const [agentOpen, setAgentOpen] = useState(readAgentOpen)
   const isAdmin = canManageTeam(member)
-  const [weekAgo] = useState(() => Date.now() - 7 * 86_400_000)
   const [importing, setImporting] = useState<{ done: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<{ tone: "success" | "error"; text: string } | null>(null)
 
@@ -405,68 +384,46 @@ export function BoardPage() {
 
   // Unclaimed agent briefings live in the agent inbox, not on the board.
   const boardArticles = useMemo(() => (articles === null ? null : articles.filter((article) => !canClaim(article))), [articles])
-  const [, setParams] = useSearchParams()
-  const showTab = (tab: BoardTab, extra: Record<string, string> = {}) => {
-    setParams({ tab, ...extra })
-    requestAnimationFrame(() => document.getElementById("board-list")?.scrollIntoView({ block: "start", behavior: "smooth" }))
-  }
 
-  // "Your turn": what needs this person's action right now.
-  const yourTurn = (boardArticles ?? []).filter((article) =>
-    isEditor(member)
-      ? article.status === "in_review" || article.status === "approved"
-      : article.authorId === member.id && article.status === "changes_requested",
-  )
-
-  const publishedThisWeek = (articles ?? []).filter(
-    (article) => article.status === "published" && article.publishedAt && Date.parse(article.publishedAt) > weekAgo && !isScheduled(article),
+  // What waits on this person: the same set as the board's "Хийх ажил" tile.
+  const todo = (boardArticles ?? []).filter(
+    (article) =>
+      (article.authorId === member.id && (article.status === "draft" || article.status === "changes_requested")) ||
+      (isEditor(member) && (article.status === "in_review" || article.status === "approved")),
   ).length
-  const inReview = (articles ?? []).filter((article) => article.status === "in_review" && !canClaim(article)).length
-  const myDrafts = (articles ?? []).filter((article) => article.authorId === member.id && article.status === "draft").length
 
   return (
     <div className="flex flex-col gap-8 px-4 py-8 sm:px-6 lg:px-10">
-      <header>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <p className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
-              <CalendarDays className="size-3.5" />
-              {mongolianDate()}
-            </p>
-            <h1 className="font-news mt-2 text-3xl sm:text-[2.25rem]">Сайн байна уу, {member.name.split(" ")[0]}</h1>
-            <p className="text-muted-foreground mt-1 text-[14px]">
-              {articles === null
-                ? "Ачаалж байна…"
-                : yourTurn.length > 0
-                  ? isEditor(member)
-                    ? `${yourTurn.length} нийтлэл таны шийдвэрийг хүлээж байна.`
-                    : `${yourTurn.length} нийтлэлд засвар хүссэн байна.`
-                  : "Таны ээлжинд хүлээгдэж буй зүйл алга. Шинэ нийтлэл эхлүүлэх үү?"}
-            </p>
-          </div>
-          <Link to="/new" className={buttonClass.primary}>
-            <FilePlus2 className="size-4" />
-            Шинэ нийтлэл
-          </Link>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p className="text-muted-foreground flex items-center gap-1.5 text-[13px]">
+            <CalendarDays className="size-3.5" />
+            {mongolianDate()}
+          </p>
+          <h1 className="font-news mt-2 text-3xl sm:text-[2.25rem]">Сайн байна уу, {member.name.split(" ")[0]}</h1>
+          <p className="text-muted-foreground mt-1 text-[14px]">
+            {articles === null ? "Ачаалж байна…" : todo > 0 ? `Танд ${todo} хийх ажил байна.` : "Таны хийх ажил дууссан байна."}
+            {isAdmin && inbox.length > 0 ? (
+              <>
+                {" "}
+                <button
+                  type="button"
+                  onClick={() => {
+                    toggleAgent(true)
+                    requestAnimationFrame(() => document.getElementById("agent-inbox")?.scrollIntoView({ block: "start", behavior: "smooth" }))
+                  }}
+                  className="text-foreground underline underline-offset-4"
+                >
+                  Агентын {inbox.length} шинэ мэдээ
+                </button>
+              </>
+            ) : null}
+          </p>
         </div>
-        <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatTile icon={<Sparkles className="size-5" />} label="Таны ээлж" value={yourTurn.length} emphasis onClick={() => showTab("turn")} />
-          <StatTile icon={<Eye className="size-5" />} label="Хянагдаж буй" value={inReview} onClick={() => showTab("in_review")} />
-          <StatTile icon={<Megaphone className="size-5" />} label="7 хоногт нийтэлсэн" value={publishedThisWeek} onClick={() => showTab("published", { sort: "published" })} />
-          {isAdmin ? (
-            <StatTile
-              icon={<Bot className="size-5" />}
-              label="Агентын мэдээ"
-              value={inbox.length}
-              onClick={() => {
-                toggleAgent(true)
-                requestAnimationFrame(() => document.getElementById("agent-inbox")?.scrollIntoView({ block: "start" }))
-              }}
-            />
-          ) : (
-            <StatTile icon={<PenLine className="size-5" />} label="Миний ноорог" value={myDrafts} onClick={() => showTab("draft", { mine: "1" })} />
-          )}
-        </div>
+        <Link to="/new" className={buttonClass.primary}>
+          <FilePlus2 className="size-4" />
+          Шинэ нийтлэл
+        </Link>
       </header>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
