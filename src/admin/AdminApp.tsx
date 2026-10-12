@@ -13,7 +13,7 @@ import { AdminSessionProvider } from "@/admin/session"
 import { TagsPage } from "@/admin/TagsPage"
 import { TeamPage } from "@/admin/TeamPage"
 
-/** Everything under /admin (desktop only). Lazy-loaded from App, so public visitors never download it. */
+/** The newsroom admin (desktop only), served on its own at admin.ediinzasag.mn (src/admin-main.tsx). */
 export default function AdminApp() {
   return (
     <DesktopOnly>

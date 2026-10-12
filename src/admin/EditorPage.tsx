@@ -234,7 +234,7 @@ export function EditorPage() {
       setArticle(saved)
       setDraft((current) => ({ ...current, slug: saved.slug }))
       setDirty(false)
-      if (!article) navigate(`/admin/edit/${saved.id}`, { replace: true })
+      if (!article) navigate(`/edit/${saved.id}`, { replace: true })
       return saved
     } catch (failure) {
       setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Хадгалж чадсангүй" })
@@ -357,7 +357,7 @@ export function EditorPage() {
     if (!ok) return
     try {
       await backend.deleteArticle(article.id)
-      navigate("/admin")
+      navigate("/")
     } catch (failure) {
       setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Устгаж чадсангүй" })
     }
@@ -427,7 +427,7 @@ export function EditorPage() {
       {/* Top bar */}
       <header className="bg-background/90 sticky top-0 z-30 border-b backdrop-blur-xl">
         <div className={cn("mx-auto flex h-14 items-center gap-3 px-4 sm:px-6", split ? "max-w-none" : "max-w-[1200px]")}>
-          <Link to="/admin" aria-label="Самбар руу буцах" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
+          <Link to="/" aria-label="Самбар руу буцах" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
             <ArrowLeft className="size-4" />
           </Link>
           <img src={publicUrl("brand/logo-black.png")} alt="" className="hidden h-5 w-auto sm:block dark:hidden" />

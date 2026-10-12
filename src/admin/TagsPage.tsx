@@ -29,7 +29,7 @@ export function TagsPage() {
     return counts
   }, [articles])
 
-  if (!canManageTags(member)) return <Navigate to="/admin" replace />
+  if (!canManageTags(member)) return <Navigate to="/" replace />
 
   async function create(event: FormEvent) {
     event.preventDefault()

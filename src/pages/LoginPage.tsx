@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react"
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom"
+import { Navigate, useLocation, useNavigate } from "react-router-dom"
 import { ArrowRight, X } from "lucide-react"
 
 import { buttonClass, Field, inputClass, Notice } from "@/admin/ui"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
+import { adminUrl } from "@/lib/admin-url"
 import { LoginShowcase, LoginShowcaseCompact } from "@/reader/LoginShowcase"
 import { useReader } from "@/reader/session"
 
@@ -62,7 +63,7 @@ export function LoginPage() {
 /**
  * Reader sign-in card: Google, a one-time code by e-mail, or a
  * password. `onDone` runs once signed in; `onClose` adds a close button (popup).
- * Staff use /admin/login.
+ * Staff sign in on the admin site (admin.ediinzasag.mn/login).
  */
 export function LoginPanel({
   from,
@@ -349,9 +350,9 @@ export function LoginPanel({
         ) : null}
         <p className="text-muted-foreground mt-6 text-center text-[12px]">
           Редакцын гишүүн үү?{" "}
-          <Link to="/admin/login" className="text-foreground underline underline-offset-2">
+          <a href={`${adminUrl}/login`} className="text-foreground underline underline-offset-2">
             Редакцын нэвтрэлт
-          </Link>
+          </a>
         </p>
       </div>
     </div>

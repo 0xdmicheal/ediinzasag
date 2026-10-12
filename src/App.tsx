@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react"
-import { BrowserRouter, Link, Route, Routes } from "react-router-dom"
+import { useEffect } from "react"
+import { BrowserRouter, Link, Route, Routes, useLocation } from "react-router-dom"
 
 import { Layout } from "@/components/site/Layout"
 import { AboutPage } from "@/pages/AboutPage"
@@ -15,9 +15,7 @@ import { NewsletterPage } from "@/pages/NewsletterPage"
 import { StoryPage } from "@/pages/StoryPage"
 import { TagPage } from "@/pages/TagPage"
 import { TalkPage } from "@/pages/TalkPage"
-
-const AdminApp = lazy(() => import("@/admin/AdminApp"))
-const PreviewFrame = lazy(() => import("@/pages/PreviewFrame"))
+import { adminUrl } from "@/lib/admin-url"
 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined
 
@@ -25,23 +23,8 @@ export default function App() {
   return (
     <BrowserRouter basename={basename}>
       <Routes>
-        <Route
-          path="admin/*"
-          element={
-            <Suspense fallback={<p className="text-muted-foreground grid min-h-svh place-items-center text-sm">Ачаалж байна…</p>}>
-              <AdminApp />
-            </Suspense>
-          }
-        />
-        {/* The admin editor's preview: the public article layout without the site chrome, in an iframe. */}
-        <Route
-          path="preview-frame"
-          element={
-            <Suspense fallback={null}>
-              <PreviewFrame />
-            </Suspense>
-          }
-        />
+        {/* The admin is its own site now; old /admin links still land there. */}
+        <Route path="admin/*" element={<ToAdmin />} />
         <Route element={<Layout />}>
           <Route index element={<HomePage />} />
           <Route path="mongolia" element={<DeskPage desk="mongolia" />} />
@@ -74,4 +57,13 @@ function DeskMissing() {
       </Link>
     </section>
   )
+}
+
+/** Old /admin/... links (bookmarks, ADMIN.md) forward to the same page on the admin site. */
+function ToAdmin() {
+  const { pathname, search } = useLocation()
+  useEffect(() => {
+    window.location.replace(`${adminUrl}${pathname.replace(/^\/admin/, "")}${search}`)
+  }, [pathname, search])
+  return null
 }

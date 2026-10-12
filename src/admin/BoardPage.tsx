@@ -87,7 +87,7 @@ function ReadinessRing({ article }: { article: Article }) {
 function ArticleCard({ article, tags }: { article: Article; tags: Map<string, string> }) {
   return (
     <Link
-      to={`/admin/edit/${article.id}`}
+      to={`/edit/${article.id}`}
       className="bg-card hover:border-foreground/25 group flex flex-col gap-2.5 rounded-lg border p-3.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors"
     >
       <p className="font-news line-clamp-2 text-[15px] leading-snug group-hover:underline">
@@ -222,7 +222,7 @@ const agentTabs: { id: AgentTab; label: string; empty: string }[] = [
 function TrackedRow({ article }: { article: Article }) {
   return (
     <li>
-      <Link to={`/admin/edit/${article.id}`} className="hover:bg-muted/60 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors">
+      <Link to={`/edit/${article.id}`} className="hover:bg-muted/60 flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors">
         <span className="min-w-0 flex-1">
           <span className="font-news line-clamp-1 text-[14px]">{article.title || "Гарчиггүй"}</span>
           <span className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-[12px]">
@@ -346,7 +346,7 @@ function AgentInbox({
                 <li key={article.id} className="flex flex-col overflow-hidden rounded-lg border">
                   {article.coverUrl ? <img src={article.coverUrl} alt="" className="aspect-[16/7] w-full object-cover" /> : null}
                   <div className="flex flex-1 flex-col gap-3 p-3">
-                    <Link to={`/admin/edit/${article.id}`} className="font-news line-clamp-2 text-[15px] leading-snug hover:underline">
+                    <Link to={`/edit/${article.id}`} className="font-news line-clamp-2 text-[15px] leading-snug hover:underline">
                       {article.title || "Гарчиггүй"}
                     </Link>
                     <div className="mt-auto flex items-center justify-between gap-2">
@@ -457,7 +457,7 @@ export function BoardPage() {
   async function claim(article: Article) {
     try {
       await backend.claimArticle(article.id)
-      navigate(`/admin/edit/${article.id}`)
+      navigate(`/edit/${article.id}`)
     } catch (failure) {
       setAgentResult({ text: failure instanceof Error ? failure.message : "Авч чадсангүй", problem: "" })
       setArticles(await backend.listArticles())
@@ -539,7 +539,7 @@ export function BoardPage() {
                   : "Таны ээлжинд хүлээгдэж буй зүйл алга. Шинэ нийтлэл эхлүүлэх үү?"}
             </p>
           </div>
-          <Link to="/admin/new" className={buttonClass.primary}>
+          <Link to="/new" className={buttonClass.primary}>
             <FilePlus2 className="size-4" />
             Шинэ нийтлэл
           </Link>

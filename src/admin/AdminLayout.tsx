@@ -17,15 +17,15 @@ export function AdminLayout() {
       </div>
     )
   }
-  if (!member) return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />
+  if (!member) return <Navigate to="/login" replace state={{ from: location.pathname }} />
 
   const links = [
-    { to: "/admin", label: "Самбар", icon: KanbanSquare, end: true, show: true },
-    { to: "/admin/new", label: "Шинэ нийтлэл", icon: FilePlus2, end: false, show: true },
-    { to: "/admin/tags", label: "Шошго", icon: Tags, end: false, show: canManageTags(member) },
-    { to: "/admin/team", label: "Баг", icon: Users, end: false, show: canManageTeam(member) },
-    { to: "/admin/readers", label: "Уншигчид", icon: Mail, end: false, show: canManageTeam(member) },
-    { to: "/admin/insights", label: "Хяналт", icon: ChartNoAxesColumn, end: false, show: canManageTeam(member) },
+    { to: "/", label: "Самбар", icon: KanbanSquare, end: true, show: true },
+    { to: "/new", label: "Шинэ нийтлэл", icon: FilePlus2, end: false, show: true },
+    { to: "/tags", label: "Шошго", icon: Tags, end: false, show: canManageTags(member) },
+    { to: "/team", label: "Баг", icon: Users, end: false, show: canManageTeam(member) },
+    { to: "/readers", label: "Уншигчид", icon: Mail, end: false, show: canManageTeam(member) },
+    { to: "/insights", label: "Хяналт", icon: ChartNoAxesColumn, end: false, show: canManageTeam(member) },
   ].filter((link) => link.show)
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -37,7 +37,7 @@ export function AdminLayout() {
       {/* Sidebar on desktop, top bar + scrolling tabs on phones. */}
       <aside className="ez-glass bg-background/80 sticky top-0 z-30 flex shrink-0 flex-col border-b backdrop-blur-xl lg:h-svh lg:w-60 lg:border-r lg:border-b-0">
         <div className="flex h-16 items-center justify-between gap-3 px-5 lg:h-20">
-          <Link to="/admin" className="flex items-center gap-2" aria-label="Самбар">
+          <Link to="/" className="flex items-center gap-2" aria-label="Самбар">
             <img src={publicUrl("brand/logo-black.png")} alt="" className="h-6 w-auto dark:hidden" />
             <img src={publicUrl("brand/logo-white.png")} alt="" className="hidden h-6 w-auto dark:block" />
             <span className="text-muted-foreground font-mono text-[11px] uppercase">Редакц</span>
