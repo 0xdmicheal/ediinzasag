@@ -351,8 +351,8 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
     <section ref={root} id="desk" aria-labelledby="desk-title" className="bg-studio text-photo-foreground scroll-mt-14">
       <span id="chart" className="block scroll-mt-14" aria-hidden />
       <span id="calendar" className="block scroll-mt-14" aria-hidden />
-      <div className="mx-auto max-w-[1520px] px-4 pt-2 pb-10 sm:px-6 lg:px-8">
-        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-white/10 pt-8">
+      <div className="px-[10px] pt-2">
+        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-white/10 px-1 pt-8">
           <div className="flex items-center gap-3">
             <span className="bg-brand text-brand-foreground grid size-9 place-items-center rounded-lg">
               <CandlestickChart className="size-5" strokeWidth={2.25} />
@@ -388,40 +388,40 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
             setWeek(next)
             setDay(next <= today && today < addDays(next, 7) ? today : next)
           }}
-          onDay={(target) => {
-            setDay(target)
-            document.getElementById(`agenda-${target}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }}
+          onDay={setDay}
           onPick={choose}
         />
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] [&>*]:min-w-0">
-          <div className="order-2 flex min-w-0 flex-col gap-3 xl:order-1">
-            <Watchlist
-              current={chart}
-              linked={linked}
-              companies={companies}
-              onPick={(item, fromCompanies) => {
-                setChart(item)
-                setLinked(fromCompanies)
-              }}
-            />
-            <TradingViewChart
-              symbol={chart.symbol}
-              title={chart.label}
-              theme="dark"
-              background={STUDIO}
-              className="h-[480px] rounded-xl border border-white/10 sm:h-[640px] xl:h-[760px]"
-            />
-          </div>
-          <div className="order-1 flex min-w-0 flex-col gap-4 xl:order-2">
-            <Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />
-            <UpNext econ={econ} earnings={earnings} now={now} today={today} pick={pick} onPick={choose} />
-          </div>
+      </div>
+
+      {/* The working row runs edge to edge, 10px from each side: calendar | chart | explanation. */}
+      <div className="mt-4 grid gap-[10px] px-[10px] xl:grid-cols-[17.5rem_minmax(0,1fr)_21rem] 2xl:grid-cols-[19rem_minmax(0,1fr)_23rem] [&>*]:min-w-0">
+        <DayRail econ={econ} earnings={earnings} week={week} day={day} today={today} now={now} pick={pick} onDay={setDay} onPick={choose} />
+        <div className="order-2 flex min-w-0 flex-col gap-[10px]">
+          <Watchlist
+            current={chart}
+            linked={linked}
+            companies={companies}
+            onPick={(item, fromCompanies) => {
+              setChart(item)
+              setLinked(fromCompanies)
+            }}
+          />
+          <TradingViewChart
+            symbol={chart.symbol}
+            title={chart.label}
+            theme="dark"
+            background={STUDIO}
+            className="h-[480px] rounded-xl border border-white/10 sm:h-[640px] xl:h-[760px]"
+          />
         </div>
+        <div className="order-1 flex min-w-0 flex-col gap-[10px] xl:order-3">
+          <Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />
+          <UpNext econ={econ} earnings={earnings} now={now} today={today} pick={pick} onPick={choose} />
+        </div>
+      </div>
 
-        <Agenda econ={econ} earnings={earnings} week={week} day={day} today={today} now={now} pick={pick} onPick={choose} />
-
+      <div className="px-[10px] pb-10">
         <p className="mt-6 text-[11px] leading-relaxed text-white/45">
           Календарь: Forex Factory, Yahoo Finance (шинжээчдийн дундаж таамаг); тайлбарыг хиймэл оюун ухаанаар бэлдэв
           {data?.updatedAt ? `, шинэчилсэн ${ubParts(data.updatedAt).day.slice(5).replace("-", ".")} ${ubParts(data.updatedAt).time}` : ""}
@@ -669,7 +669,7 @@ function Watchlist({ current, linked, companies, onPick }: { current: ChartPick;
               aria-pressed={active}
               onClick={() => onPick(item, group.id === "companies")}
               className={cn(
-                "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors",
+                "flex items-center gap-2 rounded-md border px-2 py-1 text-left transition-colors",
                 active ? "border-brand bg-brand/20" : "border-white/10 hover:border-white/25 hover:bg-white/6",
               )}
             >
@@ -948,123 +948,95 @@ function UpNext({ econ, earnings, now, today, pick, onPick }: { econ: Cluster[];
 }
 
 /* ------------------------------------------------------------------ */
-/* Agenda: the whole week, every release and report, compact           */
+/* Day rail: the calendar beside the chart, one line per item          */
 /* ------------------------------------------------------------------ */
 
-function Agenda({ econ, earnings, week, day, today, now, pick, onPick }: { econ: Cluster[]; earnings: EarningsEvent[]; week: string; day: string; today: string; now: number; pick: Pick | null; onPick: (pick: Pick) => void }) {
+function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }: { econ: Cluster[]; earnings: EarningsEvent[]; week: string; day: string; today: string; now: number; pick: Pick | null; onDay: (day: string) => void; onPick: (pick: Pick) => void }) {
   const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
-    .map((target) => ({
-      day: target,
-      releases: econ.filter((cluster) => cluster.day === target).flatMap((cluster) => cluster.events),
-      reports: earnings.filter((item) => item.reportDate === target).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0)),
-    }))
-    .filter((entry) => entry.releases.length || entry.reports.length)
-  const total = days.reduce((sum, entry) => sum + entry.releases.length + entry.reports.length, 0)
-  const toTop = () => document.getElementById("desk-title")?.scrollIntoView({ behavior: "smooth", block: "start" })
+  const releasesOf = (target: string) => econ.filter((cluster) => cluster.day === target).flatMap((cluster) => cluster.events)
+  const reportsOf = (target: string) => earnings.filter((item) => item.reportDate === target).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
+  const releases = releasesOf(day)
+  const reports = reportsOf(day)
+  const row = "grid w-full grid-cols-[2.6rem_0.4rem_minmax(0,1fr)_auto] items-center gap-x-2 rounded-md px-2 py-[7px] text-left transition-colors"
 
   return (
-    <div className="mt-10">
-      <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-white/10 pb-3">
-        <h3 className="text-[20px] font-semibold">Долоо хоногийн хөтөлбөр</h3>
-        <p className="font-mono text-[11.5px] text-white/45 tabular-nums">
-          {Number(week.slice(5, 7))}.{Number(week.slice(8))}–{Number(addDays(week, 6).slice(5, 7))}.{Number(addDays(week, 6).slice(8))} · {total}
-        </p>
+    // xl: as tall as the chart beside it; the list scrolls inside.
+    <aside aria-label="Календарь" className={cn(panel, "order-3 flex min-w-0 flex-col xl:order-1 xl:h-0 xl:min-h-full")}>
+      <div role="tablist" aria-label="Өдөр" className="grid grid-cols-7 gap-0.5 border-b border-white/10 p-1.5">
+        {days.map((target) => {
+          const count = releasesOf(target).length + reportsOf(target).length
+          const selected = target === day
+          return (
+            <button
+              key={target}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={`${dayName(target, today)}, ${count}`}
+              onClick={() => onDay(target)}
+              className={cn(
+                "flex min-w-0 flex-col items-center rounded-md py-1 transition-colors",
+                selected ? "bg-white text-[#16181c]" : "hover:bg-white/8",
+                !selected && target < today ? "opacity-45" : "",
+              )}
+            >
+              <span className={cn("text-[10.5px]", selected ? "" : target === today ? "text-brand font-semibold" : "text-white/55")}>
+                {target === today ? "Өнөө" : shortWeekdays[weekdayOf(target)]}
+              </span>
+              <span className="text-[13px] leading-tight font-semibold tabular-nums">{Number(target.slice(8))}</span>
+              <span className={cn("font-mono text-[9.5px] tabular-nums", selected ? "opacity-60" : "text-white/35")}>{count || "·"}</span>
+            </button>
+          )
+        })}
       </div>
-
-      {!days.length ? (
-        <p className="py-8 text-center text-sm text-white/50">Энэ долоо хоногт мэдээ алга.</p>
-      ) : (
-        <div className="gap-x-10 lg:columns-2">
-          {days.map((entry) => (
-            <section key={entry.day} id={`agenda-${entry.day}`} className="mb-7 scroll-mt-20 break-inside-avoid">
-              <h4 className={cn("mb-1 flex items-baseline gap-2 text-[13px] font-semibold", entry.day === day ? "text-brand" : "", entry.day < today ? "opacity-60" : "")}>
-                {dayName(entry.day, today)}
-                <span className="font-mono text-[11px] font-normal text-white/35">{entry.releases.length + entry.reports.length}</span>
-              </h4>
-              <ul className="divide-y divide-white/[0.06]">
-                {entry.releases.map((event) => {
-                  const selected = pick?.kind === "econ" && pick.id === event.id
-                  const past = Date.parse(event.startsAt) < now - 5 * 60_000
-                  const high = event.impact === "High"
-                  return (
-                    <li key={event.id}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onPick({ kind: "econ", id: event.id })
-                          toTop()
-                        }}
-                        className={cn(
-                          "grid w-full grid-cols-[2.75rem_0.5rem_minmax(0,1fr)_auto] items-baseline gap-x-2 rounded-md px-1.5 py-2 text-left transition-colors",
-                          selected ? "bg-brand/20" : "hover:bg-white/[0.05]",
-                          past && !selected ? "opacity-50" : "",
-                        )}
-                      >
-                        <span className="font-mono text-[12px] text-white/60 tabular-nums">{ubParts(event.startsAt).time}</span>
-                        <span className={cn("size-1.5 self-center rounded-full", high ? "" : "bg-white/25")} style={high ? { background: HOT } : undefined} aria-label={high ? "Өндөр нөлөө" : "Дунд нөлөө"} />
-                        <span className="min-w-0 text-[13px] leading-snug">
-                          {event.mnTitle || event.title}
-                          <span className="ml-1.5 text-[11px] text-white/40">{event.country}</span>
-                        </span>
-                        <span className="font-mono text-[11.5px] whitespace-nowrap tabular-nums">
-                          {event.actual ? (
-                            <span className="text-brand font-semibold">{event.actual}</span>
-                          ) : event.forecast ? (
-                            <span className="text-white/55">
-                              <span className="font-sans text-[10px] text-white/30">таамаг </span>
-                              {event.forecast}
-                            </span>
-                          ) : null}
-                        </span>
-                      </button>
-                    </li>
-                  )
-                })}
-                {entry.reports.map((item) => {
-                  const upside = upsideOf(item)
-                  const selected = pick?.kind === "earn" && pick.symbol === item.symbol
-                  return (
-                    <li key={item.symbol}>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          onPick({ kind: "earn", symbol: item.symbol })
-                          toTop()
-                        }}
-                        className={cn(
-                          "grid w-full grid-cols-[2.75rem_0.5rem_minmax(0,1fr)_auto] items-baseline gap-x-2 rounded-md px-1.5 py-2 text-left transition-colors",
-                          selected ? "bg-brand/20" : "hover:bg-white/[0.05]",
-                          entry.day < today && !selected ? "opacity-50" : "",
-                        )}
-                      >
-                        <span className="text-[10.5px] text-white/40">Тайлан</span>
-                        <span className="size-1.5 self-center rounded-sm bg-white/80" aria-hidden />
-                        <span className="min-w-0 text-[13px] leading-snug">
-                          {item.name}
-                          <span className="ml-1.5 text-[11px] text-white/40">{item.countryName}</span>
-                        </span>
-                        {upside !== null ? (
-                          <span className={cn("font-mono text-[11.5px] font-semibold whitespace-nowrap tabular-nums", upside >= 0 ? UP : DOWN)}>
-                            {upside >= 0 ? "+" : ""}
-                            {upside.toFixed(1)}%
-                          </span>
-                        ) : (
-                          <span />
-                        )}
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
-      )}
-      <p className="text-[11px] text-white/40">
-        <span className="mr-1 inline-block size-1.5 rounded-full align-middle" style={{ background: HOT }} /> өндөр нөлөөтэй ·{" "}
-        <span className="mr-1 inline-block size-1.5 rounded-full bg-white/25 align-middle" /> дунд · тайлангийн хувь нь шинжээчдийн зорилтот үнэ одоогийнхоос хэр зөрөхийг заана. Мөрийг дарвал дээрх график,
-        тайлбар нээгдэнэ.
+      <p className="flex items-baseline justify-between px-3 pt-2.5 pb-1">
+        <span className="text-[12.5px] font-semibold">{dayName(day, today)}</span>
+        <span className="font-mono text-[10.5px] text-white/40">{releases.length + reports.length}</span>
       </p>
-    </div>
+      <ul className="max-h-[420px] min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1.5 [scrollbar-width:thin] xl:max-h-none">
+        {!releases.length && !reports.length ? <li className="px-2 py-6 text-center text-[12px] text-white/40">Энэ өдөр мэдээ алга.</li> : null}
+        {releases.map((event) => {
+          const selected = pick?.kind === "econ" && pick.id === event.id
+          const past = Date.parse(event.startsAt) < now - 5 * 60_000
+          const high = event.impact === "High"
+          return (
+            <li key={event.id}>
+              <button
+                type="button"
+                onClick={() => onPick({ kind: "econ", id: event.id })}
+                title={`${event.mnTitle || event.title} · ${event.country}`}
+                className={cn(row, selected ? "bg-brand/25" : "hover:bg-white/6", past && !selected ? "opacity-50" : "")}
+              >
+                <span className="font-mono text-[11.5px] text-white/60 tabular-nums">{ubParts(event.startsAt).time}</span>
+                <span className={cn("size-1.5 rounded-full", high ? "" : "bg-white/25")} style={high ? { background: HOT } : undefined} />
+                <span className="truncate text-[12.5px]">{event.mnTitle || event.title}</span>
+                <span className="font-mono text-[11px] text-white/50 tabular-nums">{event.actual ? <span className="text-brand font-semibold">{event.actual}</span> : event.forecast}</span>
+              </button>
+            </li>
+          )
+        })}
+        {reports.map((item) => {
+          const selected = pick?.kind === "earn" && pick.symbol === item.symbol
+          const upside = upsideOf(item)
+          return (
+            <li key={item.symbol}>
+              <button
+                type="button"
+                onClick={() => onPick({ kind: "earn", symbol: item.symbol })}
+                title={`${item.name} · ${item.countryName}`}
+                className={cn(row, selected ? "bg-brand/25" : "hover:bg-white/6", day < today && !selected ? "opacity-50" : "")}
+              >
+                <span className="text-[10px] text-white/40">Тайлан</span>
+                <span className="size-1.5 rounded-sm bg-white/80" />
+                <span className="truncate text-[12.5px]">{item.name}</span>
+                <span className={cn("font-mono text-[11px] font-semibold tabular-nums", upside === null ? "text-white/30" : upside >= 0 ? UP : DOWN)}>
+                  {upside === null ? "–" : `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+    </aside>
   )
 }
