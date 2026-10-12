@@ -18,7 +18,8 @@
 // Agent Router (the $ credit balance, Opus 5): set ANTHROPIC_API_KEY to the sk- token,
 //   ANTHROPIC_BASE_URL=https://agentrouter.org (no /v1), AI_PROVIDER=claude, CLAUDE_MODEL=claude-opus-5.
 // Optional: AI_PROVIDER ("rules" | "gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, GEMINI_FALLBACK_MODEL
-// (used when GEMINI_MODEL is overloaded or out of quota; "none" turns it off), NEWS_PER_RUN (default 3),
+// (used when GEMINI_MODEL is overloaded or out of quota: a model name, "auto" (default: other Flash models
+// the key can use, asked from Google) or "none"), NEWS_PER_RUN (default 3),
 // NEWS_TIME_BUDGET_S (default 110: no new draft starts after this many seconds).
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase. NEWS_CRON_SECRET
 // is a password for the morning call, not an AI key. Deploy with --no-verify-jwt:
@@ -380,7 +381,7 @@ export const PROVIDER: "claude" | "gemini" | "rules" = (() => {
 })()
 export const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash"
 /** An older Flash with a bigger free quota, for when the newest one is overloaded or used up. */
-const GEMINI_FALLBACK = (Deno.env.get("GEMINI_FALLBACK_MODEL") || "gemini-2.5-flash").trim()
+const GEMINI_FALLBACK = (Deno.env.get("GEMINI_FALLBACK_MODEL") || "auto").trim()
 /** Which Gemini models actually answered during this run, for the run log. */
 const geminiServed = new Set<string>()
 
@@ -461,21 +462,59 @@ async function callGemini<T>(model: string, system: string, prompt: string, sche
  * to 25 s) and try again once; if the model is still busy, or its daily quota
  * is gone, move to the fallback model. Other errors are thrown straight away.
  */
+let geminiBackups: Promise<string[]> | null = null
+
+/**
+ * Backup models when GEMINI_MODEL is busy. "auto" asks Google which models this
+ * key may call (old ones get retired for new users without notice) and keeps the
+ * text Flash models, newest first, full Flash before Flash-Lite.
+ */
+function backupModels(): Promise<string[]> {
+  if (GEMINI_FALLBACK === "none") return Promise.resolve([])
+  if (GEMINI_FALLBACK !== "auto") return Promise.resolve(GEMINI_FALLBACK === GEMINI_MODEL ? [] : [GEMINI_FALLBACK])
+  geminiBackups ??= fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
+    headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" },
+    signal: AbortSignal.timeout(10_000),
+  })
+    .then((response) => (response.ok ? response.json() : { models: [] }))
+    .then((data: { models?: { name: string; supportedGenerationMethods?: string[] }[] }) => {
+      const version = (name: string) => Number(name.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0)
+      return (data.models ?? [])
+        .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
+        .map((model) => model.name.replace(/^models\//, ""))
+        .filter((name) => /^gemini-[\d.]+-flash(-lite)?$/.test(name) && name !== GEMINI_MODEL)
+        .sort((a, b) => Number(a.includes("lite")) - Number(b.includes("lite")) || version(b) - version(a))
+        // Two backups at most, so one draft can't wait its way past Supabase's time limit.
+        .slice(0, 2)
+    })
+    .catch(() => [])
+  return geminiBackups
+}
+
+/**
+ * Gemini with patience: on quota or overload, wait as long as Google asks (up
+ * to 25 s) and try again once; if the model is still busy, its daily quota is
+ * gone, or it isn't available to this key, move to the next backup model.
+ * Other errors (bad key, bad request) are thrown straight away.
+ */
 async function askGemini<T>(system: string, prompt: string, schema: object): Promise<T | null> {
-  const models = [GEMINI_MODEL, ...(GEMINI_FALLBACK && GEMINI_FALLBACK !== "none" && GEMINI_FALLBACK !== GEMINI_MODEL ? [GEMINI_FALLBACK] : [])]
   let last: Error | null = null
-  for (const model of models) {
+  let models = [GEMINI_MODEL]
+  for (let index = 0; index < models.length; index++) {
+    const model = models[index]
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         return await callGemini<T>(model, system, prompt, schema)
       } catch (error) {
-        if (!(error instanceof GeminiBusy)) throw error
-        last = error
-        console.warn(error.message)
-        if (error.daily || attempt === 1) break
-        await sleep(Math.min(25_000, error.retryAfterMs || 6_000))
+        const retired = error instanceof Error && /no longer available|not found|is not supported/i.test(error.message)
+        if (!(error instanceof GeminiBusy) && !(retired && index > 0)) throw error
+        last = error as Error
+        console.warn((error as Error).message)
+        if (retired || (error as GeminiBusy).daily || attempt === 1) break
+        await sleep(Math.min(25_000, (error as GeminiBusy).retryAfterMs || 6_000))
       }
     }
+    if (index === 0) models = [GEMINI_MODEL, ...(await backupModels())]
   }
   throw last ?? new Error("Gemini хариу өгсөнгүй")
 }
