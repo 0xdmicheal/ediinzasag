@@ -1,23 +1,14 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react"
-import { Link, useNavigate } from "react-router-dom"
-import { ArrowUpRight, Bot, Download, CalendarClock, CalendarDays, ChevronDown, Eye, FilePlus2, Hand, Lock, Megaphone, PenLine, RefreshCw, Search, Sparkles, Tag as TagIcon, UserRound } from "lucide-react"
+import { Link, useNavigate, useSearchParams } from "react-router-dom"
+import { ArrowUpRight, Bot, Download, CalendarDays, ChevronDown, Eye, FilePlus2, Hand, Lock, Megaphone, PenLine, RefreshCw, Sparkles } from "lucide-react"
 import { cn } from "cn"
 
+import { BoardList, type BoardTab } from "@/admin/BoardList"
 import { importBuiltins, pendingBuiltins } from "@/admin/import-builtin"
-import { canClaim, canManageTeam, formatWhen, isEditor, isScheduled, readiness, statusMeta, statusOrder, timeAgo } from "@/admin/rules"
+import { canClaim, canManageTeam, isEditor, isScheduled, timeAgo } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
-import { Select } from "@/admin/Select"
-import { Avatar, buttonClass, inputClass, Notice, StatusPill } from "@/admin/ui"
-import type { Article, NewsRun, Status, Tag } from "@/admin/types"
-
-/** Status dots: colour only where it carries meaning (needs work, approved), neutral otherwise. */
-const statusColor: Record<Status, string> = {
-  draft: "var(--chart-4)",
-  in_review: "var(--brand)",
-  changes_requested: "var(--down)",
-  approved: "var(--up)",
-  published: "var(--foreground)",
-}
+import { Avatar, buttonClass, Notice, StatusPill } from "@/admin/ui"
+import type { Article, NewsRun, Tag } from "@/admin/types"
 
 const weekdays = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"]
 
@@ -53,81 +44,6 @@ function readAgentOpen() {
   } catch {
     return false
   }
-}
-
-/** A tiny ring showing how many required readiness checks pass. */
-function ReadinessRing({ article }: { article: Article }) {
-  const checks = readiness(article, article.origin).filter((check) => check.required)
-  const done = checks.filter((check) => check.ok).length
-  const ratio = done / checks.length
-  const r = 9
-  const c = 2 * Math.PI * r
-  return (
-    <span className="flex items-center gap-1.5" title={`Бэлэн байдал ${done}/${checks.length}`}>
-      <svg viewBox="0 0 24 24" className="size-5 -rotate-90" aria-hidden>
-        <circle cx="12" cy="12" r={r} fill="none" stroke="currentColor" strokeOpacity="0.15" strokeWidth="3" />
-        <circle
-          cx="12"
-          cy="12"
-          r={r}
-          fill="none"
-          stroke={ratio === 1 ? "var(--up)" : "var(--brand)"}
-          strokeWidth="3"
-          strokeLinecap="round"
-          strokeDasharray={`${c * ratio} ${c}`}
-        />
-      </svg>
-      <span className="text-muted-foreground font-mono text-[11px]">
-        {done}/{checks.length}
-      </span>
-    </span>
-  )
-}
-
-function ArticleCard({ article, tags }: { article: Article; tags: Map<string, string> }) {
-  return (
-    <Link
-      to={`/edit/${article.id}`}
-      className="bg-card hover:border-foreground/25 group flex flex-col gap-2.5 rounded-lg border p-3.5 shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors"
-    >
-      <p className="font-news line-clamp-2 text-[15px] leading-snug group-hover:underline">
-        {article.title || <span className="text-muted-foreground">Гарчиггүй ноорог</span>}
-      </p>
-      {article.tags.length > 0 ? (
-        <div className="flex flex-wrap gap-1">
-          {article.tags.slice(0, 3).map((slug) => (
-            <span key={slug} className="bg-foreground/[0.06] rounded-md px-1.5 py-0.5 text-[11px]">
-              #{tags.get(slug) ?? slug}
-            </span>
-          ))}
-          {article.tags.length > 3 ? <span className="text-muted-foreground text-[11px]">+{article.tags.length - 3}</span> : null}
-        </div>
-      ) : null}
-      {isScheduled(article) ? (
-        <p className="bg-foreground/[0.06] inline-flex w-fit items-center gap-1.5 rounded-md px-2 py-1 text-[12px] font-medium">
-          <CalendarClock className="size-3.5" />
-          Товлосон · {formatWhen(article.publishedAt!)}
-        </p>
-      ) : null}
-      {article.status === "changes_requested" && article.reviewNote ? (
-        <p className="line-clamp-2 rounded-md bg-[color-mix(in_oklch,var(--down)_10%,transparent)] px-2 py-1.5 text-[12px]">
-          “{article.reviewNote}”
-        </p>
-      ) : null}
-      <div className="flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          {article.origin === "bot" ? (
-            <span title="Агентын мэдээ" className="bg-foreground/[0.07] grid size-6 shrink-0 place-items-center rounded-full">
-              <Bot className="size-3.5" />
-            </span>
-          ) : null}
-          <Avatar name={article.authorName || "EZ"} size="sm" />
-          <span className="text-muted-foreground truncate text-[12px]">{timeAgo(article.updatedAt)}</span>
-        </span>
-        <ReadinessRing article={article} />
-      </div>
-    </Link>
-  )
 }
 
 const hostOf = (url: string) => {
@@ -405,9 +321,6 @@ export function BoardPage() {
   const [agentResult, setAgentResult] = useState<{ text: string; problem: string } | null>(null)
   const [tags, setTags] = useState<Tag[]>([])
   const [error, setError] = useState("")
-  const [query, setQuery] = useState("")
-  const [tagFilter, setTagFilter] = useState("")
-  const [mine, setMine] = useState(false)
   const [agentOpen, setAgentOpen] = useState(readAgentOpen)
   const isAdmin = canManageTeam(member)
   const [weekAgo] = useState(() => Date.now() - 7 * 86_400_000)
@@ -490,24 +403,16 @@ export function BoardPage() {
     [articles],
   )
 
-  const tagLabels = useMemo(() => new Map(tags.map((tag) => [tag.slug, tag.label])), [tags])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return (articles ?? []).filter(
-      (article) =>
-        !canClaim(article) &&
-        (!q || article.title.toLowerCase().includes(q) || article.authorName.toLowerCase().includes(q)) &&
-        (!tagFilter || article.tags.includes(tagFilter)) &&
-        (!mine || article.authorId === member.id),
-    )
-  }, [articles, query, tagFilter, mine, member.id])
-
-  const byStatus = (status: Status) =>
-    filtered.filter((article) => article.status === status).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+  // Unclaimed agent briefings live in the agent inbox, not on the board.
+  const boardArticles = useMemo(() => (articles === null ? null : articles.filter((article) => !canClaim(article))), [articles])
+  const [, setParams] = useSearchParams()
+  const showTab = (tab: BoardTab, extra: Record<string, string> = {}) => {
+    setParams({ tab, ...extra })
+    requestAnimationFrame(() => document.getElementById("board-list")?.scrollIntoView({ block: "start", behavior: "smooth" }))
+  }
 
   // "Your turn": what needs this person's action right now.
-  const yourTurn = (articles ?? []).filter((article) =>
+  const yourTurn = (boardArticles ?? []).filter((article) =>
     isEditor(member)
       ? article.status === "in_review" || article.status === "approved"
       : article.authorId === member.id && article.status === "changes_requested",
@@ -545,9 +450,9 @@ export function BoardPage() {
           </Link>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <StatTile icon={<Sparkles className="size-5" />} label="Таны ээлж" value={yourTurn.length} emphasis />
-          <StatTile icon={<Eye className="size-5" />} label="Хянагдаж буй" value={inReview} />
-          <StatTile icon={<Megaphone className="size-5" />} label="7 хоногт нийтэлсэн" value={publishedThisWeek} />
+          <StatTile icon={<Sparkles className="size-5" />} label="Таны ээлж" value={yourTurn.length} emphasis onClick={() => showTab("turn")} />
+          <StatTile icon={<Eye className="size-5" />} label="Хянагдаж буй" value={inReview} onClick={() => showTab("in_review")} />
+          <StatTile icon={<Megaphone className="size-5" />} label="7 хоногт нийтэлсэн" value={publishedThisWeek} onClick={() => showTab("published", { sort: "published" })} />
           {isAdmin ? (
             <StatTile
               icon={<Bot className="size-5" />}
@@ -559,88 +464,16 @@ export function BoardPage() {
               }}
             />
           ) : (
-            <StatTile icon={<PenLine className="size-5" />} label="Миний ноорог" value={myDrafts} />
+            <StatTile icon={<PenLine className="size-5" />} label="Миний ноорог" value={myDrafts} onClick={() => showTab("draft", { mine: "1" })} />
           )}
         </div>
       </header>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      <section aria-label="Нийтлэлүүд" className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <label className="relative min-w-[14rem] flex-1 sm:max-w-sm">
-            <span className="sr-only">Хайх</span>
-            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" />
-            <input
-              id="board-search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Гарчиг, зохиогчоор хайх…"
-              className={cn(inputClass, "h-9 rounded-lg py-0 pl-9 text-[13px]")}
-            />
-          </label>
-          <Select
-            label="Шошгоор шүүх"
-            value={tagFilter}
-            onChange={setTagFilter}
-            icon={<TagIcon className="size-3.5" />}
-            className="w-48"
-            options={[{ value: "", label: "Бүх шошго" }, ...tags.map((tag) => ({ value: tag.slug, label: `#${tag.label}` }))]}
-          />
-          <button
-            type="button"
-            aria-pressed={mine}
-            onClick={() => setMine((value) => !value)}
-            className={cn(
-              "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-[13px] font-medium transition-colors",
-              mine ? "border-foreground bg-foreground text-background" : "bg-card hover:border-foreground/25",
-            )}
-          >
-            <UserRound className="size-3.5" />
-            Миний нийтлэл
-          </button>
-          {query || tagFilter || mine ? (
-            <button
-              type="button"
-              onClick={() => {
-                setQuery("")
-                setTagFilter("")
-                setMine(false)
-              }}
-              className="text-muted-foreground hover:text-foreground h-9 px-1 text-[13px] underline-offset-4 hover:underline"
-            >
-              Цэвэрлэх
-            </button>
-          ) : null}
-        </div>
-
-        {/* Columns scroll sideways on narrow screens. */}
-        <div className="-mx-4 overflow-x-auto px-4 pb-2 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-          <div className="grid min-w-[68rem] grid-cols-5 gap-4">
-            {statusOrder.map((status) => {
-              const column = byStatus(status)
-              return (
-                <section key={status} aria-label={statusMeta[status].label} className="bg-muted/50 flex flex-col gap-2 rounded-xl border p-2.5">
-                  <header className="flex items-center justify-between px-1 pt-1">
-                    <span className="flex items-center gap-2 text-[13px] font-semibold">
-                      <span className="size-2 rounded-full" style={{ backgroundColor: statusColor[status] }} aria-hidden />
-                      {statusMeta[status].label}
-                    </span>
-                    <span className="text-muted-foreground font-mono text-[12px]">{column.length}</span>
-                  </header>
-                  <p className="text-muted-foreground px-1 text-[11px]">{statusMeta[status].hint}</p>
-                  {column.map((article) => (
-                    <ArticleCard key={article.id} article={article} tags={tagLabels} />
-                  ))}
-                  {articles !== null && column.length === 0 ? (
-                    <p className="text-muted-foreground rounded-lg border border-dashed px-3 py-6 text-center text-[12px]">Хоосон</p>
-                  ) : null}
-                </section>
-              )
-            })}
-          </div>
-        </div>
-      </section>
+      <div id="board-list" className="scroll-mt-4">
+        <BoardList articles={boardArticles} tags={tags} member={member} />
+      </div>
 
       {isAdmin ? (
         <section aria-label="Зөвхөн админ" className="flex flex-col gap-3 border-t pt-6">
