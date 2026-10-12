@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { cn } from "cn"
 
-import { SectionHeader } from "@/components/site/home-sections"
 import { loadCalendar, recommendationLabel, type CalendarData, type EarningsEvent, type EconEvent } from "@/content/calendar"
 
 /*
@@ -30,12 +29,6 @@ function dayLabel(day: string) {
   const weekday = weekdays[new Date(`${day}T12:00:00Z`).getUTCDay()]
   const relative = day === today ? " · Өнөөдөр" : day === tomorrow ? " · Маргааш" : ""
   return `${Number(month)}-р сарын ${Number(date)} · ${weekday}${relative}`
-}
-
-function groupBy<T>(items: T[], key: (item: T) => string) {
-  const groups = new Map<string, T[]>()
-  for (const item of items) groups.set(key(item), [...(groups.get(key(item)) ?? []), item])
-  return [...groups]
 }
 
 const plainNumber = (n: number, digits = 2) => n.toLocaleString("en-US", { maximumFractionDigits: n >= 1000 ? 0 : digits, minimumFractionDigits: 0 })
@@ -90,53 +83,6 @@ function Figure({ label, value, strong }: { label: string; value: string; strong
   )
 }
 
-function EconList({ events }: { events: EconEvent[] }) {
-  const [onlyHigh, setOnlyHigh] = useState(false)
-  const shown = onlyHigh ? events.filter((event) => event.impact === "High") : events
-  if (!events.length) return <p className="text-muted-foreground text-sm">Энэ долоо хоногт үлдсэн чухал мэдээлэл алга.</p>
-  return (
-    <div className="flex flex-col gap-5">
-      <Tabs
-        label="Нөлөө"
-        value={onlyHigh ? "high" : "all"}
-        onChange={(key) => setOnlyHigh(key === "high")}
-        options={[
-          { key: "all", label: "Бүгд", count: events.length },
-          { key: "high", label: "Өндөр нөлөөтэй", count: events.filter((event) => event.impact === "High").length },
-        ]}
-      />
-      {groupBy(shown, (event) => ubParts(event.startsAt).day).map(([day, list]) => (
-        <section key={day} aria-label={dayLabel(day)}>
-          <h3 className="mb-2 text-[13px] font-semibold">{dayLabel(day)}</h3>
-          <ul className="bg-card divide-y rounded-lg border">
-            {list.map((event) => (
-              <li key={event.id} className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-x-3 gap-y-2 px-4 py-3 md:grid-cols-[3.25rem_minmax(0,1fr)_4.5rem_14rem] md:items-center">
-                <span className="font-mono text-[13px] tabular-nums">{ubParts(event.startsAt).time}</span>
-                <div className="min-w-0">
-                  <p className="text-[14px] leading-snug font-medium">
-                    <span className="bg-foreground/[0.06] text-muted-foreground mr-1.5 rounded px-1.5 py-0.5 align-[1px] text-[10.5px] font-medium">{event.country}</span>
-                    {event.mnTitle || event.title}
-                  </p>
-                  {event.mnSummary ? <p className="text-muted-foreground mt-0.5 text-[12.5px] leading-snug">{event.mnSummary}</p> : null}
-                  {event.mnTitle ? <p className="text-muted-foreground/70 mt-0.5 font-mono text-[10.5px]">{event.title}</p> : null}
-                </div>
-                <span className="col-start-2 md:col-start-auto">
-                  <Impact level={event.impact} />
-                </span>
-                <div className="col-start-2 grid grid-cols-3 gap-2 md:col-start-auto">
-                  <Figure label="Бодит" value={event.actual} strong />
-                  <Figure label="Таамаг" value={event.forecast} />
-                  <Figure label="Өмнөх" value={event.previous} />
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </div>
-  )
-}
-
 const shortWeekdays = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"]
 
 /** "2026-10-14" moved by `days`. */
@@ -148,6 +94,202 @@ function addDays(day: string, days: number) {
 
 /** Monday of the week that holds `day`. */
 const weekStart = (day: string) => addDays(day, -((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7))
+
+/**
+ * A week of days with how many items each has, paged by week. Opens on today
+ * if it has items, else the next day that does (or the last one, for a week
+ * that's over). `allowPast` keeps past days clickable (economic data already
+ * released); otherwise they're greyed out (earnings already reported).
+ */
+function useDayPicker(itemDays: string[], allowPast: boolean) {
+  const today = ubParts(new Date().toISOString()).day
+  const counts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const day of itemDays) map.set(day, (map.get(day) ?? 0) + 1)
+    return map
+  }, [itemDays])
+  const sorted = useMemo(() => [...counts.keys()].sort(), [counts])
+  const firstDay = sorted.find((day) => day >= today) ?? sorted.at(-1) ?? today
+  const [day, setDay] = useState(firstDay)
+  const [week, setWeek] = useState(() => weekStart(firstDay))
+  const lowest = allowPast ? weekStart(sorted[0] ?? today) : weekStart(today)
+  const highest = sorted.at(-1) ?? today
+  const blocked = (candidate: string) => (allowPast ? !counts.has(candidate) && candidate < today : candidate < today)
+
+  const moveWeek = (step: number) => {
+    const next = addDays(week, step * 7)
+    setWeek(next)
+    // Land on the new week's first day with items, so the list isn't empty for no reason.
+    const open = Array.from({ length: 7 }, (_, index) => addDays(next, index)).filter((candidate) => !blocked(candidate))
+    setDay(open.find((candidate) => counts.has(candidate)) ?? open[0] ?? today)
+  }
+
+  return {
+    today,
+    day,
+    setDay,
+    counts,
+    blocked,
+    days: Array.from({ length: 7 }, (_, index) => addDays(week, index)),
+    canBack: week > lowest,
+    canForward: addDays(week, 7) <= highest,
+    moveWeek,
+  }
+}
+
+function DayStrip({ picker, unit, onPick }: { picker: ReturnType<typeof useDayPicker>; unit: string; onPick: (day: string) => void }) {
+  const arrow =
+    "bg-card hover:border-foreground/30 grid size-9 shrink-0 place-items-center rounded-full border text-[17px] leading-none transition-colors disabled:pointer-events-none disabled:opacity-30"
+  return (
+    <div className="flex items-center gap-1.5 sm:gap-2">
+      <button type="button" className={arrow} onClick={() => picker.moveWeek(-1)} disabled={!picker.canBack} aria-label="Өмнөх долоо хоног">
+        ‹
+      </button>
+      <div className="grid min-w-0 flex-1 grid-cols-7 gap-1" role="tablist" aria-label="Өдөр">
+        {picker.days.map((candidate) => {
+          const count = picker.counts.get(candidate) ?? 0
+          const selected = candidate === picker.day
+          return (
+            <button
+              key={candidate}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-label={`${dayLabel(candidate)}, ${count} ${unit}`}
+              disabled={picker.blocked(candidate)}
+              onClick={() => onPick(candidate)}
+              className={cn(
+                "flex min-w-0 flex-col items-center rounded-lg border py-1.5 transition-colors disabled:opacity-35",
+                selected ? "bg-foreground text-background border-transparent" : "bg-card hover:border-foreground/30",
+              )}
+            >
+              <span className={cn("text-[11px]", selected ? "opacity-75" : "text-muted-foreground")}>
+                {candidate === picker.today ? "Өнөө" : shortWeekdays[new Date(`${candidate}T12:00:00Z`).getUTCDay()]}
+              </span>
+              <span className="text-[15px] leading-tight font-semibold tabular-nums">{Number(candidate.slice(8))}</span>
+              <span className={cn("mt-0.5 font-mono text-[10.5px] tabular-nums", selected ? "opacity-75" : count ? "text-brand font-semibold" : "text-muted-foreground/50")}>
+                {count || "·"}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+      <button type="button" className={arrow} onClick={() => picker.moveWeek(1)} disabled={!picker.canForward} aria-label="Дараагийн долоо хоног">
+        ›
+      </button>
+    </div>
+  )
+}
+
+function Chevron({ open }: { open: boolean }) {
+  return (
+    <span className={cn("text-muted-foreground w-3 shrink-0 text-[9px] transition-transform", open ? "rotate-90" : "")} aria-hidden>
+      ▶
+    </span>
+  )
+}
+
+const ECON_ROW = "grid-cols-[3rem_minmax(0,1fr)_auto] sm:grid-cols-[3.25rem_minmax(0,1fr)_5rem_13rem]"
+
+function EconRow({ event, open, onToggle }: { event: EconEvent; open: boolean; onToggle: () => void }) {
+  const figures = (
+    <>
+      <Figure label="Бодит" value={event.actual} strong />
+      <Figure label="Таамаг" value={event.forecast} />
+      <Figure label="Өмнөх" value={event.previous} />
+    </>
+  )
+  return (
+    <li>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className={cn("hover:bg-foreground/[0.03] grid w-full items-center gap-x-3 px-4 py-3 text-left transition-colors", ECON_ROW)}
+      >
+        <span className="font-mono text-[13px] tabular-nums">{ubParts(event.startsAt).time}</span>
+        <span className="flex min-w-0 items-center gap-2">
+          <Chevron open={open} />
+          <span className="min-w-0">
+            <span className="block text-[14px] leading-snug font-medium">{event.mnTitle || event.title}</span>
+            <span className="text-muted-foreground block text-[11.5px]">{event.country}</span>
+          </span>
+        </span>
+        <span className="justify-self-end sm:justify-self-start">
+          <Impact level={event.impact} />
+        </span>
+        <span className="hidden grid-cols-3 gap-2 sm:grid">{figures}</span>
+      </button>
+      {open ? (
+        <div className="px-4 pb-4 text-[13px] leading-relaxed sm:pl-[5.5rem]">
+          <div className="mb-3 grid grid-cols-3 gap-2 sm:hidden">{figures}</div>
+          {event.mnSummary ? <p>{event.mnSummary}</p> : <p className="text-muted-foreground">Тайлбар удахгүй нэмэгдэнэ.</p>}
+          {event.mnTitle ? <p className="text-muted-foreground/80 mt-1 font-mono text-[11px]">{event.title}</p> : null}
+        </div>
+      ) : null}
+    </li>
+  )
+}
+
+function EconList({ events }: { events: EconEvent[] }) {
+  const [onlyHigh, setOnlyHigh] = useState(false)
+  const shown = onlyHigh ? events.filter((event) => event.impact === "High") : events
+  const picker = useDayPicker(
+    useMemo(() => events.map((event) => ubParts(event.startsAt).day), [events]),
+    true,
+  )
+  const [open, setOpen] = useState<string | null>(null)
+  if (!events.length) return <p className="text-muted-foreground text-sm">Энэ долоо хоногт үлдсэн чухал мэдээлэл алга.</p>
+  const list = shown.filter((event) => ubParts(event.startsAt).day === picker.day)
+  const all = events.filter((event) => ubParts(event.startsAt).day === picker.day)
+
+  return (
+    <div className="flex flex-col gap-4">
+      <DayStrip
+        picker={picker}
+        unit="мэдээ"
+        onPick={(day) => {
+          picker.setDay(day)
+          setOpen(null)
+        }}
+      />
+      <section aria-label={dayLabel(picker.day)}>
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-[13px] font-semibold">
+            {dayLabel(picker.day)} <span className="text-muted-foreground font-normal">· {list.length} мэдээ</span>
+          </h3>
+          <Tabs
+            label="Нөлөө"
+            value={onlyHigh ? "high" : "all"}
+            onChange={(key) => setOnlyHigh(key === "high")}
+            options={[
+              { key: "all", label: "Бүгд", count: all.length },
+              { key: "high", label: "Зөвхөн өндөр нөлөөтэй", count: all.filter((event) => event.impact === "High").length },
+            ]}
+          />
+        </div>
+        {list.length ? (
+          <ul className="bg-card divide-y rounded-lg border">
+            <li className={cn("text-muted-foreground hidden gap-x-3 px-4 py-2 text-[11px] sm:grid", ECON_ROW)}>
+              <span>Цаг</span>
+              <span className="pl-5">Мэдээ</span>
+              <span>Нөлөө</span>
+              <span>Бодит · Таамаг · Өмнөх</span>
+            </li>
+            {list.map((event) => (
+              <EconRow key={event.id} event={event} open={open === event.id} onToggle={() => setOpen(open === event.id ? null : event.id)} />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground bg-card rounded-lg border px-4 py-6 text-center text-sm">
+            {all.length ? "Энэ өдөр өндөр нөлөөтэй мэдээ алга." : "Энэ өдөр чухал мэдээ алга."}
+          </p>
+        )}
+        <p className="text-muted-foreground mt-2 text-[11px] leading-relaxed">Мөрийг дарж энэ тоо юу хэмждэг, яагаад чухлыг уншина. Цаг нь Улаанбаатарын цагаар.</p>
+      </section>
+    </div>
+  )
+}
 
 const upsideOf = (item: EarningsEvent) => (item.price && item.targetMean ? (item.targetMean / item.price - 1) * 100 : null)
 
@@ -180,9 +322,7 @@ function EarningsRow({ item, open, onToggle }: { item: EarningsEvent; open: bool
         className={cn("hover:bg-foreground/[0.03] grid w-full items-center gap-x-3 px-4 py-3 text-left transition-colors", ROW)}
       >
         <span className="flex min-w-0 items-center gap-2">
-          <span className={cn("text-muted-foreground w-3 shrink-0 text-[9px] transition-transform", open ? "rotate-90" : "")} aria-hidden>
-            ▶
-          </span>
+          <Chevron open={open} />
           <span className="min-w-0">
             <span className="block truncate text-[14px] font-medium">{item.name}</span>
             <span className="text-muted-foreground block truncate text-[11.5px] sm:hidden">
@@ -210,81 +350,28 @@ function EarningsRow({ item, open, onToggle }: { item: EarningsEvent; open: bool
 }
 
 function EarningsList({ items }: { items: EarningsEvent[] }) {
-  const today = ubParts(new Date().toISOString()).day
-  const counts = useMemo(() => {
-    const map = new Map<string, number>()
-    for (const item of items) map.set(item.reportDate, (map.get(item.reportDate) ?? 0) + 1)
-    return map
-  }, [items])
-  const reportDays = useMemo(() => [...counts.keys()].sort(), [counts])
-  const firstDay = reportDays.find((day) => day >= today) ?? today
-  const lastDay = reportDays.at(-1) ?? today
-  const [day, setDay] = useState(firstDay)
-  const [week, setWeek] = useState(() => weekStart(firstDay))
+  const picker = useDayPicker(
+    useMemo(() => items.map((item) => item.reportDate), [items]),
+    false,
+  )
   const [open, setOpen] = useState<string | null>(null)
 
   if (!items.length) return <p className="text-muted-foreground text-sm">Ойрын 60 хоногт тайлан гаргах компани алга.</p>
-
-  const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
-  const list = items.filter((item) => item.reportDate === day).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
-  const canBack = week > weekStart(today)
-  const canForward = addDays(week, 7) <= lastDay
-  const pick = (next: string) => {
-    setDay(next)
-    setOpen(null)
-  }
-  const moveWeek = (step: number) => {
-    const next = addDays(week, step * 7)
-    setWeek(next)
-    // Land on the new week's first day with reports, so the list isn't empty for no reason.
-    const week7 = Array.from({ length: 7 }, (_, index) => addDays(next, index)).filter((candidate) => candidate >= today)
-    pick(week7.find((candidate) => counts.has(candidate)) ?? week7[0] ?? today)
-  }
-  const arrow = "bg-card hover:border-foreground/30 grid size-9 shrink-0 place-items-center rounded-full border text-[17px] leading-none transition-colors disabled:pointer-events-none disabled:opacity-30"
+  const list = items.filter((item) => item.reportDate === picker.day).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <button type="button" className={arrow} onClick={() => moveWeek(-1)} disabled={!canBack} aria-label="Өмнөх долоо хоног">
-          ‹
-        </button>
-        <div className="grid min-w-0 flex-1 grid-cols-7 gap-1" role="tablist" aria-label="Өдөр">
-          {days.map((candidate) => {
-            const count = counts.get(candidate) ?? 0
-            const selected = candidate === day
-            return (
-              <button
-                key={candidate}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-label={`${dayLabel(candidate)}, ${count} компани`}
-                disabled={candidate < today}
-                onClick={() => pick(candidate)}
-                className={cn(
-                  "flex min-w-0 flex-col items-center rounded-lg border py-1.5 transition-colors disabled:opacity-35",
-                  selected ? "bg-foreground text-background border-transparent" : "bg-card hover:border-foreground/30",
-                )}
-              >
-                <span className={cn("text-[11px]", selected ? "opacity-75" : "text-muted-foreground")}>
-                  {candidate === today ? "Өнөө" : shortWeekdays[new Date(`${candidate}T12:00:00Z`).getUTCDay()]}
-                </span>
-                <span className="text-[15px] leading-tight font-semibold tabular-nums">{Number(candidate.slice(8))}</span>
-                <span className={cn("mt-0.5 font-mono text-[10.5px] tabular-nums", selected ? "opacity-75" : count ? "text-brand font-semibold" : "text-muted-foreground/50")}>
-                  {count || "·"}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-        <button type="button" className={arrow} onClick={() => moveWeek(1)} disabled={!canForward} aria-label="Дараагийн долоо хоног">
-          ›
-        </button>
-      </div>
-
-      <section aria-label={dayLabel(day)}>
+      <DayStrip
+        picker={picker}
+        unit="компани"
+        onPick={(day) => {
+          picker.setDay(day)
+          setOpen(null)
+        }}
+      />
+      <section aria-label={dayLabel(picker.day)}>
         <h3 className="mb-2 text-[13px] font-semibold">
-          {dayLabel(day)} <span className="text-muted-foreground font-normal">· {list.length} компани</span>
+          {dayLabel(picker.day)} <span className="text-muted-foreground font-normal">· {list.length} компани</span>
         </h3>
         {list.length ? (
           <ul className="bg-card divide-y rounded-lg border">
@@ -331,16 +418,18 @@ export function MarketCalendar() {
   )
 
   return (
-    <section id="calendar" className="scroll-mt-28">
-      <SectionHeader title="Календарь">
-        <div className="hidden sm:block">{tabs}</div>
-      </SectionHeader>
-      <div className="-mt-2 mb-4 sm:hidden">{tabs}</div>
-      <p className="text-muted-foreground -mt-2 mb-6 max-w-2xl leading-relaxed">
+    <section id="calendar" className="scroll-mt-40">
+      <header className="mb-5 flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h3 className="text-[19px] leading-tight font-semibold tracking-tight sm:text-[22px]">{tab === "econ" ? "Эдийн засгийн календарь" : "Ашгийн тайлангийн календарь"}</h3>
+          <p className="text-muted-foreground mt-1 max-w-2xl text-[14px] leading-relaxed">
         {tab === "econ"
           ? "Энэ долоо хоногт зах зээлийг хөдөлгөж болох эдийн засгийн мэдээлэл, Улаанбаатарын цагаар. Тайлбарыг хиймэл оюун ухаанаар бэлдэв."
           : "Дэлхийн 20 том эдийн засгийн томоохон компаниудын ойрын тайлан: шинжээчдийн таамаг, зорилтот үнэ. Товч тайлбарыг хиймэл оюун ухаанаар бэлдэв."}
-      </p>
+          </p>
+        </div>
+        {tabs}
+      </header>
 
       {error ? <p className="text-muted-foreground text-sm">Календарийг ачаалж чадсангүй. Дараа дахин оролдоно уу.</p> : null}
       {!data && !error ? <div className="bg-muted h-48 animate-pulse rounded-lg" aria-label="Ачаалж байна" /> : null}
