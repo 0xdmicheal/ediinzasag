@@ -20,7 +20,7 @@ import { publicUrl } from "@/lib/public-url"
 
 export type BoardTile = "todo" | "drafts" | "review" | "published"
 
-const STEP = 24
+const STEP = 36
 
 const tiles: { key: BoardTile; label: string; hint: string }[] = [
   { key: "todo", label: "Хийх ажил", hint: "Таны хийх зүйл" },
@@ -79,9 +79,9 @@ function excerpt(article: Article) {
 function DefaultCover({ article }: { article: Article }) {
   return (
     <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#16181c]">
-      <div className="absolute -right-20 -bottom-28 size-52 rounded-full border-[6px] border-[#298dff]/40" aria-hidden />
-      <img src={publicUrl("brand/logo-white.png")} alt="" className="relative h-9 w-auto opacity-90" />
-      <span className="absolute bottom-2.5 left-3 font-mono text-[10px] tracking-wider text-white/60 uppercase">{deskLabel[article.desk]}</span>
+      <div className="absolute -right-12 -bottom-16 size-28 rounded-full border-4 border-[#298dff]/40" aria-hidden />
+      <img src={publicUrl("brand/logo-white.png")} alt="" className="relative h-5 w-auto opacity-90" />
+      <span className="absolute bottom-1.5 left-2 font-mono text-[9px] tracking-wider text-white/60 uppercase">{deskLabel[article.desk]}</span>
     </div>
   )
 }
@@ -95,9 +95,10 @@ function Card({ article, member, tags }: { article: Article; member: Member; tag
     <li>
       <Link
         to={`/edit/${article.id}`}
-        className="bg-card hover:border-foreground/30 group flex h-full flex-col overflow-hidden rounded-xl border shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors"
+        title={`${article.title || "Гарчиггүй ноорог"} · ${article.authorName || "Агент"}`}
+        className="bg-card hover:border-foreground/30 group flex h-full flex-col overflow-hidden rounded-lg border shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors"
       >
-        <div className="bg-muted aspect-[16/9] overflow-hidden">
+        <div className="bg-muted aspect-[16/10] overflow-hidden">
           {article.coverUrl ? (
             <img
               src={article.coverUrl}
@@ -105,42 +106,39 @@ function Card({ article, member, tags }: { article: Article; member: Member; tag
               loading="lazy"
               referrerPolicy="no-referrer"
               onError={(event) => (event.currentTarget.style.display = "none")}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />
           ) : (
             <DefaultCover article={article} />
           )}
         </div>
-        <div className="flex flex-1 flex-col gap-2 p-4">
-          <span className="text-brand-strong flex items-center gap-1.5 font-mono text-[11px] font-medium tracking-wide uppercase">
-            {article.origin === "bot" ? <Bot className="size-3.5" aria-label="Агентын мэдээ" /> : null}#{tag}
+        <div className="flex flex-1 flex-col gap-1 p-2.5">
+          <span className="text-brand-strong flex min-w-0 items-center gap-1 font-mono text-[10px] font-medium tracking-wide uppercase">
+            {article.origin === "bot" ? <Bot className="size-3 shrink-0" aria-label="Агентын мэдээ" /> : null}
+            <span className="truncate">#{tag}</span>
           </span>
-          <h3 className="font-news line-clamp-2 text-[17px] leading-snug">
+          <h3 className="font-news line-clamp-3 text-[13.5px] leading-snug">
             {article.title || <span className="text-muted-foreground">Гарчиггүй ноорог</span>}
           </h3>
           {article.status === "changes_requested" && article.reviewNote ? (
-            <p className="line-clamp-2 text-[13px] text-[var(--down)]">Редактор: “{article.reviewNote}”</p>
+            <p className="line-clamp-2 text-[11.5px] leading-snug text-[var(--down)]">“{article.reviewNote}”</p>
           ) : (
-            <p className={cn("line-clamp-2 text-[13px] leading-relaxed", text.placeholder ? "text-muted-foreground/70 italic" : "text-muted-foreground")}>{text.text}</p>
+            <p className={cn("line-clamp-2 text-[11.5px] leading-snug", text.placeholder ? "text-muted-foreground/70 italic" : "text-muted-foreground")}>{text.text}</p>
           )}
-          <div className="mt-auto flex items-center justify-between gap-3 pt-2">
-            <p className="text-muted-foreground min-w-0 truncate text-[12px]">
-              <StatusText article={article} />
-              <span aria-hidden> · </span>
-              {article.authorName || "Агент"}
-              <span aria-hidden> · </span>
-              <span title={formatWhen(article.updatedAt)}>{timeAgo(article.publishedAt && article.status === "published" ? article.publishedAt : article.updatedAt)}</span>
-            </p>
-            <span
-              className={cn(
-                "inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-3.5 text-[12px] font-medium transition-colors",
-                primary ? "bg-foreground text-background group-hover:bg-foreground/85" : "text-muted-foreground group-hover:text-foreground border",
-              )}
-            >
-              {label}
-              <ArrowRight className="size-3.5" />
-            </span>
-          </div>
+          <p className="text-muted-foreground mt-auto truncate pt-1 text-[11px]">
+            <StatusText article={article} />
+            <span aria-hidden> · </span>
+            <span title={formatWhen(article.updatedAt)}>{timeAgo(article.publishedAt && article.status === "published" ? article.publishedAt : article.updatedAt)}</span>
+          </p>
+          <span
+            className={cn(
+              "mt-1 inline-flex h-7 items-center justify-center gap-1 rounded-md text-[12px] font-medium transition-colors",
+              primary ? "bg-foreground text-background group-hover:bg-foreground/85" : "text-muted-foreground group-hover:text-foreground border",
+            )}
+          >
+            {label}
+            <ArrowRight className="size-3" />
+          </span>
         </div>
       </Link>
     </li>
@@ -330,7 +328,7 @@ export function BoardList({ articles, tags, member }: { articles: Article[] | nu
               ) : null}
             </div>
           ) : (
-            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
               {shown.map((article) => (
                 <Card key={article.id} article={article} member={member} tags={tagLabels} />
               ))}
