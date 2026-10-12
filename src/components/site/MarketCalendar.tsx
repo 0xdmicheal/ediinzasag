@@ -137,108 +137,174 @@ function EconList({ events }: { events: EconEvent[] }) {
   )
 }
 
-function TargetBar({ item }: { item: EarningsEvent }) {
-  const { targetLow: low, targetHigh: high, targetMean: mean, price } = item
-  if (low === null || high === null || mean === null || high <= low) return null
-  const span = high - low
-  const at = (value: number) => `${Math.min(100, Math.max(0, ((value - low) / span) * 100))}%`
+const shortWeekdays = ["Ня", "Да", "Мя", "Лх", "Пү", "Ба", "Бя"]
+
+/** "2026-10-14" moved by `days`. */
+function addDays(day: string, days: number) {
+  const date = new Date(`${day}T12:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+/** Monday of the week that holds `day`. */
+const weekStart = (day: string) => addDays(day, -((new Date(`${day}T12:00:00Z`).getUTCDay() + 6) % 7))
+
+const upsideOf = (item: EarningsEvent) => (item.price && item.targetMean ? (item.targetMean / item.price - 1) * 100 : null)
+
+function Upside({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-muted-foreground/60 font-mono text-[12.5px]">–</span>
   return (
-    <div className="mt-2" aria-hidden>
-      <div className="bg-foreground/10 relative h-1.5 rounded-full">
-        <span className="bg-brand absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ left: at(mean) }} title="Дундаж зорилт" />
-        {price !== null ? <span className="bg-foreground absolute top-1/2 h-3.5 w-0.5 -translate-x-1/2 -translate-y-1/2" style={{ left: at(price) }} title="Одоогийн үнэ" /> : null}
-      </div>
-      <div className="text-muted-foreground mt-1 flex justify-between font-mono text-[10px] tabular-nums">
-        <span>{plainNumber(low)}</span>
-        <span>{plainNumber(high)}</span>
-      </div>
-    </div>
+    <span className={cn("font-mono text-[12.5px] font-semibold tabular-nums", value >= 0 ? "text-[var(--up)]" : "text-[var(--down)]")}>
+      {value >= 0 ? "▲ +" : "▼ "}
+      {value.toFixed(1)}%
+    </span>
   )
 }
 
-function EarningsCard({ item }: { item: EarningsEvent }) {
-  const upside = item.price && item.targetMean ? (item.targetMean / item.price - 1) * 100 : null
+const ROW = "grid-cols-[minmax(0,1fr)_auto_4.75rem] sm:grid-cols-[minmax(0,1fr)_7rem_6.5rem_4.75rem]"
+
+function EarningsRow({ item, open, onToggle }: { item: EarningsEvent; open: boolean; onToggle: () => void }) {
+  const details = [
+    item.targetMean !== null ? `Зорилт ${plainNumber(item.targetMean)} ${item.currency}` : "",
+    item.price !== null ? `одоо ${plainNumber(item.price)}` : "",
+    item.revenueEstimate !== null ? `орлогын таамаг ${bigMoney(item.revenueEstimate, item.currency)}` : "",
+    item.analysts ? `${item.analysts} шинжээч` : "",
+    recommendationLabel[item.recommendation] ?? "",
+  ].filter(Boolean)
   return (
-    <li className="bg-card flex flex-col gap-3 rounded-lg border p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold">{item.name}</p>
-          <p className="text-muted-foreground text-[12px]">
-            {item.countryName} · <span className="font-mono">{item.symbol}</span>
-          </p>
-        </div>
-        {item.recommendation ? (
-          <span
-            className={cn(
-              "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-              item.recommendation.includes("buy") ? "bg-[color-mix(in_oklch,var(--up)_14%,transparent)] text-[var(--up)]" : item.recommendation === "hold" ? "bg-foreground/[0.07]" : "bg-[color-mix(in_oklch,var(--down)_12%,transparent)] text-[var(--down)]",
-            )}
-          >
-            {recommendationLabel[item.recommendation] ?? item.recommendation}
+    <li>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className={cn("hover:bg-foreground/[0.03] grid w-full items-center gap-x-3 px-4 py-3 text-left transition-colors", ROW)}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <span className={cn("text-muted-foreground w-3 shrink-0 text-[9px] transition-transform", open ? "rotate-90" : "")} aria-hidden>
+            ▶
           </span>
-        ) : null}
-      </div>
-      <div className="grid grid-cols-3 gap-2">
-        <Figure label="EPS таамаг" value={item.epsEstimate !== null ? plainNumber(item.epsEstimate) : ""} />
-        <Figure label="Орлогын таамаг" value={item.revenueEstimate !== null ? bigMoney(item.revenueEstimate, item.currency) : ""} />
-        <Figure label="Шинжээч" value={item.analysts ? String(item.analysts) : ""} />
-      </div>
-      {item.targetMean !== null ? (
-        <div>
-          <p className="text-[12.5px]">
-            Зорилтот үнэ <span className="font-mono font-semibold tabular-nums">{plainNumber(item.targetMean)}</span>
-            {item.price !== null ? <span className="text-muted-foreground"> · одоо {plainNumber(item.price)}</span> : null}
-            {upside !== null ? (
-              <span className={cn("ml-1.5 font-mono text-[12px] font-semibold tabular-nums", upside >= 0 ? "text-[var(--up)]" : "text-[var(--down)]")}>
-                {upside >= 0 ? "▲ +" : "▼ "}
-                {upside.toFixed(1)}%
-              </span>
-            ) : null}
-            <span className="text-muted-foreground"> {item.currency}</span>
-          </p>
-          <TargetBar item={item} />
+          <span className="min-w-0">
+            <span className="block truncate text-[14px] font-medium">{item.name}</span>
+            <span className="text-muted-foreground block truncate text-[11.5px] sm:hidden">
+              {item.countryName} · <span className="font-mono">{item.symbol}</span>
+            </span>
+          </span>
+        </span>
+        <span className="text-muted-foreground hidden truncate text-[12.5px] sm:block">{item.countryName}</span>
+        <span className="text-right font-mono text-[12.5px] tabular-nums sm:text-left">
+          <span className="text-muted-foreground mr-1 font-sans text-[10.5px]">EPS</span>
+          {item.epsEstimate !== null ? plainNumber(item.epsEstimate) : "–"}
+        </span>
+        <span className="text-right">
+          <Upside value={upsideOf(item)} />
+        </span>
+      </button>
+      {open ? (
+        <div className="px-4 pb-4 text-[12.5px] leading-relaxed sm:pl-9">
+          {item.mnSummary ? <p>{item.mnSummary}</p> : null}
+          {details.length ? <p className="text-muted-foreground mt-1.5 font-mono text-[11.5px] tabular-nums">{details.join(" · ")}</p> : null}
         </div>
       ) : null}
-      {item.mnSummary ? <p className="text-muted-foreground border-t pt-3 text-[12.5px] leading-relaxed">{item.mnSummary}</p> : null}
     </li>
   )
 }
 
 function EarningsList({ items }: { items: EarningsEvent[] }) {
-  const [country, setCountry] = useState("all")
-  const countries = useMemo(() => [...new Map(items.map((item) => [item.country, { name: item.countryName }])).entries()], [items])
-  const shown = country === "all" ? items : items.filter((item) => item.country === country)
+  const today = ubParts(new Date().toISOString()).day
+  const counts = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const item of items) map.set(item.reportDate, (map.get(item.reportDate) ?? 0) + 1)
+    return map
+  }, [items])
+  const reportDays = useMemo(() => [...counts.keys()].sort(), [counts])
+  const firstDay = reportDays.find((day) => day >= today) ?? today
+  const lastDay = reportDays.at(-1) ?? today
+  const [day, setDay] = useState(firstDay)
+  const [week, setWeek] = useState(() => weekStart(firstDay))
+  const [open, setOpen] = useState<string | null>(null)
+
   if (!items.length) return <p className="text-muted-foreground text-sm">Ойрын 60 хоногт тайлан гаргах компани алга.</p>
+
+  const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
+  const list = items.filter((item) => item.reportDate === day).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
+  const canBack = week > weekStart(today)
+  const canForward = addDays(week, 7) <= lastDay
+  const pick = (next: string) => {
+    setDay(next)
+    setOpen(null)
+  }
+  const moveWeek = (step: number) => {
+    const next = addDays(week, step * 7)
+    setWeek(next)
+    // Land on the new week's first day with reports, so the list isn't empty for no reason.
+    const week7 = Array.from({ length: 7 }, (_, index) => addDays(next, index)).filter((candidate) => candidate >= today)
+    pick(week7.find((candidate) => counts.has(candidate)) ?? week7[0] ?? today)
+  }
+  const arrow = "bg-card hover:border-foreground/30 grid size-9 shrink-0 place-items-center rounded-full border text-[17px] leading-none transition-colors disabled:pointer-events-none disabled:opacity-30"
+
   return (
-    <div className="flex flex-col gap-5">
-      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
-        {[["all", { name: "Бүх улс" }] as const, ...countries].map(([code, info]) => (
-          <button
-            key={code}
-            type="button"
-            aria-pressed={country === code}
-            onClick={() => setCountry(code)}
-            className={cn(
-              "h-8 shrink-0 rounded-full border px-3 text-[12.5px] whitespace-nowrap transition-colors",
-              country === code ? "bg-foreground text-background border-transparent" : "bg-card hover:border-foreground/30",
-            )}
-          >
-            {info.name}
-          </button>
-        ))}
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-1.5 sm:gap-2">
+        <button type="button" className={arrow} onClick={() => moveWeek(-1)} disabled={!canBack} aria-label="Өмнөх долоо хоног">
+          ‹
+        </button>
+        <div className="grid min-w-0 flex-1 grid-cols-7 gap-1" role="tablist" aria-label="Өдөр">
+          {days.map((candidate) => {
+            const count = counts.get(candidate) ?? 0
+            const selected = candidate === day
+            return (
+              <button
+                key={candidate}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                aria-label={`${dayLabel(candidate)}, ${count} компани`}
+                disabled={candidate < today}
+                onClick={() => pick(candidate)}
+                className={cn(
+                  "flex min-w-0 flex-col items-center rounded-lg border py-1.5 transition-colors disabled:opacity-35",
+                  selected ? "bg-foreground text-background border-transparent" : "bg-card hover:border-foreground/30",
+                )}
+              >
+                <span className={cn("text-[11px]", selected ? "opacity-75" : "text-muted-foreground")}>
+                  {candidate === today ? "Өнөө" : shortWeekdays[new Date(`${candidate}T12:00:00Z`).getUTCDay()]}
+                </span>
+                <span className="text-[15px] leading-tight font-semibold tabular-nums">{Number(candidate.slice(8))}</span>
+                <span className={cn("mt-0.5 font-mono text-[10.5px] tabular-nums", selected ? "opacity-75" : count ? "text-brand font-semibold" : "text-muted-foreground/50")}>
+                  {count || "·"}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        <button type="button" className={arrow} onClick={() => moveWeek(1)} disabled={!canForward} aria-label="Дараагийн долоо хоног">
+          ›
+        </button>
       </div>
-      {groupBy(shown, (item) => item.reportDate).map(([day, list]) => (
-        <section key={day} aria-label={dayLabel(day)}>
-          <h3 className="mb-2 text-[13px] font-semibold">
-            {dayLabel(day)} <span className="text-muted-foreground font-normal">· {list.length} компани</span>
-          </h3>
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+
+      <section aria-label={dayLabel(day)}>
+        <h3 className="mb-2 text-[13px] font-semibold">
+          {dayLabel(day)} <span className="text-muted-foreground font-normal">· {list.length} компани</span>
+        </h3>
+        {list.length ? (
+          <ul className="bg-card divide-y rounded-lg border">
+            <li className={cn("text-muted-foreground hidden gap-x-3 px-4 py-2 text-[11px] sm:grid", ROW)}>
+              <span className="pl-5">Компани</span>
+              <span>Улс</span>
+              <span>Ашгийн таамаг</span>
+              <span className="text-right">Зорилт</span>
+            </li>
             {list.map((item) => (
-              <EarningsCard key={item.symbol} item={item} />
+              <EarningsRow key={item.symbol} item={item} open={open === item.symbol} onToggle={() => setOpen(open === item.symbol ? null : item.symbol)} />
             ))}
           </ul>
-        </section>
-      ))}
+        ) : (
+          <p className="text-muted-foreground bg-card rounded-lg border px-4 py-6 text-center text-sm">Энэ өдөр тайлан гаргах компани алга.</p>
+        )}
+        <p className="text-muted-foreground mt-2 text-[11px] leading-relaxed">
+          Мөрийг дарж шинжээчдийн товч дүгнэлтийг уншина. «Зорилт» нь шинжээчдийн дундаж зорилтот үнэ одоогийн үнээс хэдэн хувиар өндөр, нам байгааг харуулна.
+        </p>
+      </section>
     </div>
   )
 }
