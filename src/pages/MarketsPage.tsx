@@ -3,6 +3,7 @@ import { Link } from "react-router-dom"
 import { cn } from "cn"
 
 import { SectionHeader } from "@/components/site/home-sections"
+import { MarketCalendar } from "@/components/site/MarketCalendar"
 import { MarketTerminal } from "@/components/site/MarketTerminal"
 import { signedPct } from "@/components/site/market-marks"
 import {
@@ -42,6 +43,7 @@ const narrow = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
 const sections = [
   { id: "chart", label: "Терминал" },
   { id: "top20", label: "ТОП-20" },
+  { id: "calendar", label: "Календарь" },
   { id: "macro", label: "Макро" },
   { id: "performance", label: "Гүйцэтгэл" },
   { id: "world", label: "Дэлхий" },
@@ -132,6 +134,7 @@ export function MarketsPage() {
         {/* The terminal leads; everything below explains the numbers in it. */}
         <MarketTerminal />
         <Top20 />
+        <MarketCalendar />
         <Macro />
         <Performance />
         {/* Wide screens: the two global boards side by side. */}
