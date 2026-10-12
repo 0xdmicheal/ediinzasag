@@ -33,6 +33,10 @@ const TOPICS: { test: RegExp; points: number; why: string; tag?: string; mongoli
   { test: word("federal reserve|fed|treasury yield|bond yield|nasdaq|s&p|wall street"), points: 2, why: "дэлхийн зах зээл", tag: "markets" },
   { test: word("eurozone|ecb|европ"), points: 1, why: "Европ", tag: "europe" },
   { test: word("united states|америк|trump|white house"), points: 1, why: "АНУ", tag: "us" },
+  { test: word("tariff|тариф|trade war|худалдааны дайн|sanction|хориг арга хэмжээ|export control"), points: 3, why: "худалдааны дайн", tag: "geopolitics" },
+  { test: word("war|дайн|ukraine|украин|taiwan|тайвань|missile|military|цэрэг"), points: 2, why: "геополитик", tag: "geopolitics" },
+  { test: word("semiconductor|chip|чип|nvidia|tsmc|artificial intelligence|хиймэл оюун|ai"), points: 2, why: "технологи", tag: "tech" },
+  { test: word("startup|стартап|fintech|финтек|crypto|крипто|bitcoin|биткойн"), points: 1, why: "технологи", tag: "tech" },
 ]
 
 /** Opinion, video and listicles lose to a straight news report. */

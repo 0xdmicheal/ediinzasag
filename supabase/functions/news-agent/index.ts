@@ -2,7 +2,8 @@
 //
 // Once a day (pg_cron, see the end of schema.sql) or when an editor presses
 // "Одоо татах" on /admin, it:
-//   1. reads world economy and markets RSS feeds,
+//   1. reads world economy, markets, tech and Mongolian RSS feeds (and the
+//      section pages of Mongolian sites that have no RSS),
 //   2. picks a few stories that matter to Mongolian readers,
 //   3. files each one for a person to check,
 //   4. copies the story's main image into the covers bucket with a credit,
@@ -45,6 +46,11 @@ interface Feed {
   /** Mongolia-focused feeds are flagged to the ranker and may be a little older. */
   mongolia?: boolean
   maxAgeHours?: number
+  /**
+   * For sites with no RSS: `url` is a section page and this matches its article
+   * links. The newest few (highest id) are opened for title, excerpt and image.
+   */
+  articleLinks?: RegExp
 }
 
 /** Feeds the agent reads. Add or remove freely; a feed that fails is skipped and reported for that run. */
@@ -55,6 +61,16 @@ const FEEDS: Feed[] = [
   { name: "The Guardian", url: "https://www.theguardian.com/world/mongolia/rss", mongolia: true, maxAgeHours: 96 },
   { name: "The Diplomat", url: "https://thediplomat.com/regions/central-asia/feed/", mongolia: true, maxAgeHours: 72 },
   { name: "iKon.mn", url: "https://ikon.mn/rss", mongolia: true },
+  { name: "Сонин.мн", url: "https://sonin.mn/rss", mongolia: true },
+  { name: "Itoim.mn", url: "https://itoim.mn/rss.xml", mongolia: true, maxAgeHours: 72 },
+  // Montsame's Mongolian site turns away server requests; its English edition comes through Google News.
+  { name: "Google News", url: googleNews("site:montsame.mn when:2d"), mongolia: true, maxAgeHours: 72 },
+  { name: "Google News", url: googleNews("(China OR Russia) Mongolia when:3d"), mongolia: true, maxAgeHours: 72 },
+  // Mongolian sites with no RSS: read the section page instead.
+  { name: "Өнөөдөр", url: "https://unuudur.mn/as/economy", mongolia: true, articleLinks: /\/a\/\d+$/ },
+  { name: "Medee.mn", url: "https://medee.mn/category/economy", mongolia: true, articleLinks: /\/p\/\d+$/ },
+  { name: "Mongolian Mining Journal", url: "https://mongolianminingjournal.com", mongolia: true, articleLinks: /\/a\/\d+$/ },
+  { name: "Polit.mn", url: "https://polit.mn", mongolia: true, articleLinks: /\/a\/\d+$/ },
   // World economy and markets.
   { name: "BBC", url: "https://feeds.bbci.co.uk/news/business/rss.xml" },
   { name: "Bloomberg", url: "https://feeds.bloomberg.com/markets/news.rss" },
@@ -77,7 +93,17 @@ const FEEDS: Feed[] = [
   { name: "Mining Technology", url: "https://www.mining-technology.com/feed/" },
   { name: "OilPrice.com", url: "https://oilprice.com/rss/main" },
   { name: "Al Jazeera", url: "https://www.aljazeera.com/xml/rss/all.xml" },
+  // Tech and trade/sanctions conflicts: they move the markets Mongolia trades with.
+  { name: "BBC", url: "https://feeds.bbci.co.uk/news/technology/rss.xml" },
+  { name: "BBC", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
+  { name: "The Guardian", url: "https://www.theguardian.com/technology/rss" },
+  { name: "TechCrunch", url: "https://techcrunch.com/feed/" },
+  { name: "Google News", url: googleNews('(tariff OR "trade war" OR sanctions OR "export controls") when:1d') },
+  { name: "Google News", url: googleNews('(semiconductor OR "AI chips" OR Nvidia OR TSMC) when:1d') },
 ]
+
+/** How many of a section page's newest articles to open per run. */
+const SECTION_LIMIT = 6
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -174,8 +200,52 @@ async function fetchText(url: string, timeoutMs: number) {
   return response.text()
 }
 
+/** A page's <meta> tags (og:title, og:image…), first value wins. */
+function metaTags(html: string) {
+  const meta = new Map<string, string>()
+  for (const match of html.matchAll(/<meta\b[^>]*>/gi)) {
+    const key = (match[0].match(/\b(?:property|name)=["']([^"']+)["']/i)?.[1] ?? "").toLowerCase()
+    const content = match[0].match(/\bcontent=["']([^"']*)["']/i)?.[1]
+    if (key && content && !meta.has(key)) meta.set(key, decode(content))
+  }
+  return meta
+}
+
+/**
+ * A site with no RSS: the newest article links on its section page, each opened
+ * for its og: tags. These pages carry no reliable date, so newest = highest id,
+ * and the board's source_url check drops what an earlier run already filed.
+ */
+async function readSection(feed: Feed): Promise<FeedItem[]> {
+  const html = await fetchText(feed.url, 10_000)
+  const links = new Map<number, string>()
+  for (const match of html.matchAll(/href=["']([^"'#?]+)["']/gi)) {
+    const link = new URL(decode(match[1]), feed.url).href
+    const id = Number(link.match(/(\d+)$/)?.[1])
+    if (feed.articleLinks!.test(link) && id) links.set(id, link)
+  }
+  const newest = [...links].sort((a, b) => b[0] - a[0]).slice(0, SECTION_LIMIT)
+  const pages = await Promise.allSettled(
+    newest.map(async ([, link]) => {
+      const meta = metaTags(await fetchText(link, 10_000))
+      return {
+        source: feed.name,
+        mongolia: Boolean(feed.mongolia),
+        title: stripTags(meta.get("og:title") ?? ""),
+        link,
+        summary: stripTags(meta.get("og:description") ?? meta.get("description") ?? "").slice(0, 500),
+        published: Date.parse(meta.get("article:published_time") ?? "") || null,
+        image: meta.get("og:image") ?? "",
+      }
+    }),
+  )
+  return pages.flatMap((page) => (page.status === "fulfilled" && page.value.title ? [page.value] : []))
+}
+
 async function readFeeds() {
-  const results = await Promise.allSettled(FEEDS.map(async (feed) => parseFeed(await fetchText(feed.url, 10_000), feed)))
+  const results = await Promise.allSettled(
+    FEEDS.map(async (feed) => (feed.articleLinks ? readSection(feed) : parseFeed(await fetchText(feed.url, 10_000), feed))),
+  )
   const seenLinks = new Set<string>()
   const seenTitles = new Set<string>()
   const items: FeedItem[] = []
@@ -207,12 +277,7 @@ async function readFeeds() {
 async function readArticle(url: string) {
   try {
     const html = await fetchText(url, 12_000)
-    const meta = new Map<string, string>()
-    for (const match of html.matchAll(/<meta\b[^>]*>/gi)) {
-      const key = (match[0].match(/\b(?:property|name)=["']([^"']+)["']/i)?.[1] ?? "").toLowerCase()
-      const content = match[0].match(/\bcontent=["']([^"']*)["']/i)?.[1]
-      if (key && content && !meta.has(key)) meta.set(key, decode(content))
-    }
+    const meta = metaTags(html)
     const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
       .map((match) => stripTags(match[1]))
       .filter((text) => text.length > 60)
