@@ -854,6 +854,41 @@ drop policy if exists "team reads runs" on public.news_runs;
 create policy "team reads runs" on public.news_runs for select to authenticated
   using (public.current_team_role() is not null);
 
+-- ---------------------------------------------------------------- news inbox
+-- Every story the news agent reads ("Мэдээний урсгал" in the admin). The agent
+-- files the best few as articles itself; the team turns any other one into an
+-- article card from the inbox, or dismisses it. Kept two weeks.
+create table if not exists public.news_items (
+  id bigint generated always as identity primary key,
+  link text not null unique,
+  source text not null,
+  title text not null,
+  summary text not null default '',
+  image text not null default '',
+  published_at timestamptz,
+  mongolia boolean not null default false,
+  priority smallint not null default 0,   -- the rules score, 0–10
+  why text not null default '',
+  tags text[] not null default '{}',
+  desk text not null default 'world' check (desk in ('mongolia', 'world')),
+  status text not null default 'new' check (status in ('new', 'filed', 'dismissed')),
+  article_id uuid references public.articles(id) on delete set null,
+  seen_at timestamptz not null default now()
+);
+create index if not exists news_items_inbox on public.news_items (status, seen_at desc, priority desc);
+
+alter table public.news_items enable row level security;
+drop policy if exists "team reads news items" on public.news_items;
+create policy "team reads news items" on public.news_items for select to authenticated
+  using (public.current_team_role() is not null);
+-- Dismissing (and undoing it) is the only change made from the browser; filing goes through the news-agent function.
+drop policy if exists "team dismisses news items" on public.news_items;
+create policy "team dismisses news items" on public.news_items for update to authenticated
+  using (public.current_team_role() is not null and status <> 'filed')
+  with check (public.current_team_role() is not null and status in ('new', 'dismissed'));
+revoke insert, update, delete on public.news_items from anon, authenticated;
+grant update (status) on public.news_items to authenticated;
+
 -- ---------------------------------------------------------------- admin insights
 -- Everything /admin/insights shows, computed here so personal details (age,
 -- region, gender) only leave the database as counts, and only for admins.

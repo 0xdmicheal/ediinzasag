@@ -1,5 +1,5 @@
 import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router-dom"
-import { ChartNoAxesColumn, ExternalLink, FilePlus2, KanbanSquare, LogOut, Mail, Tags, Users } from "lucide-react"
+import { ChartNoAxesColumn, ExternalLink, FilePlus2, Inbox, KanbanSquare, LogOut, Mail, Tags, Users } from "lucide-react"
 
 import { canManageTags, canManageTeam } from "@/admin/rules"
 import { useSession } from "@/admin/session"
@@ -22,6 +22,7 @@ export function AdminLayout() {
   const links = [
     { to: "/", label: "Самбар", icon: KanbanSquare, end: true, show: true },
     { to: "/new", label: "Шинэ нийтлэл", icon: FilePlus2, end: false, show: true },
+    { to: "/inbox", label: "Мэдээний урсгал", icon: Inbox, end: false, show: true },
     { to: "/tags", label: "Шошго", icon: Tags, end: false, show: canManageTags(member) },
     { to: "/team", label: "Баг", icon: Users, end: false, show: canManageTeam(member) },
     { to: "/readers", label: "Уншигчид", icon: Mail, end: false, show: canManageTeam(member) },

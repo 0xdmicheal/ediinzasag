@@ -1,5 +1,5 @@
 import { slugify } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsRun, ReaderRecord, Role, RunDetails, Status, Tag } from "@/admin/types"
+import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsItem, NewsRun, ReaderRecord, Role, RunDetails, Status, Tag } from "@/admin/types"
 import { devLinkPreview, plainPreview, type LinkPreview } from "@/admin/link-preview"
 import { supabaseClient } from "@/lib/supabase"
 
@@ -278,6 +278,28 @@ export function createSupabaseBackend(): Backend {
       }
       return data as { created: number; scanned: number; details?: RunDetails }
     },
+    async listNewsItems() {
+      const { data, error } = await client
+        .from("news_items")
+        .select("*")
+        .order("seen_at", { ascending: false })
+        .order("priority", { ascending: false })
+        .limit(1000)
+      if (error) fail(error)
+      return (data as NewsItemRow[]).map(toNewsItem)
+    },
+    async fileNewsItem(id) {
+      const { data, error } = await client.functions.invoke("news-agent", { body: { action: "file", id: Number(id) } })
+      if (error) {
+        const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
+        throw new Error(detail?.error ?? "Карт үүсгэж чадсангүй")
+      }
+      return (data as { article_id: string }).article_id
+    },
+    async setNewsItemDismissed(id, dismissed) {
+      const { error } = await client.from("news_items").update({ status: dismissed ? "dismissed" : "new" }).eq("id", Number(id))
+      if (error) fail(error)
+    },
     async listNewsRuns() {
       const { data, error } = await client.from("news_runs").select("*").order("started_at", { ascending: false }).limit(10)
       if (error) fail(error)
@@ -298,6 +320,42 @@ export function createSupabaseBackend(): Backend {
     },
   }
 }
+
+interface NewsItemRow {
+  id: number
+  link: string
+  source: string
+  title: string
+  summary: string
+  image: string
+  published_at: string | null
+  mongolia: boolean
+  priority: number
+  why: string
+  tags: string[]
+  desk: NewsItem["desk"]
+  status: NewsItem["status"]
+  article_id: string | null
+  seen_at: string
+}
+
+const toNewsItem = (row: NewsItemRow): NewsItem => ({
+  id: String(row.id),
+  link: row.link,
+  source: row.source,
+  title: row.title,
+  summary: row.summary,
+  image: row.image,
+  publishedAt: row.published_at,
+  mongolia: row.mongolia,
+  priority: row.priority,
+  why: row.why,
+  tags: row.tags ?? [],
+  desk: row.desk,
+  status: row.status,
+  articleId: row.article_id,
+  seenAt: row.seen_at,
+})
 
 interface RunRow {
   id: number

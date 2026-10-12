@@ -6,6 +6,7 @@ import { ConfirmProvider } from "@/admin/ConfirmDialog"
 import { DesktopOnly } from "@/admin/DesktopOnly"
 import { BoardPage } from "@/admin/BoardPage"
 import { EditorPage } from "@/admin/EditorPage"
+import { InboxPage } from "@/admin/InboxPage"
 import { InsightsPage } from "@/admin/InsightsPage"
 import { LoginPage } from "@/admin/LoginPage"
 import { ReadersPage } from "@/admin/ReadersPage"
@@ -27,6 +28,7 @@ export default function AdminApp() {
             <Route path="edit/:id" element={<EditorPage key="editor" />} />
             <Route element={<AdminLayout />}>
               <Route index element={<BoardPage />} />
+              <Route path="inbox" element={<InboxPage />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="team" element={<TeamPage />} />
               <Route path="readers" element={<ReadersPage />} />

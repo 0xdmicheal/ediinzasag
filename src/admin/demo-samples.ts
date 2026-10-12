@@ -1,5 +1,5 @@
 import { publicUrl } from "@/lib/public-url"
-import type { Article, AuthorStats, Insights, Member, NewsRun } from "@/admin/types"
+import type { Article, AuthorStats, Insights, Member, NewsItem, NewsRun } from "@/admin/types"
 import { regions } from "@/reader/regions"
 
 /*
@@ -98,6 +98,39 @@ export function demoBriefings(count: number, known: Set<string> = new Set()): Ar
       createdAt: now,
       updatedAt: now,
     }))
+}
+
+/** Sample stories for the demo "Мэдээний урсгал" inbox. Titles say they are samples. */
+const inboxSamples: [source: string, title: string, mongolia: boolean, priority: number, why: string, tags: string[]][] = [
+  ["Жишээ: Mongolian Mining Journal", "Жишээ: Нүүрсний экспорт оны эхнээс 40 хувиар өсөв", true, 10, "Монголын эх сурвалж, экспортын түүхий эд", ["mining"]],
+  ["Жишээ: Өнөөдөр", "Жишээ: АИ-92 шатахууны үнэ нэмэгдлээ", true, 9, "Монголын эх сурвалж, шатахуун", ["fuel"]],
+  ["Жишээ: Reuters", "Sample: Copper hits a three-month high on China stimulus hopes", false, 6, "экспортын түүхий эд, Хятад", ["mining", "china"]],
+  ["Жишээ: iKon.mn", "Жишээ: Монголбанк бодлогын хүүг өөрчлөхгүй байхаар шийдэв", true, 10, "Монголын тухай, үнэ ба хүү", ["policy"]],
+  ["Жишээ: Bloomberg", "Sample: US expands chip export controls to more Chinese firms", false, 5, "худалдааны дайн, технологи", ["geopolitics", "tech"]],
+  ["Жишээ: Medee.mn", "Жишээ: Төсвийн тодотголыг УИХ-аар хэлэлцэж эхэллээ", true, 8, "Монголын эх сурвалж, худалдаа, төсөв", []],
+  ["Жишээ: CNBC", "Sample: Oil slips as OPEC+ signals more supply", false, 4, "шатахуун", ["fuel"]],
+  ["Жишээ: TechCrunch", "Sample: AI startup raises $200 million for data centres", false, 2, "технологи", ["tech"]],
+]
+
+export function demoNewsItems(): NewsItem[] {
+  const now = Date.now()
+  return inboxSamples.map(([source, title, mongolia, priority, why, tags], index) => ({
+    id: `news-${index + 1}`,
+    link: `https://example.com/demo/inbox-${index + 1}`,
+    source,
+    title,
+    summary: "Демо мэдээ: жинхэнэ эх сурвалжийн товч хэсэг энд харагдана.",
+    image: publicUrl(samples[index % samples.length].cover),
+    publishedAt: new Date(now - (index + 1) * 47 * 60_000).toISOString(),
+    mongolia,
+    priority,
+    why,
+    tags,
+    desk: mongolia ? "mongolia" : "world",
+    status: "new",
+    articleId: null,
+    seenAt: new Date(now - index * 60_000).toISOString(),
+  }))
 }
 
 /** Small deterministic random numbers, so the demo charts look the same on every visit. */

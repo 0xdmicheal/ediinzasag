@@ -71,6 +71,7 @@ const actionText: Record<string, string> = {
   created: "үүсгэв",
   edited: "засварлав",
   claimed: "мэдээг авч засварлаж эхлэв",
+  filed: "Мэдээний урсгалаас карт үүсгэв",
   draft: "ноорог руу буцаав",
   in_review: "хянуулахаар илгээв",
   changes_requested: "засвар хүсэв",

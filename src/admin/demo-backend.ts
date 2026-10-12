@@ -1,7 +1,7 @@
-import { demoBriefings, demoInsights } from "@/admin/demo-samples"
+import { demoBriefings, demoInsights, demoNewsItems } from "@/admin/demo-samples"
 import { devLinkPreview, plainPreview } from "@/admin/link-preview"
 import { allowedTransitions, canClaim, canDelete, canEdit, canManageTags, canManageTeam, isEditor, slugify, TAKE_MIN_WORDS, wordCount } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, Backend, Member, NewsRun, ReaderRecord, Role, Status, Tag } from "@/admin/types"
+import type { Activity, Article, ArticleDraft, Backend, Member, NewsItem, NewsRun, ReaderRecord, Role, Status, Tag } from "@/admin/types"
 
 /*
  * Demo backend: everything lives in this browser's localStorage, so you can
@@ -18,6 +18,7 @@ interface Store {
   articles: Article[]
   activity: Activity[]
   runs?: NewsRun[]
+  inbox?: NewsItem[]
 }
 
 /** Fields added after the first demo release, so older browser data keeps working. */
@@ -378,6 +379,45 @@ export function createDemoBackend(): Backend {
       store.runs = [run, ...(store.runs ?? [])].slice(0, 10)
       save(store)
       return { created: fresh.length, scanned: run.scanned, details: run.details }
+    },
+    async listNewsItems() {
+      const store = load()
+      requireMember(store)
+      store.inbox ??= demoNewsItems()
+      save(store)
+      return store.inbox
+    },
+    async fileNewsItem(id) {
+      const store = load()
+      const member = requireMember(store)
+      const item = (store.inbox ??= demoNewsItems()).find((entry) => entry.id === id)
+      if (!item) throw new Error("Мэдээ олдсонгүй")
+      if (item.articleId) return item.articleId
+      // The real function drafts it (Gemini) or files a source card; the demo files a ready-made sample card.
+      const [card] = demoBriefings(1)
+      const article: Article = {
+        ...card,
+        title: item.title,
+        dek: item.summary,
+        desk: item.desk,
+        tags: item.tags,
+        coverUrl: item.image,
+        coverCredit: `Зураг: ${item.source}`,
+        sources: [{ label: `${item.source}: ${item.title}`, href: item.link }],
+        sourceUrl: item.link,
+      }
+      store.articles.push(article)
+      log(store, article.id, member, "filed")
+      Object.assign(item, { status: "filed", articleId: article.id })
+      save(store)
+      return article.id
+    },
+    async setNewsItemDismissed(id, dismissed) {
+      const store = load()
+      requireMember(store)
+      const item = store.inbox?.find((entry) => entry.id === id)
+      if (item && item.status !== "filed") item.status = dismissed ? "dismissed" : "new"
+      save(store)
     },
     async listNewsRuns() {
       return load().runs ?? []

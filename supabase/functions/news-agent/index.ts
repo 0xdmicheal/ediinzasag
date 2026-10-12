@@ -22,7 +22,7 @@
 // is a password for the morning call, not an AI key. Deploy with --no-verify-jwt:
 // the cron call has no user token, so this function checks the cron secret or the editor's token itself.
 
-import { rankByRules, sourceCard } from "./rules.ts"
+import { rankByRules, score, sourceCard } from "./rules.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
@@ -653,6 +653,106 @@ async function copyImage(db: SupabaseClient, url: string, slug: string) {
   }
 }
 
+type Tags = { slug: string; label: string }[]
+
+/**
+ * Files one story as an unclaimed bot article in review: a model draft, or the
+ * source card in rules mode. `cardIfNoDraft` (a person asked for this story)
+ * falls back to the card when the model declines, instead of filing nothing.
+ * Resolves with the new article's id, or null when nothing was filed.
+ */
+async function fileStory(
+  db: SupabaseClient,
+  pick: { item: FeedItem; why: string; priority: number; tags?: string[]; desk?: "mongolia" | "world" },
+  tags: Tags,
+  cardIfNoDraft = false,
+): Promise<string | null> {
+  const { item, why, priority } = pick
+  const page = await readArticle(item.link)
+  const briefing = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
+  if (!briefing && PROVIDER !== "rules" && !cardIfNoDraft) return null
+  const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published })
+  const tagSlugs = new Set(tags.map((tag) => tag.slug))
+  const slug = `${slugify(briefing?.slug || item.title) || "medee"}-${Date.now().toString(36).slice(-4)}`
+  const coverUrl = await copyImage(db, page.image || item.image, slug)
+  const { data, error } = await db
+    .from("articles")
+    .insert({
+      slug,
+      title: (card?.title || briefing!.title).slice(0, 120),
+      dek: card?.dek || briefing!.dek,
+      body: (card?.body || briefing!.body_html).replace(ALLOWED_HTML, ""),
+      desk: card ? pick.desk || "world" : briefing!.desk === "mongolia" ? "mongolia" : "world",
+      tags: (card ? pick.tags ?? [] : briefing!.tags).filter((tag) => tagSlugs.has(tag)).slice(0, 5),
+      cover_url: coverUrl,
+      cover_alt: coverUrl ? (card ? "Эх сурвалжийн зураг" : briefing!.cover_alt) : "",
+      cover_credit: coverUrl ? `Зураг: ${item.source}` : "",
+      sources: [{ label: `${item.source}: ${item.title}`, href: item.link }],
+      source_url: item.link,
+      bot_notes: [
+        `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 — ${why}`,
+        ...(card
+          ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ. EZ-ийн дүгнэлтийг редактор нэмнэ.", "Нүүр зургийн эрхийг шалгана."]
+          : briefing!.verify_notes.map((note) => note.trim()).filter(Boolean)),
+      ].join("\n"),
+    })
+    .select("id")
+    .single()
+  // 23505: the same story was added by a parallel run.
+  if (error && error.code !== "23505") throw error
+  if (!data) return null
+  await db.from("news_items").update({ status: "filed", article_id: data.id }).eq("link", item.link)
+  return data.id as string
+}
+
+/** Every fresh story goes to the inbox with its rules score; the inbox keeps two weeks. */
+async function saveInbox(db: SupabaseClient, items: FeedItem[], filed: Set<string>) {
+  const rows = items.map((item) => ({
+    link: item.link,
+    source: item.source.slice(0, 120),
+    title: item.title.slice(0, 300),
+    summary: item.summary,
+    image: item.image,
+    published_at: item.published ? new Date(item.published).toISOString() : null,
+    mongolia: item.mongolia,
+    status: filed.has(item.link) ? "filed" : "new",
+    ...score(item),
+  }))
+  for (let start = 0; start < rows.length; start += 500) {
+    const { error } = await db.from("news_items").upsert(rows.slice(start, start + 500), { onConflict: "link", ignoreDuplicates: true })
+    // An older database without news_items still runs; the inbox just stays empty.
+    if (error) return console.warn("inbox skipped:", error.message)
+  }
+  await db.from("news_items").delete().lt("seen_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
+}
+
+/** "Карт болгох" in the inbox: one stored story becomes an article card. */
+async function fileFromInbox(db: SupabaseClient, id: number) {
+  const { data: row, error } = await db.from("news_items").select("*").eq("id", id).maybeSingle()
+  if (error) throw error
+  if (!row) throw new Error("Мэдээ олдсонгүй")
+  if (row.status === "filed" && row.article_id) return { article_id: row.article_id as string }
+  const { data: tagRows } = await db.from("tags").select("slug, label")
+  const item: FeedItem = {
+    source: row.source,
+    title: row.title,
+    link: row.link,
+    summary: row.summary,
+    published: row.published_at ? Date.parse(row.published_at) : null,
+    image: row.image,
+    mongolia: row.mongolia,
+  }
+  const articleId = await fileStory(db, { item, why: row.why, priority: row.priority, tags: row.tags, desk: row.desk }, (tagRows ?? []) as Tags, true)
+  if (!articleId) {
+    // Filed before under the same link (e.g. by the morning run): point the inbox at that article.
+    const { data: existing } = await db.from("articles").select("id").eq("source_url", row.link).maybeSingle()
+    if (!existing) throw new Error("Карт үүсгэж чадсангүй")
+    await db.from("news_items").update({ status: "filed", article_id: existing.id }).eq("id", id)
+    return { article_id: existing.id as string }
+  }
+  return { article_id: articleId }
+}
+
 async function run(db: SupabaseClient, trigger: "cron" | "manual") {
   const { data: runRow } = await db.from("news_runs").insert({ trigger }).select("id").single()
   const finish = async (patch: Record<string, unknown>) => {
@@ -692,6 +792,7 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     const knownUrls = new Set((known ?? []).map((row: { source_url: string }) => row.source_url))
     const items = fresh.filter((item) => !knownUrls.has(item.link))
     details.new = items.length
+    await saveInbox(db, fresh, knownUrls)
     if (items.length === 0) {
       const error = feeds.ok === 0 ? "Нэг ч эх сурвалж уншигдсангүй" : ""
       await finish({ scanned: fresh.length, created: 0, error, details })
@@ -699,8 +800,7 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     }
 
     const { data: tagRows } = await db.from("tags").select("slug, label")
-    const tags = (tagRows ?? []) as { slug: string; label: string }[]
-    const tagSlugs = new Set(tags.map((tag) => tag.slug))
+    const tags = (tagRows ?? []) as Tags
     const picks: Pick[] =
       PROVIDER === "rules"
         ? rankByRules(items, PER_RUN, MIN_PRIORITY).map((pick) => ({
@@ -714,39 +814,8 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     details.picked = picks.map(({ item, priority }) => ({ title: item.title.slice(0, 140), source: item.source, priority }))
 
     // Rules and Claude: all at once. Gemini's free tier: two at a time, to stay under its per-minute limit.
-    const written = await settleInBatches(
-      picks,
-      PROVIDER === "gemini" ? 2 : picks.length,
-      async ({ item, why, priority, tags: ruleTags, desk }) => {
-        const page = await readArticle(item.link)
-        const briefing = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
-        if (PROVIDER !== "rules" && !briefing) return false
-        const card = PROVIDER === "rules" ? sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published }) : null
-        const slug = `${slugify(briefing?.slug || item.title) || "medee"}-${Date.now().toString(36).slice(-4)}`
-        const coverUrl = await copyImage(db, page.image || item.image, slug)
-        const { error } = await db.from("articles").insert({
-          slug,
-          title: (card?.title || briefing!.title).slice(0, 120),
-          dek: card?.dek || briefing!.dek,
-          body: (card?.body || briefing!.body_html).replace(ALLOWED_HTML, ""),
-          desk: card ? desk || "world" : briefing!.desk === "mongolia" ? "mongolia" : "world",
-          tags: (card ? ruleTags ?? [] : briefing!.tags).filter((tag) => tagSlugs.has(tag)).slice(0, 5),
-          cover_url: coverUrl,
-          cover_alt: coverUrl ? (card ? "Эх сурвалжийн зураг" : briefing!.cover_alt) : "",
-          cover_credit: coverUrl ? `Зураг: ${item.source}` : "",
-          sources: [{ label: `${item.source}: ${item.title}`, href: item.link }],
-          source_url: item.link,
-          bot_notes: [
-            `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 — ${why}`,
-            ...(card
-              ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ. EZ-ийн дүгнэлтийг редактор нэмнэ.", "Нүүр зургийн эрхийг шалгана."]
-              : briefing!.verify_notes.map((note) => note.trim()).filter(Boolean)),
-          ].join("\n"),
-        })
-        // 23505: the same story was added by a parallel run.
-        if (error && error.code !== "23505") throw error
-        return !error
-      },
+    const written = await settleInBatches(picks, PROVIDER === "gemini" ? 2 : picks.length, async (pick) =>
+      Boolean(await fileStory(db, pick, tags)),
     )
     const created = written.filter((result) => result.status === "fulfilled" && result.value).length
     details.failures = written.flatMap((result, index) =>
@@ -788,17 +857,23 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
     auth: { persistSession: false },
   })
 
-  // The daily cron sends the shared secret; people must be signed-in editors or admins.
+  // { action: "file", id } turns one inbox story into a card; anything else is a full run.
+  const body = await request.json().catch(() => ({})) as { action?: string; id?: number }
+  const filing = body.action === "file"
+
+  // The daily cron sends the shared secret. People must be signed in: any team member
+  // may file an inbox story, only editors and admins start a run.
   const cronSecret = Deno.env.get("NEWS_CRON_SECRET")
   let trigger: "cron" | "manual" = "manual"
-  if (cronSecret && request.headers.get("x-cron-secret") === cronSecret) {
+  if (!filing && cronSecret && request.headers.get("x-cron-secret") === cronSecret) {
     trigger = "cron"
   } else {
     const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
     const { data } = await db.auth.getUser(token)
     if (!data.user) return json({ error: "Нэвтэрнэ үү" }, 401)
     const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
-    if (profile?.role !== "editor" && profile?.role !== "admin") return json({ error: "Редактор, админ л ажиллуулна" }, 403)
+    if (!profile?.role) return json({ error: "Редакцын гишүүд л ашиглана" }, 403)
+    if (!filing && profile.role !== "editor" && profile.role !== "admin") return json({ error: "Редактор, админ л ажиллуулна" }, 403)
   }
 
   if (PROVIDER === "claude" && !Deno.env.get("ANTHROPIC_API_KEY")) return json({ error: "ANTHROPIC_API_KEY тохируулаагүй байна (ADMIN.md)" }, 500)
@@ -807,6 +882,10 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
   }
 
   try {
+    if (filing) {
+      if (!Number.isInteger(body.id)) return json({ error: "id хэрэгтэй" }, 400)
+      return json(await fileFromInbox(db, body.id!))
+    }
     return json(await run(db, trigger))
   } catch (error) {
     console.error(error)

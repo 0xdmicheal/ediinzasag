@@ -52,6 +52,28 @@ export interface NewsRun {
   details: RunDetails
 }
 
+/** One story the agent read: the "Мэдээний урсгал" inbox (news_items), kept two weeks. */
+export interface NewsItem {
+  id: string
+  link: string
+  source: string
+  title: string
+  summary: string
+  image: string
+  publishedAt: string | null
+  /** From a Mongolian source, or about Mongolia. */
+  mongolia: boolean
+  /** The rules score, 0–10, and what earned it. */
+  priority: number
+  why: string
+  tags: string[]
+  desk: "mongolia" | "world"
+  /** "filed": an article card exists (articleId). */
+  status: "new" | "filed" | "dismissed"
+  articleId: string | null
+  seenAt: string
+}
+
 export interface AuthorStats {
   id: string
   name: string
@@ -189,6 +211,11 @@ export interface Backend {
   /** Editors and admins: run the news agent now. Resolves with how many briefings were added. */
   runNewsAgent(): Promise<{ created: number; scanned: number; details?: RunDetails }>
   listNewsRuns(): Promise<NewsRun[]>
+  /** Every story the agent read in the last two weeks, newest first. */
+  listNewsItems(): Promise<NewsItem[]>
+  /** Any team member: turns an inbox story into an unclaimed article card. Resolves with the article id. */
+  fileNewsItem(id: string): Promise<string>
+  setNewsItemDismissed(id: string, dismissed: boolean): Promise<void>
   /** Admin only. */
   insights(): Promise<Insights>
 }

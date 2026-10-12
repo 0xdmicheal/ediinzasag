@@ -53,7 +53,8 @@ function sameEvent(a: Set<string>, b: Set<string>) {
   return smaller >= 2 && shared / smaller >= 0.6
 }
 
-function score(item: RuleItem) {
+/** The relevance score of one story: 0–10, why, topic tags and desk. */
+export function score(item: RuleItem) {
   const text = `${item.title} ${item.summary}`
   if (SKIP.test(item.title)) return { priority: 0, why: "тойм, подкаст эсвэл бичлэг", tags: [] as string[], desk: "world" as const }
   let topic = 0
