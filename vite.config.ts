@@ -60,16 +60,32 @@ function linkPreviewDev() {
   }
 }
 
-export default defineConfig({
+/** `--mode admin`: the same index.html boots the admin (src/admin-main.tsx) instead of the public site. */
+function adminEntry() {
+  return {
+    name: "admin-entry",
+    transformIndexHtml: {
+      // "pre", so the swap happens before Vite picks up the entry script.
+      order: "pre" as const,
+      handler: (html: string) =>
+        html
+          .replace("/src/main.tsx", "/src/admin-main.tsx")
+          .replace(/<title>.*<\/title>/, '<title>Редакц · EZ Эдийн засаг</title>\n    <meta name="robots" content="noindex, nofollow" />'),
+    },
+  }
+}
+
+export default defineConfig(({ mode }) => ({
   base: process.env.VITE_BASE || "/",
-  plugins: [substackRss(), linkPreviewDev(), react(), tailwindcss()],
+  // The Substack pull only feeds the public site.
+  plugins: [mode === "admin" ? adminEntry() : substackRss(), linkPreviewDev(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(root, "./src"),
     },
   },
   server: {
-    port: 5180,
+    port: mode === "admin" ? 5181 : 5180,
     strictPort: true,
   },
-})
+}))

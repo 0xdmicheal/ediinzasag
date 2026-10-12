@@ -1,6 +1,22 @@
-# Редакцын админ (/admin)
+# Редакцын админ (admin.ediinzasag.mn)
 
-Багийн гишүүд нэвтэрч нийтлэл бичиж, хянаж, нийтэлдэг хэсэг.
+Багийн гишүүд нэвтэрч нийтлэл бичиж, хянаж, нийтэлдэг хэсэг. Нийтийн сайтаас тусдаа апп:
+нийтийн сайтын багцад админы код огт ордоггүй. Хуучин `ediinzasag.mn/admin/...` холбоосууд
+`admin.ediinzasag.mn/...` руу автоматаар шилжинэ. Доорх `/admin/team` гэх мэт замууд одоо
+`admin.ediinzasag.mn/team` гэсэн үг.
+
+## Ажиллуулах, байршуулах
+
+| | Нийтийн сайт | Админ |
+|---|---|---|
+| Локал | `npm run dev` → http://localhost:5180 | `npm run dev:admin` → http://localhost:5181 |
+| Build | `npm run build` → `dist/` | `npm run build:admin` → `dist-admin/` |
+| Байршил | GitHub Pages (`.github/workflows/pages.yml`) | Cloudflare Pages (main-д push хийхэд автоматаар) |
+
+Cloudflare Pages тохиргоо: Build command `npm run build:admin`, Output `dist-admin`,
+Environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `NODE_VERSION=24`.
+Custom domain `admin.ediinzasag.mn` (Datacon дээр CNAME `admin` → `<project>.pages.dev`).
+`design.ediinzasag.mn` нь Datacon-ы Domain Forwarding-оор `ediinzasag.mn/design` руу шилждэг.
 
 ## Эрх
 
@@ -20,7 +36,7 @@
 
 ## Демо горим
 
-Supabase холбогдоогүй үед `/admin` демо горимоор ажиллана: өгөгдөл зөвхөн тухайн хөтчийн
+Supabase холбогдоогүй үед админ демо горимоор ажиллана: өгөгдөл зөвхөн тухайн хөтчийн
 localStorage-д хадгалагдана, багаар хуваалцахгүй, аюулгүй биш. Нэвтрэх хуудсан дээрх
 "Сэтгүүлч / Редактор / Админ" товчоор эрх бүрийг туршина.
 

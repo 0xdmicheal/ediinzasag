@@ -18,7 +18,7 @@ export function LoginPage() {
   const { backend, member } = useSession()
   const navigate = useNavigate()
   const location = useLocation()
-  const from = (location.state as { from?: string } | null)?.from ?? "/admin"
+  const from = (location.state as { from?: string } | null)?.from ?? "/"
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")

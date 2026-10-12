@@ -63,7 +63,7 @@ export function TeamPage() {
     backend.listMembers().then(setMembers)
   }, [backend])
 
-  if (!canManageTeam(member)) return <Navigate to="/admin" replace />
+  if (!canManageTeam(member)) return <Navigate to="/" replace />
 
   const count = (key: Role) => members.filter((item) => item.role === key).length
   const sorted = [...members].sort((a, b) => roles.indexOf(b.role) - roles.indexOf(a.role) || a.name.localeCompare(b.name))

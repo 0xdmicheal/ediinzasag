@@ -13,6 +13,6 @@ export function AdminGuard() {
       </div>
     )
   }
-  if (!member) return <Navigate to="/admin/login" replace state={{ from: location.pathname }} />
+  if (!member) return <Navigate to="/login" replace state={{ from: location.pathname }} />
   return <Outlet />
 }

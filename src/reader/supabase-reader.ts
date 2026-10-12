@@ -58,6 +58,10 @@ function toComment(row: CommentRow, mine: boolean): StoryComment {
 
 function fail(error: { message: string; status?: number }): never {
   if (error.status === 429) throw new Error("Хэт олон оролдлого. Түр хүлээгээд дахин оролдоно уу")
+  // "Error sending magic link / recovery / confirmation email": Supabase's SMTP refused the message.
+  if (/^Error sending .*email$/i.test(error.message)) {
+    throw new Error("И-мэйл илгээж чадсангүй. Түр хүлээгээд дахин оролдох эсвэл Google-ээр нэвтэрнэ үү")
+  }
   throw new Error(messages[error.message] ?? error.message)
 }
 

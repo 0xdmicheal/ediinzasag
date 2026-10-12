@@ -64,7 +64,7 @@ export function ReadersPage() {
     )
   }, [readers, query])
 
-  if (!canManageTeam(member)) return <Navigate to="/admin" replace />
+  if (!canManageTeam(member)) return <Navigate to="/" replace />
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">

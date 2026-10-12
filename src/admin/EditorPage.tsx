@@ -12,6 +12,7 @@ import {
   Eye,
   Hand,
   ImagePlus,
+  Image as ImageIcon,
   Monitor,
   ShieldCheck,
   Smartphone,
@@ -22,6 +23,8 @@ import { cn } from "cn"
 
 import { useConfirm } from "@/admin/ConfirmDialog"
 import { ArticlePreview } from "@/admin/ArticlePreview"
+import { PosterDialog } from "@/admin/PosterDialog"
+import type { PosterInput } from "@/admin/posters"
 import { RichEditor } from "@/admin/RichEditor"
 import { scheduleDayValue, ScheduleDate } from "@/admin/ScheduleDate"
 import {
@@ -131,6 +134,8 @@ export function EditorPage() {
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  // A snapshot of the draft, so the posters don't re-render on every keystroke behind the dialog.
+  const [posterInput, setPosterInput] = useState<PosterInput | null>(null)
   const [split, setSplit] = useState(readSplit)
   const [device, setDevice] = useState<"desktop" | "phone">("desktop")
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -234,7 +239,7 @@ export function EditorPage() {
       setArticle(saved)
       setDraft((current) => ({ ...current, slug: saved.slug }))
       setDirty(false)
-      if (!article) navigate(`/admin/edit/${saved.id}`, { replace: true })
+      if (!article) navigate(`/edit/${saved.id}`, { replace: true })
       return saved
     } catch (failure) {
       setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Хадгалж чадсангүй" })
@@ -357,7 +362,7 @@ export function EditorPage() {
     if (!ok) return
     try {
       await backend.deleteArticle(article.id)
-      navigate("/admin")
+      navigate("/")
     } catch (failure) {
       setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Устгаж чадсангүй" })
     }
@@ -427,7 +432,7 @@ export function EditorPage() {
       {/* Top bar */}
       <header className="bg-background/90 sticky top-0 z-30 border-b backdrop-blur-xl">
         <div className={cn("mx-auto flex h-14 items-center gap-3 px-4 sm:px-6", split ? "max-w-none" : "max-w-[1200px]")}>
-          <Link to="/admin" aria-label="Самбар руу буцах" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
+          <Link to="/" aria-label="Самбар руу буцах" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
             <ArrowLeft className="size-4" />
           </Link>
           <img src={publicUrl("brand/logo-black.png")} alt="" className="hidden h-5 w-auto sm:block dark:hidden" />
@@ -471,6 +476,15 @@ export function EditorPage() {
             >
               <Columns2 className="size-4" />
               Зэрэгцүүлэх
+            </button>
+            <button
+              type="button"
+              onClick={() => setPosterInput({ title: draft.title, dek: draft.dek, desk: draft.desk, coverUrl: draft.coverUrl })}
+              title="Facebook, Instagram, X-д зориулсан постер"
+              className={buttonClass.ghost}
+            >
+              <ImageIcon className="size-4" />
+              <span className="hidden sm:inline">Постер</span>
             </button>
             <button type="button" onClick={() => setPreviewOpen(true)} className={buttonClass.ghost}>
               <Eye className="size-4" />
@@ -991,6 +1005,15 @@ export function EditorPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {posterInput ? (
+        <PosterDialog
+          input={posterInput}
+          slug={draft.slug}
+          coverCleared={draft.coverRightsOk}
+          onClose={() => setPosterInput(null)}
+        />
       ) : null}
     </div>
   )
