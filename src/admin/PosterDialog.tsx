@@ -11,9 +11,7 @@ import {
   posterFileName,
   posterFormats,
   renderPoster,
-  type Box,
   type PosterAssets,
-  type PosterElement,
   type PosterFormat,
   type PosterInput,
   type PosterLang,
@@ -26,22 +24,7 @@ const langs: { key: PosterLang; label: string }[] = [
   { key: "mn", label: "Монгол" },
   { key: "en", label: "English" },
 ]
-const elementLabels: Record<PosterElement, string> = { photo: "Зураг", headline: "Гарчиг", logo: "Лого", date: "Огноо" }
-
-/** What each element's size slider changes, and its range. */
-const sizeOf: Record<PosterElement, { get: (layout: PosterLayout) => number; set: (layout: PosterLayout, value: number) => PosterLayout; min: number; max: number; step: number }> = {
-  photo: { get: (l) => l.photo.scale, set: (l, v) => ({ ...l, photo: { ...l.photo, scale: v } }), min: 1, max: 4, step: 0.01 },
-  headline: { get: (l) => l.headline.size, set: (l, v) => ({ ...l, headline: { ...l.headline, size: v } }), min: 28, max: 180, step: 1 },
-  logo: { get: (l) => l.logo.h, set: (l, v) => ({ ...l, logo: { ...l.logo, h: v } }), min: 30, max: 360, step: 1 },
-  date: { get: (l) => l.date.size, set: (l, v) => ({ ...l, date: { ...l.date, size: v } }), min: 14, max: 120, step: 1 },
-}
-
-function move(layout: PosterLayout, element: PosterElement, from: PosterLayout, dx: number, dy: number): PosterLayout {
-  const shift = <T extends { x: number; y: number }>(value: T) => ({ ...value, x: Math.round(value.x + dx), y: Math.round(value.y + dy) })
-  return { ...layout, [element]: shift(from[element]) }
-}
-
-const clampSize = (element: PosterElement, value: number) => Math.min(sizeOf[element].max, Math.max(sizeOf[element].min, value))
+const ZOOM = { min: 1, max: 4 }
 
 interface Saved {
   text: Record<PosterLang, string>
@@ -49,7 +32,7 @@ interface Saved {
   layouts: Record<PosterFormat, PosterLayout>
 }
 
-const storageKey = (slug: string) => `ez-poster-v2-${slug || "draft"}`
+const storageKey = (slug: string) => `ez-poster-v3-${slug || "draft"}`
 
 function loadSaved(slug: string): Partial<Saved> {
   try {
@@ -90,12 +73,12 @@ function Tabs<T extends string>({ value, options, onChange, label }: { value: T;
   )
 }
 
-function Slider({ label, value, min, max, step, onChange, format = (v) => String(Math.round(v)) }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void; format?: (value: number) => string }) {
+function Slider({ label, value, min, max, step, onChange }: { label: string; value: number; min: number; max: number; step: number; onChange: (value: number) => void }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="flex justify-between text-[12px]">
         <span className="font-medium">{label}</span>
-        <span className="text-muted-foreground font-mono">{format(value)}</span>
+        <span className="text-muted-foreground font-mono">{Math.round(value * 100)}%</span>
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(event) => onChange(Number(event.target.value))} className="accent-[var(--brand)]" />
     </label>
@@ -103,9 +86,10 @@ function Slider({ label, value, min, max, step, onChange, format = (v) => String
 }
 
 /**
- * The poster editor: drag the photo, headline, logo or date to move it, scroll
- * (or use the slider) to scale it. Separate Mongolian and English headlines;
- * text, date and layout are remembered per article in this browser.
+ * The poster editor. The design is fixed (posters.ts); a person only frames the
+ * photo (drag to move, scroll or slider to zoom) and sets the fade, and writes
+ * the Mongolian and English headlines. Text, date and framing are remembered
+ * per article in this browser.
  */
 export function PosterDialog({ input, slug, coverCleared, onClose }: { input: PosterInput; slug: string; coverCleared: boolean; onClose: () => void }) {
   const [saved] = useState(() => loadSaved(slug))
@@ -113,20 +97,20 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
   const [lang, setLang] = useState<PosterLang>("mn")
   const [text, setText] = useState<Record<PosterLang, string>>(saved.text ?? { mn: input.title, en: "" })
   const [date, setDate] = useState(saved.date ?? posterDate(input.date))
-  const [layouts, setLayouts] = useState<Record<PosterFormat, PosterLayout>>(
-    () => saved.layouts ?? { post: defaultLayout("post"), story: defaultLayout("story") },
-  )
-  const [selected, setSelected] = useState<PosterElement>("headline")
+  const [layouts, setLayouts] = useState<Record<PosterFormat, PosterLayout>>(() => saved.layouts ?? { post: defaultLayout(), story: defaultLayout() })
   const [assets, setAssets] = useState<PosterAssets | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const boxes = useRef<Record<PosterElement, Box> | null>(null)
-  const drag = useRef<{ element: PosterElement; startX: number; startY: number; from: PosterLayout } | null>(null)
+  const drag = useRef<{ startX: number; startY: number; from: PosterLayout["photo"] } | null>(null)
 
   const layout = layouts[format]
   const setLayout = useCallback((next: (current: PosterLayout) => PosterLayout) => setLayouts((all) => ({ ...all, [format]: next(all[format]) })), [format])
+  const zoomTo = useCallback(
+    (scale: number) => setLayout((current) => ({ ...current, photo: { ...current.photo, scale: Math.min(ZOOM.max, Math.max(ZOOM.min, scale)) } })),
+    [setLayout],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -144,22 +128,11 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
     }
   }, [slug, text, date, layouts])
 
-  // Redraw the preview, then outline the selected element (the outline is never exported).
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !assets) return
-    const ctx = canvas.getContext("2d")!
-    boxes.current = drawPoster(ctx, format, { headline: text[lang], date, coverUrl: input.coverUrl }, layout, assets)
-    if (selected !== "photo") {
-      const box = boxes.current[selected]
-      ctx.save()
-      ctx.strokeStyle = "#298dff"
-      ctx.lineWidth = 4
-      ctx.setLineDash([14, 10])
-      ctx.strokeRect(box.x - 10, box.y - 10, box.w + 20, box.h + 20)
-      ctx.restore()
-    }
-  }, [assets, format, layout, text, lang, date, input.coverUrl, selected])
+    drawPoster(canvas.getContext("2d")!, format, { headline: text[lang], date, coverUrl: input.coverUrl }, layout, assets)
+  }, [assets, format, layout, text, lang, date, input.coverUrl])
 
   const toPoster = (event: { clientX: number; clientY: number }) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -167,61 +140,36 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
     return { x: ((event.clientX - rect.left) / rect.width) * width, y: ((event.clientY - rect.top) / rect.height) * height }
   }
 
-  const hit = (x: number, y: number): PosterElement => {
-    const pad = 16
-    for (const element of ["headline", "logo", "date"] as const) {
-      const box = boxes.current?.[element]
-      if (box && box.w && x >= box.x - pad && x <= box.x + box.w + pad && y >= box.y - pad && y <= box.y + box.h + pad) return element
-    }
-    return "photo"
-  }
-
   function onPointerDown(event: ReactPointerEvent<HTMLCanvasElement>) {
     const point = toPoster(event)
-    const element = hit(point.x, point.y)
-    setSelected(element)
-    drag.current = { element, startX: point.x, startY: point.y, from: layout }
+    drag.current = { startX: point.x, startY: point.y, from: layout.photo }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
   function onPointerMove(event: ReactPointerEvent<HTMLCanvasElement>) {
     if (!drag.current) return
     const point = toPoster(event)
-    const { element, startX, startY, from } = drag.current
-    setLayout((current) => move(current, element, from, point.x - startX, point.y - startY))
+    const { startX, startY, from } = drag.current
+    setLayout((current) => ({ ...current, photo: { ...current.photo, x: Math.round(from.x + point.x - startX), y: Math.round(from.y + point.y - startY) } }))
   }
 
-  // Wheel to scale whatever is under the cursor. Not a React handler: those are passive and can't stop the page scrolling.
+  // Wheel zooms the photo. Not a React handler: those are passive and can't stop the page scrolling.
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const onWheel = (event: WheelEvent) => {
       event.preventDefault()
-      const point = toPoster(event)
-      const element = hit(point.x, point.y)
-      setSelected(element)
-      const factor = event.deltaY < 0 ? 1.04 : 1 / 1.04
-      setLayout((current) => sizeOf[element].set(current, clampSize(element, sizeOf[element].get(current) * factor)))
+      zoomTo(layout.photo.scale * (event.deltaY < 0 ? 1.04 : 1 / 1.04))
     }
     canvas.addEventListener("wheel", onWheel, { passive: false })
     return () => canvas.removeEventListener("wheel", onWheel)
-  })
+  }, [layout.photo.scale, zoomTo])
 
-  // Arrow keys nudge the selected element (Shift: 10px); Escape closes.
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") return onClose()
-      const target = event.target as HTMLElement
-      if (target.closest("input, textarea")) return
-      const step = event.shiftKey ? 10 : 2
-      const delta = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[event.key]
-      if (!delta) return
-      event.preventDefault()
-      setLayout((current) => move(current, selected, current, delta[0], delta[1]))
-    }
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && onClose()
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
-  }, [onClose, selected, setLayout])
+  }, [onClose])
 
   async function download(which: { format: PosterFormat; lang: PosterLang }[]) {
     setBusy(true)
@@ -241,7 +189,6 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
 
   const everything = formats.flatMap((f) => langs.filter((l) => text[l.key].trim()).map((l) => ({ format: f, lang: l.key })))
   const { width, height, label, hint } = posterFormats[format]
-  const size = sizeOf[selected]
 
   return (
     <div role="dialog" aria-modal="true" aria-label="Сошиал постер" className="bg-muted fixed inset-0 z-40 flex flex-col">
@@ -272,12 +219,12 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
             onPointerMove={onPointerMove}
             onPointerUp={() => (drag.current = null)}
             onPointerCancel={() => (drag.current = null)}
-            aria-label={`${label} урьдчилан харах: чирж зөөнө, хулганы дугуйгаар томруулна`}
-            className={cn("max-h-full max-w-full touch-none rounded-lg shadow-lg", assets ? "cursor-move" : "animate-pulse")}
+            aria-label={`${label} урьдчилан харах: зургийг чирж зөөнө, хулганы дугуйгаар томруулна`}
+            className={cn("max-h-full max-w-full touch-none rounded-lg shadow-lg", assets ? "cursor-grab active:cursor-grabbing" : "animate-pulse")}
             style={{ aspectRatio: `${width} / ${height}`, height: "min(100%, calc(100svh - 9rem))" }}
           />
           <p className="text-muted-foreground text-[12px]">
-            {label} · {hint}. Чирж зөөнө, хулганы дугуйгаар томруулна/жижигрүүлнэ, сумаар нарийн зөөнө.
+            {label} · {hint}. Зургийг чирж байрлуулна, хулганы дугуйгаар томруулна.
           </p>
         </div>
 
@@ -294,7 +241,7 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
               placeholder={lang === "en" ? "The yield on the U.S. 30-year bond reached *5.73* percent…" : "Гарчиг"}
               className={cn(inputClass, "resize-y")}
             />
-            <span className="text-muted-foreground text-[11px]">*од* дотор бичсэн хэсэг цэнхэр болно, жишээ нь *5.73*.</span>
+            <span className="text-muted-foreground text-[11px]">*од* дотор бичсэн хэсэг цэнхэр болно, жишээ нь *5.73*. 4 мөрөөс урт бол дээшээ нэмэгдэнэ.</span>
           </label>
 
           <label className="flex flex-col gap-1.5">
@@ -303,52 +250,19 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
           </label>
 
           <div className="flex flex-col gap-3">
-            <span className="text-[12px] font-medium">Сонгосон: {elementLabels[selected]}</span>
-            <div className="flex flex-wrap gap-1.5">
-              {(Object.keys(elementLabels) as PosterElement[]).map((element) => (
-                <button
-                  key={element}
-                  type="button"
-                  onClick={() => setSelected(element)}
-                  className={cn(
-                    "h-7 rounded-full border px-3 text-[12px] transition-colors",
-                    selected === element ? "bg-foreground text-background border-transparent" : "hover:bg-foreground/5",
-                  )}
-                >
-                  {elementLabels[element]}
-                </button>
-              ))}
-            </div>
-            <Slider
-              label={selected === "photo" ? "Томруулах" : "Хэмжээ"}
-              value={size.get(layout)}
-              min={size.min}
-              max={size.max}
-              step={size.step}
-              format={selected === "photo" ? (v) => `${Math.round(v * 100)}%` : undefined}
-              onChange={(value) => setLayout((current) => size.set(current, value))}
-            />
-            {selected === "headline" ? (
-              <Slider
-                label="Мөрийн өргөн"
-                value={layout.headline.w}
-                min={240}
-                max={width - 40}
-                step={2}
-                onChange={(value) => setLayout((current) => ({ ...current, headline: { ...current.headline, w: value } }))}
-              />
-            ) : null}
+            <span className="text-[12px] font-medium">Зураг</span>
+            <Slider label="Томруулах" value={layout.photo.scale} min={ZOOM.min} max={ZOOM.max} step={0.01} onChange={zoomTo} />
           </div>
 
           <div className="flex flex-col gap-3">
             <span className="text-[12px] font-medium">Харанхуй сүүдэр</span>
-            <Slider label="Бараан" value={layout.fade.amount} min={0} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, amount: value } }))} />
-            <Slider label="Өндөр" value={layout.fade.height} min={0.1} max={1} step={0.01} format={(v) => `${Math.round(v * 100)}%`} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, height: value } }))} />
+            <Slider label="Бараан" value={layout.fade.amount} min={0} max={1} step={0.01} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, amount: value } }))} />
+            <Slider label="Өндөр" value={layout.fade.height} min={0.1} max={1} step={0.01} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, height: value } }))} />
           </div>
 
-          <button type="button" onClick={() => setLayout(() => defaultLayout(format))} className={cn(buttonClass.ghost, "self-start")}>
+          <button type="button" onClick={() => setLayout(() => defaultLayout())} className={cn(buttonClass.ghost, "self-start")}>
             <RotateCcw className="size-4" />
-            Байрлалыг анхны болгох
+            Зураг, сүүдрийг анхны болгох
           </button>
 
           {error ? <Notice tone="error">{error}</Notice> : null}

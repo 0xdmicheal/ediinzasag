@@ -4,15 +4,15 @@ import { publicUrl } from "@/lib/public-url"
 /*
  * Social posters for an article, drawn on a canvas in the browser so they cost
  * nothing to make and come out at the exact pixel sizes the networks want.
- * Layout: full-bleed photo, a dark fade from the bottom, the headline in
- * Geologica Medium (parts marked *like this* in Blue 500), the white logo and
- * the date in Geologica ExtraLight. Every element can be moved and scaled in
- * PosterDialog; positions are in poster pixels.
+ * The newsroom's fixed design: full-bleed photo, a dark fade from the bottom,
+ * the headline in Geologica Medium (Canva 40; parts marked *like this* in Blue 500),
+ * the white logo under it on the right, and the date in Geologica ExtraLight
+ * (Canva 15.3). Only the photo (position, zoom) and the fade can be changed in
+ * PosterDialog; everything else sits where the design puts it.
  */
 
 export type PosterFormat = "post" | "story"
 export type PosterLang = "mn" | "en"
-export type PosterElement = "photo" | "headline" | "logo" | "date"
 
 export const posterFormats: Record<PosterFormat, { width: number; height: number; label: string; hint: string }> = {
   post: { width: 1080, height: 1350, label: "Пост 1080×1350", hint: "Facebook, Instagram, X" },
@@ -29,17 +29,30 @@ export interface PosterInput {
   date?: string
 }
 
+/** The parts a person may change: the photo and the fade. */
 export interface PosterLayout {
   /** Photo offset from centred cover-fit, and zoom (1 = just covers the poster). */
   photo: { x: number; y: number; scale: number }
-  /** Bottom-left of the headline block (more lines grow upward), its wrap width and font size. */
-  headline: { x: number; y: number; w: number; size: number }
-  logo: { x: number; y: number; h: number }
-  /** `x` is the date's centre. */
-  date: { x: number; y: number; size: number }
   /** Dark fade from the bottom: how dark (0–1) and how far up (share of the height). */
   fade: { amount: number; height: number }
 }
+
+/**
+ * The fixed design, in poster pixels (measured from the newsroom's Canva
+ * template, 1080px wide). The headline box's bottom edge is fixed, so longer
+ * headlines grow upward; the logo sits under the box's right end.
+ */
+const design: Record<PosterFormat, { headlineBottom: number; dateBaseline: number }> = {
+  post: { headlineBottom: 1190, dateBaseline: 1301 },
+  story: { headlineBottom: 1644, dateBaseline: 1766 },
+}
+const MARGIN = 110
+// Canva's 40 / 15.3 measure 1.267× larger in the exported 1080px poster: 50.7px and 19.4px here.
+const HEADLINE = { size: 50.7, lineHeight: 53, width: 733 }
+/** The last line's baseline sits this far above the box's bottom edge (where the logo starts). */
+const LAST_BASELINE = 16
+const LOGO_H = 50
+const DATE_SIZE = 19.4
 
 export interface PosterContent {
   headline: string
@@ -52,28 +65,12 @@ export interface PosterAssets {
   logo: HTMLImageElement | null
 }
 
-export type Box = { x: number; y: number; w: number; h: number }
 
 const BRAND = "#298dff"
 const WHITE = "#ffffff"
 const FONT = '"Geologica Variable", "Segoe UI", sans-serif'
-const LOGO_RATIO = 285 / 112
-
-export function defaultLayout(format: PosterFormat): PosterLayout {
-  const { width, height } = posterFormats[format]
-  const story = format === "story"
-  const pad = 60
-  const size = story ? 84 : 76
-  // Instagram covers the bottom ~300px of a story with its own UI, so the text sits higher there.
-  const headlineBottom = story ? height - 380 : height - 150
-  const logoH = story ? 96 : 84
-  return {
-    photo: { x: 0, y: 0, scale: 1 },
-    headline: { x: pad, y: headlineBottom, w: width - pad * 2 - Math.round(logoH * LOGO_RATIO) - 24, size },
-    logo: { x: width - pad - Math.round(logoH * LOGO_RATIO), y: headlineBottom - logoH, h: logoH },
-    date: { x: width / 2, y: story ? height - 300 : height - 64, size: 30 },
-    fade: { amount: 0.85, height: story ? 0.6 : 0.62 },
-  }
+export function defaultLayout(): PosterLayout {
+  return { photo: { x: 0, y: 0, scale: 1 }, fade: { amount: 0.85, height: 0.6 } }
 }
 
 /** Today (or the given ISO date) as 2026/10/11. */
@@ -86,7 +83,7 @@ export function posterDate(iso?: string) {
 /** Cyrillic sample so the browser fetches the glyph ranges with Ө and Ү, not just Latin. */
 async function loadFonts() {
   const sample = "ӨөҮүАБВ EZ 0123"
-  await Promise.all([document.fonts.load(`500 80px ${FONT}`, sample), document.fonts.load(`200 30px ${FONT}`, sample)])
+  await Promise.all([document.fonts.load(`500 51px ${FONT}`, sample), document.fonts.load(`200 19px ${FONT}`, sample)])
 }
 
 function loadImage(src: string) {
@@ -139,31 +136,23 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
   return lines
 }
 
-function photoBox(image: HTMLImageElement, width: number, height: number, photo: PosterLayout["photo"]): Box {
+function photoBox(image: HTMLImageElement, width: number, height: number, photo: PosterLayout["photo"]) {
   const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * photo.scale
   const w = image.naturalWidth * scale
   const h = image.naturalHeight * scale
   return { x: (width - w) / 2 + photo.x, y: (height - h) / 2 + photo.y, w, h }
 }
 
-/**
- * Draws a poster and returns where each element landed, so the editor can
- * hit-test drags. Synchronous: load assets once with loadPosterAssets.
- */
+/** Draws a poster. Synchronous: load the photo, logo and fonts once with loadPosterAssets. */
 export function drawPoster(ctx: CanvasRenderingContext2D, format: PosterFormat, content: PosterContent, layout: PosterLayout, assets: PosterAssets) {
   const { width, height } = posterFormats[format]
-  const boxes: Record<PosterElement, Box> = {
-    photo: { x: 0, y: 0, w: width, h: height },
-    headline: { x: 0, y: 0, w: 0, h: 0 },
-    logo: { x: 0, y: 0, w: 0, h: 0 },
-    date: { x: 0, y: 0, w: 0, h: 0 },
-  }
+  const { headlineBottom, dateBaseline } = design[format]
 
   ctx.fillStyle = "#16181c"
   ctx.fillRect(0, 0, width, height)
   if (assets.cover) {
-    boxes.photo = photoBox(assets.cover, width, height, layout.photo)
-    ctx.drawImage(assets.cover, boxes.photo.x, boxes.photo.y, boxes.photo.w, boxes.photo.h)
+    const photo = photoBox(assets.cover, width, height, layout.photo)
+    ctx.drawImage(assets.cover, photo.x, photo.y, photo.w, photo.h)
   }
 
   // The fade: clear at its top, `amount` black at the bottom, eased so it has no visible edge.
@@ -176,43 +165,31 @@ export function drawPoster(ctx: CanvasRenderingContext2D, format: PosterFormat, 
   ctx.fillRect(0, fadeTop, width, height - fadeTop)
 
   ctx.textBaseline = "alphabetic"
-
-  const { headline } = layout
-  ctx.font = `500 ${headline.size}px ${FONT}`
-  const lines = wrap(ctx, content.headline.trim() || "Гарчиг", headline.w)
-  const lineHeight = headline.size * 1.12
-  const top = headline.y - lineHeight * lines.length
+  ctx.font = `500 ${HEADLINE.size}px ${FONT}`
+  const lines = wrap(ctx, content.headline.trim() || "Гарчиг", HEADLINE.width)
   const space = ctx.measureText(" ").width
-  let widest = 0
   lines.forEach((line, index) => {
-    let x = headline.x
-    const y = top + headline.size * 0.92 + index * lineHeight
+    let x = MARGIN
+    const y = headlineBottom - LAST_BASELINE - (lines.length - 1 - index) * HEADLINE.lineHeight
     line.forEach((word) => {
       ctx.fillStyle = word.blue ? BRAND : WHITE
       ctx.fillText(word.text, x, y)
       x += ctx.measureText(word.text).width + space
     })
-    widest = Math.max(widest, x - space - headline.x)
   })
-  boxes.headline = { x: headline.x, y: top, w: Math.max(widest, 40), h: lineHeight * lines.length }
 
   if (assets.logo) {
-    const w = layout.logo.h * (assets.logo.naturalWidth / assets.logo.naturalHeight)
-    ctx.drawImage(assets.logo, layout.logo.x, layout.logo.y, w, layout.logo.h)
-    boxes.logo = { x: layout.logo.x, y: layout.logo.y, w, h: layout.logo.h }
+    const w = LOGO_H * (assets.logo.naturalWidth / assets.logo.naturalHeight)
+    ctx.drawImage(assets.logo, width - MARGIN - w, headlineBottom, w, LOGO_H)
   }
 
   if (content.date.trim()) {
-    ctx.font = `200 ${layout.date.size}px ${FONT}`
+    ctx.font = `200 ${DATE_SIZE}px ${FONT}`
     ctx.fillStyle = WHITE
     ctx.textAlign = "center"
-    ctx.fillText(content.date, layout.date.x, layout.date.y)
+    ctx.fillText(content.date, width / 2, dateBaseline)
     ctx.textAlign = "left"
-    const w = ctx.measureText(content.date).width
-    boxes.date = { x: layout.date.x - w / 2, y: layout.date.y - layout.date.size, w, h: layout.date.size * 1.25 }
   }
-
-  return boxes
 }
 
 /** Renders one poster at full size for download. */
