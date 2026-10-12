@@ -12,6 +12,7 @@ import {
   Eye,
   Hand,
   ImagePlus,
+  Image as ImageIcon,
   Monitor,
   ShieldCheck,
   Smartphone,
@@ -22,6 +23,8 @@ import { cn } from "cn"
 
 import { useConfirm } from "@/admin/ConfirmDialog"
 import { ArticlePreview } from "@/admin/ArticlePreview"
+import { PosterDialog } from "@/admin/PosterDialog"
+import type { PosterInput } from "@/admin/posters"
 import { RichEditor } from "@/admin/RichEditor"
 import { scheduleDayValue, ScheduleDate } from "@/admin/ScheduleDate"
 import {
@@ -131,6 +134,8 @@ export function EditorPage() {
   const [message, setMessage] = useState<{ tone: "error" | "success"; text: string } | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [previewOpen, setPreviewOpen] = useState(false)
+  // A snapshot of the draft, so the posters don't re-render on every keystroke behind the dialog.
+  const [posterInput, setPosterInput] = useState<PosterInput | null>(null)
   const [split, setSplit] = useState(readSplit)
   const [device, setDevice] = useState<"desktop" | "phone">("desktop")
   const [historyOpen, setHistoryOpen] = useState(false)
@@ -471,6 +476,15 @@ export function EditorPage() {
             >
               <Columns2 className="size-4" />
               Зэрэгцүүлэх
+            </button>
+            <button
+              type="button"
+              onClick={() => setPosterInput({ title: draft.title, dek: draft.dek, desk: draft.desk, coverUrl: draft.coverUrl })}
+              title="Facebook, Instagram, X-д зориулсан постер"
+              className={buttonClass.ghost}
+            >
+              <ImageIcon className="size-4" />
+              <span className="hidden sm:inline">Постер</span>
             </button>
             <button type="button" onClick={() => setPreviewOpen(true)} className={buttonClass.ghost}>
               <Eye className="size-4" />
@@ -991,6 +1005,15 @@ export function EditorPage() {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {posterInput ? (
+        <PosterDialog
+          input={posterInput}
+          slug={draft.slug}
+          coverCleared={draft.coverRightsOk}
+          onClose={() => setPosterInput(null)}
+        />
       ) : null}
     </div>
   )
