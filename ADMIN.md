@@ -130,7 +130,8 @@ The Diplomat, iKon.mn; дэлхийн — BBC, Bloomberg, FT, The Economist, CNB
 Суулгах (≈15 мин, Supabase холбосны дараа):
 1. `supabase/schema.sql`-ийг дахин бүтнээр нь **Run** хийнэ (шинэ багана, `claim_article`, `news_runs`, `admin_insights`).
 2. [Supabase CLI](https://supabase.com/docs/guides/cli) суулгаад нэвтэрнэ: `npx supabase login`, `npx supabase link --project-ref <project-ref>`.
-3. Нууц түлхүүрүүд. AI-ийн аль нэгийг сонгоно:
+3. Нууц түлхүүр. AI түлхүүр заавал биш.
+   - **Түлхүүргүй (дүрэм):** эх сурвалжийн RSS-ийг уншиж, Монгол, зэс, нүүрс, алт, төгрөг, шатахуун, хүү гэсэн үгээр эрэмбэлж, эхийн ишлэлтэй карт үүсгэнэ. Орчуулга, "Яагаад чухал вэ", "Монголд ямар хамаатай вэ", EZ-ийн дүгнэлтийг хүн бичнэ. Түлхүүр тохируулаагүй бол энэ арга өөрөө ажиллана. Албаар сонгох: `npx supabase secrets set AI_PROVIDER=rules`
    - **Үнэгүй (турших):** Google Gemini — https://aistudio.google.com/apikey → "Create API key".
      ```bash
      npx supabase secrets set GEMINI_API_KEY=AIza... NEWS_CRON_SECRET=<урт-санамсаргүй-үг>

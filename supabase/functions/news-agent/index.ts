@@ -3,21 +3,25 @@
 // Once a day (pg_cron, see the end of schema.sql) or when an editor presses
 // "Одоо татах" on /admin, it:
 //   1. reads world economy and markets RSS feeds,
-//   2. asks an AI model which few stories matter most to Mongolian readers,
-//   3. has it write each one as a Mongolian briefing (translated, attributed,
-//      with "what to verify" notes for the reviewer),
+//   2. picks a few stories that matter to Mongolian readers,
+//   3. files each one for a person to check,
 //   4. copies the story's main image into the covers bucket with a credit,
 //   5. inserts it as an unclaimed 'bot' article in review.
-// Nothing is published here: a person claims the briefing, checks it, adds the
-// EZ take and clears the photo before guard_article() lets it go live.
+// Nothing is published here: a person claims the card, writes the piece, adds
+// the EZ take and clears the photo before guard_article() lets it go live.
 //
-// Secrets (supabase secrets set ...): NEWS_CRON_SECRET, and one AI key:
+// With no AI key, step 2 is a keyword ranking (rules.ts) and step 3 is a source
+// card: the outlet's own excerpt, not a generated article. Set AI_PROVIDER=rules
+// to force that. A key switches the same run to a model draft:
 //   GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY.
 // Agent Router (the $ credit balance, Opus 5): set ANTHROPIC_API_KEY to the sk- token,
 //   ANTHROPIC_BASE_URL=https://agentrouter.org (no /v1), AI_PROVIDER=claude, CLAUDE_MODEL=claude-opus-5.
-// Optional: AI_PROVIDER ("gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, NEWS_PER_RUN (default 3). SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY
-// are provided by Supabase. Deploy with --no-verify-jwt: the cron call has no
-// user token, so this function checks the cron secret or the editor's token itself.
+// Optional: AI_PROVIDER ("rules" | "gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, NEWS_PER_RUN (default 3).
+// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase. NEWS_CRON_SECRET
+// is a password for the morning call, not an AI key. Deploy with --no-verify-jwt:
+// the cron call has no user token, so this function checks the cron secret or the editor's token itself.
+
+import { rankByRules, sourceCard } from "./rules.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
@@ -273,14 +277,19 @@ const NEWSROOM =
   "interest rates and inflation."
 
 /**
- * Which model writes the briefings. "gemini" uses Google's free tier (fine for
- * a demo: about 4 requests per run); "claude" is the paid, higher-quality
- * option. Without AI_PROVIDER, whichever key is set wins (Claude first).
+ * "rules" ranks feeds by keyword and files a source card. No model, no key.
+ * "gemini" and "claude" write a Mongolian draft. With no AI_PROVIDER, a key
+ * selects its model; with neither key, the run uses rules.
  */
-const PROVIDER: "claude" | "gemini" =
-  Deno.env.get("AI_PROVIDER") === "gemini" || (Deno.env.get("AI_PROVIDER") !== "claude" && !Deno.env.get("ANTHROPIC_API_KEY"))
-    ? "gemini"
-    : "claude"
+const PROVIDER: "claude" | "gemini" | "rules" = (() => {
+  const choice = Deno.env.get("AI_PROVIDER")
+  if (choice === "rules") return "rules"
+  if (choice === "claude") return "claude"
+  if (choice === "gemini") return "gemini"
+  if (Deno.env.get("ANTHROPIC_API_KEY")) return "claude"
+  if (Deno.env.get("GEMINI_API_KEY")) return "gemini"
+  return "rules"
+})()
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash"
 
 /** One structured JSON call; returns null when the model declines. Retries brief overloads (free tiers hit these often). */
@@ -460,6 +469,8 @@ interface Pick {
   item: FeedItem
   why: string
   priority: number
+  tags?: string[]
+  desk?: "mongolia" | "world"
 }
 
 /**
@@ -587,7 +598,7 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
   }
 
   const details: RunDetails = {
-    provider: PROVIDER === "gemini" ? `gemini · ${GEMINI_MODEL}` : `claude · ${MODEL}`,
+    provider: PROVIDER === "rules" ? "rules · эх сурвалж" : PROVIDER === "gemini" ? `gemini · ${GEMINI_MODEL}` : `claude · ${MODEL}`,
     feeds_ok: 0,
     feeds_total: FEEDS.length,
     feeds_failed: [],
@@ -621,34 +632,46 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     const { data: tagRows } = await db.from("tags").select("slug, label")
     const tags = (tagRows ?? []) as { slug: string; label: string }[]
     const tagSlugs = new Set(tags.map((tag) => tag.slug))
-    const picks = await rank(items, PER_RUN)
+    const picks: Pick[] =
+      PROVIDER === "rules"
+        ? rankByRules(items, PER_RUN, MIN_PRIORITY).map((pick) => ({
+            item: items[pick.index],
+            why: pick.why,
+            priority: pick.priority,
+            tags: pick.tags,
+            desk: pick.desk,
+          }))
+        : await rank(items, PER_RUN)
     details.picked = picks.map(({ item, priority }) => ({ title: item.title.slice(0, 140), source: item.source, priority }))
 
-    // Claude: all at once. Gemini's free tier: two at a time, to stay under its per-minute limit.
+    // Rules and Claude: all at once. Gemini's free tier: two at a time, to stay under its per-minute limit.
     const written = await settleInBatches(
       picks,
       PROVIDER === "gemini" ? 2 : picks.length,
-      async ({ item, why, priority }) => {
+      async ({ item, why, priority, tags: ruleTags, desk }) => {
         const page = await readArticle(item.link)
-        const briefing = await write(item, page.text, why, tags)
-        if (!briefing) return false
-        const slug = `${slugify(briefing.slug || item.title) || "medee"}-${Date.now().toString(36).slice(-4)}`
+        const briefing = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
+        if (PROVIDER !== "rules" && !briefing) return false
+        const card = PROVIDER === "rules" ? sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published }) : null
+        const slug = `${slugify(briefing?.slug || item.title) || "medee"}-${Date.now().toString(36).slice(-4)}`
         const coverUrl = await copyImage(db, page.image || item.image, slug)
         const { error } = await db.from("articles").insert({
           slug,
-          title: briefing.title.slice(0, 120),
-          dek: briefing.dek,
-          body: briefing.body_html.replace(ALLOWED_HTML, ""),
-          desk: briefing.desk === "mongolia" ? "mongolia" : "world",
-          tags: briefing.tags.filter((tag) => tagSlugs.has(tag)).slice(0, 5),
+          title: (card?.title || briefing!.title).slice(0, 120),
+          dek: card?.dek || briefing!.dek,
+          body: (card?.body || briefing!.body_html).replace(ALLOWED_HTML, ""),
+          desk: card ? desk || "world" : briefing!.desk === "mongolia" ? "mongolia" : "world",
+          tags: (card ? ruleTags ?? [] : briefing!.tags).filter((tag) => tagSlugs.has(tag)).slice(0, 5),
           cover_url: coverUrl,
-          cover_alt: coverUrl ? briefing.cover_alt : "",
+          cover_alt: coverUrl ? (card ? "Эх сурвалжийн зураг" : briefing!.cover_alt) : "",
           cover_credit: coverUrl ? `Зураг: ${item.source}` : "",
           sources: [{ label: `${item.source}: ${item.title}`, href: item.link }],
           source_url: item.link,
           bot_notes: [
-            `Агентын үнэлгээ: ${priority}/10 — ${why}`,
-            ...briefing.verify_notes.map((note) => note.trim()).filter(Boolean),
+            `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 — ${why}`,
+            ...(card
+              ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ. EZ-ийн дүгнэлтийг редактор нэмнэ.", "Нүүр зургийн эрхийг шалгана."]
+              : briefing!.verify_notes.map((note) => note.trim()).filter(Boolean)),
           ].join("\n"),
         })
         // 23505: the same story was added by a parallel run.
@@ -662,7 +685,7 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
         ? [`${picks[index].item.title.slice(0, 60)}: ${String(result.reason?.message ?? result.reason).slice(0, 160)}`]
         : result.value
           ? []
-          : [`${picks[index].item.title.slice(0, 60)}: загвар бичихээс татгалзсан`],
+          : [`${picks[index].item.title.slice(0, 60)}: ${PROVIDER === "rules" ? "хадгалж чадсангүй" : "загвар бичихээс татгалзсан"}`],
     )
     const error = details.failures.length ? `${details.failures.length}/${picks.length} бичиж чадсангүй: ${details.failures[0]}` : ""
     await finish({ scanned: fresh.length, created, error: error.slice(0, 300), details })
@@ -710,7 +733,7 @@ Deno.serve(async (request) => {
 
   if (PROVIDER === "claude" && !Deno.env.get("ANTHROPIC_API_KEY")) return json({ error: "ANTHROPIC_API_KEY тохируулаагүй байна (ADMIN.md)" }, 500)
   if (PROVIDER === "gemini" && !Deno.env.get("GEMINI_API_KEY")) {
-    return json({ error: "AI түлхүүр алга: GEMINI_API_KEY (үнэгүй) эсвэл ANTHROPIC_API_KEY тохируулна уу (ADMIN.md)" }, 500)
+    return json({ error: "GEMINI_API_KEY тохируулаагүй байна. Түлхүүргүй бол AI_PROVIDER=rules (ADMIN.md)" }, 500)
   }
 
   try {
