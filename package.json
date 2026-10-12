@@ -11,7 +11,8 @@
     "build:admin": "tsc -b && vite build --mode admin --outDir dist-admin",
     "lint": "oxlint",
     "preview": "vite preview",
-    "pull:substack": "python scripts/pull_substack.py"
+    "pull:substack": "python scripts/pull_substack.py",
+    "agent:dry-run": "npx --yes deno run --allow-net --allow-env --allow-read --allow-write --env-file=.env.local supabase/functions/news-agent/dry-run.ts"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

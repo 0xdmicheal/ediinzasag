@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-admin
+news-agent-report.html
 dist-ssr
 *.local
 supabase/.temp/

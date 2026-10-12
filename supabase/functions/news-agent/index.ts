@@ -31,14 +31,18 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
 const ANTHROPIC_BASE = (Deno.env.get("ANTHROPIC_BASE_URL") || "").replace(/\/$/, "")
 const ROUTER = /agentrouter\.org/i.test(ANTHROPIC_BASE)
 const MODEL = Deno.env.get("CLAUDE_MODEL") || (ROUTER ? "claude-opus-5" : "claude-opus-5-5")
-const PER_RUN = Math.max(1, Math.min(8, Number(Deno.env.get("NEWS_PER_RUN") ?? "3") || 3))
+export const PER_RUN = Math.max(1, Math.min(8, Number(Deno.env.get("NEWS_PER_RUN") ?? "3") || 3))
 const MAX_AGE_HOURS = 36
 const USER_AGENT = "Mozilla/5.0 (compatible; EZNewsAgent/1.0; +https://ediinzasag.mn)"
 /** Stories rated below this are only used to fill the daily quota when nothing better exists. */
-const MIN_PRIORITY = Math.max(1, Math.min(10, Number(Deno.env.get("NEWS_MIN_PRIORITY") ?? "5") || 5))
+export const MIN_PRIORITY = Math.max(1, Math.min(10, Number(Deno.env.get("NEWS_MIN_PRIORITY") ?? "5") || 5))
 
 const googleNews = (query: string) =>
   `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`
+
+/** Broad Google News searches stay on wire services and major business papers, not content farms. */
+const TRUSTED =
+  "(site:reuters.com OR site:apnews.com OR site:bloomberg.com OR site:ft.com OR site:cnbc.com OR site:wsj.com OR site:nikkei.com OR site:scmp.com OR site:bbc.com OR site:economist.com)"
 
 interface Feed {
   name: string
@@ -54,7 +58,7 @@ interface Feed {
 }
 
 /** Feeds the agent reads. Add or remove freely; a feed that fails is skipped and reported for that run. */
-const FEEDS: Feed[] = [
+export const FEEDS: Feed[] = [
   // Mongolia first: the stories readers can't get elsewhere in Mongolian.
   { name: "Google News", url: googleNews("Mongolia economy when:3d"), mongolia: true, maxAgeHours: 72 },
   { name: "Google News", url: googleNews('Mongolia (mining OR copper OR coal OR "Oyu Tolgoi" OR tugrik) when:3d'), mongolia: true, maxAgeHours: 72 },
@@ -65,7 +69,7 @@ const FEEDS: Feed[] = [
   { name: "Itoim.mn", url: "https://itoim.mn/rss.xml", mongolia: true, maxAgeHours: 72 },
   // Montsame's Mongolian site turns away server requests; its English edition comes through Google News.
   { name: "Google News", url: googleNews("site:montsame.mn when:2d"), mongolia: true, maxAgeHours: 72 },
-  { name: "Google News", url: googleNews("(China OR Russia) Mongolia when:3d"), mongolia: true, maxAgeHours: 72 },
+  { name: "Google News", url: googleNews(`(China OR Russia) Mongolia ${TRUSTED} when:3d`), mongolia: true, maxAgeHours: 72 },
   // Mongolian sites with no RSS: read the section page instead.
   { name: "Өнөөдөр", url: "https://unuudur.mn/as/economy", mongolia: true, articleLinks: /\/a\/\d+$/ },
   { name: "Medee.mn", url: "https://medee.mn/category/economy", mongolia: true, articleLinks: /\/p\/\d+$/ },
@@ -98,8 +102,8 @@ const FEEDS: Feed[] = [
   { name: "BBC", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
   { name: "The Guardian", url: "https://www.theguardian.com/technology/rss" },
   { name: "TechCrunch", url: "https://techcrunch.com/feed/" },
-  { name: "Google News", url: googleNews('(tariff OR "trade war" OR sanctions OR "export controls") when:1d') },
-  { name: "Google News", url: googleNews('(semiconductor OR "AI chips" OR Nvidia OR TSMC) when:1d') },
+  { name: "Google News", url: googleNews(`(tariff OR "trade war" OR sanctions OR "export controls") ${TRUSTED} when:1d`) },
+  { name: "Google News", url: googleNews(`(semiconductor OR "AI chips" OR Nvidia OR TSMC) ${TRUSTED} when:1d`) },
 ]
 
 /** How many of a section page's newest articles to open per run. */
@@ -242,7 +246,7 @@ async function readSection(feed: Feed): Promise<FeedItem[]> {
   return pages.flatMap((page) => (page.status === "fulfilled" && page.value.title ? [page.value] : []))
 }
 
-async function readFeeds() {
+export async function readFeeds() {
   const results = await Promise.allSettled(
     FEEDS.map(async (feed) => (feed.articleLinks ? readSection(feed) : parseFeed(await fetchText(feed.url, 10_000), feed))),
   )
@@ -274,7 +278,7 @@ async function readFeeds() {
 }
 
 /** The article page's main image (og:image) and readable paragraphs. */
-async function readArticle(url: string) {
+export async function readArticle(url: string) {
   try {
     const html = await fetchText(url, 12_000)
     const meta = metaTags(html)
@@ -346,7 +350,7 @@ const NEWSROOM =
  * "gemini" and "claude" write a Mongolian draft. With no AI_PROVIDER, a key
  * selects its model; with neither key, the run uses rules.
  */
-const PROVIDER: "claude" | "gemini" | "rules" = (() => {
+export const PROVIDER: "claude" | "gemini" | "rules" = (() => {
   const choice = Deno.env.get("AI_PROVIDER")
   if (choice === "rules") return "rules"
   if (choice === "claude") return "claude"
@@ -355,7 +359,7 @@ const PROVIDER: "claude" | "gemini" | "rules" = (() => {
   if (Deno.env.get("GEMINI_API_KEY")) return "gemini"
   return "rules"
 })()
-const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash"
+export const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash"
 
 /** One structured JSON call; returns null when the model declines. Retries brief overloads (free tiers hit these often). */
 async function ask<T>(system: string, prompt: string, schema: object, effort: "low" | "medium" | "high"): Promise<T | null> {
@@ -544,7 +548,7 @@ interface Pick {
  * stories when there are enough: strong ones (priority ≥ MIN_PRIORITY) first,
  * then the best of the rest, so the desk gets its daily briefings.
  */
-async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
+export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
   // Cap each source so busy feeds (iKon.mn, Nikkei) don't crowd out the rest.
   const capped = (list: FeedItem[], perSource: number) => {
     const counts = new Map<string, number>()
@@ -592,7 +596,7 @@ interface Briefing {
   verify_notes: string[]
 }
 
-function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[]) {
+export function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[]) {
   return ask<Briefing>(
     `${NEWSROOM}\n\nYou draft briefings in Mongolian (Cyrillic) from foreign reporting. A human editor will check every fact, ` +
       `add the newsroom's own analysis and decide whether to publish; your draft must make that easy and must never overstate.`,
@@ -775,7 +779,8 @@ async function settleInBatches<T, R>(list: T[], size: number, task: (value: T) =
 /* Entry point                                                         */
 /* ------------------------------------------------------------------ */
 
-Deno.serve(async (request) => {
+// NEWS_DRY_RUN: imported by dry-run.ts on a laptop, so no server.
+if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: CORS })
   if (request.method !== "POST") return json({ error: "POST only" }, 405)
 
