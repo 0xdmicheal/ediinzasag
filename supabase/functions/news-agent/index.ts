@@ -23,6 +23,9 @@
 // the cron call has no user token, so this function checks the cron secret or the editor's token itself.
 
 import { rankByRules, score, sourceCard } from "./rules.ts"
+import { EXEMPLARS, STYLE_CARD, STYLE_PAIRS } from "../_shared/style-card.ts"
+import { lintStyle } from "../_shared/style-lint.ts"
+import { termsFor } from "../_shared/termbase.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
@@ -326,7 +329,7 @@ const RANK_SCHEMA = {
 const BRIEFING_SCHEMA = {
   type: "object",
   properties: {
-    title: { type: "string", description: "Mongolian headline, 10-70 characters, calm and factual" },
+    title: { type: "string", description: "Mongolian headline, calm and factual, one object and one number when the story has one; no exclamation marks" },
     dek: { type: "string", description: "Mongolian one-sentence summary, 40-200 characters" },
     slug: { type: "string", description: "Short latin slug, lowercase words joined by hyphens" },
     body_html: { type: "string", description: "Mongolian article body as HTML using only <h2>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>" },
@@ -334,8 +337,22 @@ const BRIEFING_SCHEMA = {
     tags: { type: "array", items: { type: "string" } },
     cover_alt: { type: "string", description: "Mongolian description of the cover photo's likely subject, under 120 characters" },
     verify_notes: { type: "array", items: { type: "string" }, description: "Mongolian checklist for the human reviewer" },
+    claims: {
+      type: "array",
+      description: "Fact sheet: every figure, date and quote used in body_html, each traced to the source text",
+      items: {
+        type: "object",
+        properties: {
+          claim: { type: "string", description: "The claim in Mongolian, as written in the article" },
+          figure: { type: "string", description: "The exact figure with unit as the source gives it, or empty for a quote" },
+          source: { type: "string", description: "Who said or published it (institution, outlet, person)" },
+        },
+        required: ["claim", "figure", "source"],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ["title", "dek", "slug", "body_html", "desk", "tags", "cover_alt", "verify_notes"],
+  required: ["title", "dek", "slug", "body_html", "desk", "tags", "cover_alt", "verify_notes", "claims"],
   additionalProperties: false,
 }
 
@@ -594,29 +611,64 @@ interface Briefing {
   tags: string[]
   cover_alt: string
   verify_notes: string[]
+  claims?: { claim: string; figure: string; source: string }[]
 }
 
 export function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[]) {
+  const terms = termsFor(`${item.title} ${item.summary} ${text}`)
+  const termbase = terms.length
+    ? `Termbase (use these Mongolian forms):\n${terms.map((term) => `- ${term.en} → ${term.mn}${term.note ? ` (${term.note})` : ""}`).join("\n")}`
+    : ""
   return ask<Briefing>(
-    `${NEWSROOM}\n\nYou draft briefings in Mongolian (Cyrillic) from foreign reporting. A human editor will check every fact, ` +
-      `add the newsroom's own analysis and decide whether to publish; your draft must make that easy and must never overstate.`,
+    `${NEWSROOM}\n\nYou write briefings in Mongolian (Cyrillic) for ediinzasag.mn from foreign and Mongolian reporting. ` +
+      `A human editor checks every fact, adds the newsroom's own analysis and decides whether to publish; your draft must make that easy and must never overstate. ` +
+      `It must read as written by a Mongolian journalist, never as a translation or as generic AI prose.\n\n${STYLE_CARD}\n\n${STYLE_PAIRS}\n\n${EXEMPLARS}`,
     `Write a Mongolian briefing from this ${item.source} story.\n\n` +
-      `Rules:\n` +
-      `- If the source is already in Mongolian, rewrite it in your own words (never copy sentences); otherwise translate.\n` +
-      `- Condense faithfully. Use only facts present in the source text below; never invent numbers, quotes or dates.\n` +
-      `- Attribute: say what ${item.source} reported and who said what ("${item.source} мэдээлснээр…").\n` +
-      `- 250-450 words. Sections with <h2>: "Юу болов", "Яагаад чухал вэ", and "Монголд ямар хамаатай вэ" (careful, clearly hedged reasoning about possible effects on Mongolia; no new facts).\n` +
-      `- Calm headline: no "ШОК", "ЯАРАЛТАЙ", "ОДОО Л", no exclamation marks.\n` +
-      `- Do not write an opinion or conclusion section; the editor adds "EZ-ийн дүгнэлт" themselves.\n` +
+      `Structure (body_html, 250-450 words, <h2> headings in this order):\n` +
+      `- <h2>Юу болов</h2>: lead with the key figure, its unit and who reported it, wire style («${item.source}-ийн мэдээлснээр…» or the institution first). Then the context in one or two paragraphs.\n` +
+      `- <h2>Яагаад чухал вэ</h2>: open with the question a Mongolian reader would ask, answer it in one sentence, then walk the mechanism in plain steps («…вэ гэвэл энгийнээр ингэж ойлгоно»). Each number gets a yardstick. Say plainly where the evidence is one-sided.\n` +
+      `- <h2>Монголд ямар хамаатай вэ</h2>: a bridge sentence («Нэгэнт … ярьсных энийг Монголтой холбож харах хэрэгтэй.»), then careful, hedged reasoning about the tögrög, prices, exports or household costs. No new facts. End on one calm, complete sentence.\n` +
+      `Do not write an opinion or conclusion section; the editor adds "EZ-ийн дүгнэлт" themselves.\n\n` +
+      `Fields:\n` +
       `- tags: 1-4 slugs chosen only from this list: ${tags.map((tag) => `${tag.slug} (${tag.label})`).join(", ")}.\n` +
       `- desk: "mongolia" only if the story is mainly about Mongolia, otherwise "world".\n` +
-      `- verify_notes: 2-5 concrete things the editor should check against the original or Mongolian sources (figures, names, dates, local data to add).\n\n` +
+      `- claims: every figure, date and quote you used, traced to the source text. If a figure is not in the source text, do not use it.\n` +
+      `- verify_notes: 2-5 concrete things the editor should check (figures against the original, names and titles, a Mongolian primary source to add: Монголбанк, ҮСХ 1212.mn, Гаалийн Ерөнхий Газар, АМГТГ).\n\n` +
+      (termbase ? `${termbase}\n\n` : "") +
       `Why it was picked: ${why}\n` +
       `Headline: ${item.title}\nPublished: ${item.published ? new Date(item.published).toISOString() : "unknown"}\nURL: ${item.link}\n` +
       `Feed summary: ${item.summary}\n\nSource text:\n${text || "(Only the feed summary is available. Keep the briefing short and say in verify_notes that the full text must be read.)"}`,
     BRIEFING_SCHEMA,
     "high",
   )
+}
+
+/**
+ * After the model: apply the style book's mechanical fixes (dashes, иен, ОПЕК,
+ * month digits, «quotes»…), then list what is left for the editor, plus any
+ * number in the draft that the source text does not contain (style book L08).
+ */
+export function polish(briefing: Briefing, sourceText: string) {
+  let draft = { title: briefing.title, dek: briefing.dek, body: briefing.body_html, take: "" }
+  for (const hit of lintStyle(draft)) if (hit.fix) draft = hit.fix(draft)
+  const noDash = (value: string) => value.replace(/\s*[—–]\s*/g, ", ")
+  const notes = lintStyle(draft).map((hit) => `Хэв маяг (${hit.rule}): ${hit.message}`)
+  // Compare numbers without thousands separators: "35,000" and "35 000" both become "35000".
+  const flat = (text: string) => text.replace(/(\d)[,\s](?=\d{3}(?!\d))/g, "$1")
+  const source = flat(sourceText)
+  const numbers = flat(draft.body.replace(/<[^>]+>/g, " ")).match(/\d+(?:[.,]\d+)?/g) ?? []
+  // Small numbers (days, ordinals, "2 дахин") are too common to check usefully.
+  const unsourced = [...new Set(numbers)].filter((n) => Number(n.replace(",", ".")) > 31 && !source.includes(n) && !source.includes(n.replace(".", ",")))
+  if (unsourced.length) notes.push(`Эх сурвалжид олдоогүй тоо: ${unsourced.slice(0, 8).join(", ")}. Тооцоолсон бол «ойролцоогоор» гэж тэмдэглэнэ, эс бөгөөс хасна.`)
+  return {
+    ...briefing,
+    title: draft.title,
+    dek: draft.dek,
+    body_html: draft.body,
+    cover_alt: noDash(briefing.cover_alt),
+    verify_notes: briefing.verify_notes.map(noDash),
+    styleNotes: notes,
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -669,7 +721,8 @@ async function fileStory(
 ): Promise<string | null> {
   const { item, why, priority } = pick
   const page = await readArticle(item.link)
-  const briefing = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
+  const drafted = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
+  const briefing = drafted ? polish(drafted, `${item.title} ${item.summary} ${page.text}`) : null
   if (!briefing && PROVIDER !== "rules" && !cardIfNoDraft) return null
   const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published })
   const tagSlugs = new Set(tags.map((tag) => tag.slug))
@@ -690,10 +743,14 @@ async function fileStory(
       sources: [{ label: `${item.source}: ${item.title}`, href: item.link }],
       source_url: item.link,
       bot_notes: [
-        `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 — ${why}`,
+        `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 · ${why}`,
         ...(card
           ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ. EZ-ийн дүгнэлтийг редактор нэмнэ.", "Нүүр зургийн эрхийг шалгана."]
-          : briefing!.verify_notes.map((note) => note.trim()).filter(Boolean)),
+          : [
+              ...briefing!.verify_notes.map((note) => note.trim()).filter(Boolean),
+              ...briefing!.styleNotes,
+              ...(briefing!.claims ?? []).map((claim) => `Баримт: ${claim.claim}${claim.figure ? ` (${claim.figure})` : ""} · ${claim.source}`),
+            ]),
       ].join("\n"),
     })
     .select("id")

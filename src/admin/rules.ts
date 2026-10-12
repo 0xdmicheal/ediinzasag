@@ -106,8 +106,6 @@ export interface Check {
   required: boolean
 }
 
-const shouty = /(!{2,}|ШОК|ЯАРАЛТАЙ|ОДОО Л)/
-
 export const wordCount = countWords
 
 export function readMinutes(body: string) {
@@ -128,19 +126,13 @@ export function readiness(draft: ArticleDraft, origin: Origin = "human"): Check[
       : []
   return [
     ...agentChecks,
-    { id: "title", label: `Гарчиг 10–70 тэмдэгт (${titleLength})`, ok: titleLength >= 10 && titleLength <= 70, required: true },
+    { id: "title", label: "Гарчиг бичсэн", ok: titleLength > 0, required: true },
     { id: "dek", label: "Товч тайлбар бичсэн", ok: draft.dek.trim().length >= 30, required: true },
     { id: "body", label: `Үндсэн текст 120+ үг (${words})`, ok: words >= 120, required: true },
-    { id: "sources", label: "Тоо бүр эх сурвалжтай: 1+ эх сурвалж", ok: draft.sources.some((s) => s.label.trim()), required: true },
+    { id: "sources", label: "Эх сурвалж", ok: draft.sources.some((s) => s.label.trim()), required: false },
     { id: "tags", label: `1–5 шошго (${draft.tags.length})`, ok: draft.tags.length >= 1 && draft.tags.length <= 5, required: true },
     { id: "cover", label: "Нүүр зураг", ok: Boolean(draft.coverUrl), required: true },
-    { id: "cover-alt", label: "Нүүр зургийн тайлбар", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: false },
-    {
-      id: "calm",
-      label: "Айдас биш, ойлголт: ШОК, !!! байхгүй",
-      ok: !shouty.test(`${draft.title} ${draft.dek}`),
-      required: true,
-    },
+    { id: "cover-alt", label: "Нүүр зургийн тайлбар, эх сурвалж", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: false },
     { id: "headings", label: "2+ дэд гарчиг", ok: countHeadings(draft.body) >= 2, required: false },
     // House style (EZ Mongolian Writing Style Book): errors block publishing; details and fixes in the editor panel.
     ...(() => {

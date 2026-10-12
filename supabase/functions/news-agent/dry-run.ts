@@ -43,10 +43,13 @@ for (const pick of picks) {
   const page = await agent.readArticle(pick.item.link)
   if (agent.PROVIDER === "rules") {
     const card = sourceCard({ ...pick.item, excerpt: page.text })
-    cards.push({ pick, page, title: card.title, dek: card.dek, body: card.body, tags: pick.tags ?? [] })
+    cards.push({ pick, page, title: card.title, dek: card.dek, body: card.body, tags: pick.tags ?? [], notes: [] as string[] })
   } else {
-    const draft = await agent.write(pick.item, page.text, pick.why, TAGS)
-    cards.push({ pick, page, title: draft?.title ?? "(загвар бичсэнгүй)", dek: draft?.dek ?? "", body: draft?.body_html ?? "", tags: draft?.tags ?? [] })
+    const raw = await agent.write(pick.item, page.text, pick.why, TAGS)
+    // The same clean-up the live run applies before filing the card.
+    const draft = raw ? agent.polish(raw, `${pick.item.title} ${pick.item.summary} ${page.text}`) : null
+    const notes = draft ? [...draft.styleNotes, ...(draft.claims ?? []).map((c) => `Баримт: ${c.claim}${c.figure ? ` (${c.figure})` : ""} · ${c.source}`)] : []
+    cards.push({ pick, page, title: draft?.title ?? "(загвар бичсэнгүй)", dek: draft?.dek ?? "", body: draft?.body_html ?? "", tags: draft?.tags ?? [], notes })
   }
 }
 
@@ -65,13 +68,14 @@ Nothing was written to Supabase.</p>
 ${feeds.failed.length ? `<p class="meta">Failed sources: ${escape(feeds.failed.join(", "))}</p>` : ""}
 ${cards
   .map(
-    ({ pick, page, title, dek, body, tags }) => `<article>
+    ({ pick, page, title, dek, body, tags, notes }) => `<article>
   <div class="meta">${escape(pick.item.source)} · ${pick.priority}/10 · ${escape(pick.why)} · <a href="${escape(pick.item.link)}">эх сурвалж</a></div>
   <h2>${escape(title)}</h2>
   <p><i>${escape(dek)}</i></p>
   ${tags.map((tag: string) => `<span class="tag">${escape(tag)}</span>`).join("")}
   ${page.image || pick.item.image ? `<img src="${escape(page.image || pick.item.image)}" alt="">` : ""}
   <div>${body}</div>
+  ${notes.length ? `<ul class="meta">${notes.map((note: string) => `<li>${escape(note)}</li>`).join("")}</ul>` : ""}
 </article>`,
   )
   .join("")}
