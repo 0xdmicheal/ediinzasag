@@ -5,17 +5,7 @@ import { cn } from "cn"
 
 import { MarketDesk, WATCHLIST } from "@/components/site/MarketDesk"
 import { signedPct } from "@/components/site/market-marks"
-import {
-  ChangePill,
-  ExportMix,
-  IndexRanking,
-  parseNumber,
-  PerformanceChart,
-  StockExplorer,
-  ValueBars,
-  YieldCurve,
-  type PerformanceRow,
-} from "@/components/site/market-charts"
+import { parseNumber, YieldCurve } from "@/components/site/market-charts"
 import { formatMove, formatValue, money } from "@/components/site/money"
 import { friendlyName, glossary, plain, regions, unitHint } from "@/content/market-guide"
 import {
@@ -32,6 +22,7 @@ import {
   top20,
   usCurve,
   worldIndices,
+  type Quote,
 } from "@/content/markets"
 
 /*
@@ -72,26 +63,6 @@ const TILE_CHART: Record<string, string> = {
   copper: "OANDA:XCUUSD",
   gold: "OANDA:XAUUSD",
   brent: "TVC:UKOIL",
-}
-
-function Lead({ children }: { children: ReactNode }) {
-  return <p className="text-muted-foreground mt-1 max-w-2xl text-[14px] leading-relaxed">{children}</p>
-}
-
-/** A titled block inside a room: small heading, one-line lead, then content. */
-function Block({ id, title, lead, aside, children, className }: { id?: string; title: string; lead?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section id={id} className={cn("min-w-0 scroll-mt-20", className)}>
-      <header className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h3 className="text-[19px] leading-tight font-semibold tracking-tight sm:text-[22px]">{title}</h3>
-          {lead ? <Lead>{lead}</Lead> : null}
-        </div>
-        {aside}
-      </header>
-      {children}
-    </section>
-  )
 }
 
 function SourceLine({ children }: { children: ReactNode }) {
@@ -270,10 +241,31 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
 /* Монгол                                                              */
 /* ------------------------------------------------------------------ */
 
+/** Minimal type: a small label above a heading, hairlines instead of boxes. */
+function Head({ kicker, title, note }: { kicker?: string; title: string; note?: ReactNode }) {
+  return (
+    <header className="mb-4">
+      {kicker ? <p className="text-muted-foreground text-[11px] font-medium tracking-[0.14em] uppercase">{kicker}</p> : null}
+      <h3 className="mt-1 text-[18px] leading-tight font-semibold tracking-tight">{title}</h3>
+      {note ? <p className="text-muted-foreground mt-1 max-w-2xl text-[13px] leading-relaxed">{note}</p> : null}
+    </header>
+  )
+}
+
+/** "▲ 6.09%" in up/down colour, plain text (no pill). */
+function Move({ pct, className }: { pct: number; className?: string }) {
+  const flat = Math.abs(pct) < 0.005
+  return (
+    <span className={cn("font-medium whitespace-nowrap tabular-nums", flat ? "text-muted-foreground" : pct > 0 ? "text-[var(--up)]" : "text-[var(--down)]", className)}>
+      {flat ? "0.00%" : `${pct > 0 ? "▲" : "▼"} ${signedPct(pct).replace(/^[+-]/, "")}`}
+    </span>
+  )
+}
+
 function MongoliaRoom() {
   return (
-    <div className="flex flex-col gap-14">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)] [&>*]:min-w-0">
+    <div className="flex flex-col gap-16">
+      <div className="grid gap-12 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:gap-16 [&>*]:min-w-0">
         <Top20 />
         <Macro />
       </div>
@@ -293,55 +285,38 @@ function Top20() {
   const grown = Math.round((1_000_000 * (1 + year / 100)) / 100) * 100
 
   return (
-    <section id="top20" className="bg-card flex scroll-mt-20 flex-col rounded-xl border p-5 sm:p-7">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-[19px] font-semibold tracking-tight sm:text-[22px]">ТОП-20 индекс</h3>
-          <p className="text-muted-foreground text-[13px]">Монголын хамгийн том 20 компанийн хувьцааны дундаж</p>
-        </div>
-        <span className="text-muted-foreground font-mono text-[11px]">{top20.asOf}</span>
-      </div>
-
-      <p className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-2">
-        <span className="text-[2.6rem] leading-none font-semibold tracking-tight tabular-nums sm:text-6xl">{top20.price}</span>
+    <section id="top20" className="scroll-mt-20">
+      <Head kicker={`ТОП-20 индекс · ${top20.asOf}`} title="Монголын хамгийн том 20 компани" />
+      <p className="flex flex-wrap items-baseline gap-x-3">
+        <span className="text-[3.25rem] leading-none font-semibold tracking-tight tabular-nums sm:text-[4.25rem]">{top20.price}</span>
         <span className="text-muted-foreground text-sm">оноо</span>
-        <ChangePill pct={top20.pct} size="lg" />
       </p>
-
-      <dl className="mt-6 grid grid-cols-3 divide-x rounded-lg border">
+      <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-2 text-[14px]">
         {[
           ["Өнөөдөр", top20.pct],
           ["1 сард", month],
           ["1 жилд", year],
-        ].map(([label, pct]) => (
-          <div key={label as string} className="px-3 py-3 sm:px-4">
-            <dt className="text-muted-foreground text-[11px]">{label}</dt>
-            <dd className={cn("mt-0.5 text-[15px] font-semibold tabular-nums sm:text-lg", (pct as number) > 0 ? "text-[var(--up)]" : (pct as number) < 0 ? "text-[var(--down)]" : "")}>
-              {(pct as number) > 0 ? "▲ " : (pct as number) < 0 ? "▼ " : ""}
-              {signedPct(pct as number).replace(/^[+-]/, "")}
+        ].map(([name, pct]) => (
+          <div key={name as string} className="flex items-baseline gap-2">
+            <dt className="text-muted-foreground text-[12px]">{name}</dt>
+            <dd>
+              <Move pct={pct as number} />
             </dd>
           </div>
         ))}
       </dl>
-
-      <div className="mt-5">
-        <div className="flex justify-between text-[12px]">
-          <span className="text-muted-foreground">Түүхэн дээд цэгээс</span>
-          <span className="font-medium">{belowHigh.toFixed(2)}% доогуур</span>
+      <div className="mt-6">
+        <div className="bg-foreground/10 h-px">
+          <div className="bg-foreground h-[2px] -translate-y-px" style={{ width: `${100 - belowHigh}%` }} />
         </div>
-        <div className="bg-foreground/10 relative mt-2 h-2 rounded-full">
-          <div className="bg-brand h-full rounded-full" style={{ width: `${100 - belowHigh}%` }} />
-        </div>
-        <p className="text-muted-foreground mt-1.5 text-[11px]">
-          Дээд цэг {top20.high} оноо, {top20.highWhen}
+        <p className="text-muted-foreground mt-2 text-[12px]">
+          Түүхэн дээд цэг {top20.high} ({top20.highWhen}) хүрэхэд {belowHigh.toFixed(2)}% дутуу.
         </p>
       </div>
-
-      <p className="bg-muted/60 mt-5 rounded-lg p-4 text-[13.5px] leading-relaxed">
-        Нэг жилийн өмнө ТОП-20-д <strong>1,000,000₮</strong> хийсэн бол одоо ойролцоогоор <strong>{money(grown.toLocaleString("en-US"), "MNT")}</strong> болох байсан.
-        <span className="text-muted-foreground block text-[11px]">Жишээ. Шимтгэл, ногдол ашгийг тооцоогүй.</span>
+      <p className="text-muted-foreground mt-5 border-l-2 pl-3 text-[13px] leading-relaxed">
+        Нэг жилийн өмнө 1,000,000₮ хийсэн бол одоо ойролцоогоор <span className="text-foreground font-medium">{money(grown.toLocaleString("en-US"), "MNT")}</span> болох байсан (шимтгэл, ногдол
+        ашгийг тооцоогүй).
       </p>
-
       <SourceLine>
         <a href={top20.href}>{top20.source}</a>
       </SourceLine>
@@ -352,39 +327,26 @@ function Top20() {
 function Macro() {
   const { inflation, policyRate, reserves } = mongoliaMacro
   const real = policyRate.value - inflation.value
-  const share = Math.round((reserves.value / mongoliaMacro.reservesGoal) * 100)
-  const cells: { label: string; value: ReactNode; note: ReactNode; tone?: string }[] = [
-    { label: "Инфляц, жилээр", value: `${inflation.value}%`, note: <>Зорилт {mongoliaMacro.target} · <a href={inflation.href}>{inflation.source}</a></> },
-    { label: "Бодлогын хүү", value: `${policyRate.value}%`, note: <a href={policyRate.href}>{policyRate.source}, {policyRate.label}</a> },
+  const cells: { name: string; value: string; note: ReactNode; tone?: string }[] = [
+    { name: "Инфляц", value: `${inflation.value}%`, note: <>зорилт {mongoliaMacro.target} · <a href={inflation.href}>{inflation.source}</a></> },
+    { name: "Бодлогын хүү", value: `${policyRate.value}%`, note: <a href={policyRate.href}>{policyRate.source}, {policyRate.label}</a> },
     {
-      label: "Бодит хүү",
-      value: `${real < 0 ? "−" : "+"}${Math.abs(real).toFixed(1)} нэгж`,
+      name: "Бодит хүү",
+      value: `${real < 0 ? "−" : "+"}${Math.abs(real).toFixed(1)}`,
       tone: real < 0 ? "text-[var(--down)]" : "text-[var(--up)]",
-      note: real < 0 ? "Хүү инфляцаас доогуур: хадгаламж бодитоор үнэ цэнээ алдаж байна." : "Хүү инфляцаас дээгүүр: хадгаламж бодитоор өсөж байна.",
+      note: real < 0 ? "хүү инфляцаас доогуур" : "хүү инфляцаас дээгүүр",
     },
-    {
-      label: "Валютын нөөц",
-      value: `${reserves.value} тэрбум $`,
-      note: (
-        <>
-          <span className="bg-foreground/10 mb-1.5 block h-1.5 overflow-hidden rounded-full" aria-hidden>
-            <span className="bg-brand block h-full rounded-full" style={{ width: `${share}%` }} />
-          </span>
-          {mongoliaMacro.reservesGoal} тэрбумын зорилтын {share}% · <a href={reserves.href}>{reserves.source}</a>
-        </>
-      ),
-    },
+    { name: "Валютын нөөц", value: `$${reserves.value} тэрбум`, note: <>{mongoliaMacro.reservesGoal} тэрбумын зорилтын {Math.round((reserves.value / mongoliaMacro.reservesGoal) * 100)}% · <a href={reserves.href}>{reserves.source}</a></> },
   ]
   return (
-    <section id="macro" className="flex scroll-mt-20 flex-col">
-      <h3 className="text-[19px] font-semibold tracking-tight sm:text-[22px]">Макро</h3>
-      <Lead>Ханш, хувьцааны ард байгаа дөрвөн тоо.</Lead>
-      <dl className="mt-4 grid grid-cols-2 gap-3">
-        {cells.map((cell) => (
-          <div key={cell.label} className="bg-card flex flex-col rounded-xl border p-4 sm:p-5">
-            <dt className="text-muted-foreground text-[12px]">{cell.label}</dt>
-            <dd className={cn("mt-1 text-[22px] font-semibold tracking-tight tabular-nums sm:text-[28px]", cell.tone)}>{cell.value}</dd>
-            <dd className="text-muted-foreground mt-2 text-[11px] leading-snug [&_a]:underline">{cell.note}</dd>
+    <section id="macro" className="scroll-mt-20">
+      <Head kicker="Макро" title="Ханшийн ард байгаа дөрвөн тоо" />
+      <dl className="grid grid-cols-2 border-t">
+        {cells.map((cell, index) => (
+          <div key={cell.name} className={cn("border-b py-4", index % 2 === 0 ? "pr-4" : "border-l pl-4")}>
+            <dt className="text-muted-foreground text-[12px]">{cell.name}</dt>
+            <dd className={cn("mt-1 text-[26px] leading-none font-semibold tracking-tight tabular-nums sm:text-[32px]", cell.tone)}>{cell.value}</dd>
+            <dd className="text-muted-foreground mt-2 text-[11px] [&_a]:underline">{cell.note}</dd>
           </div>
         ))}
       </dl>
@@ -392,82 +354,122 @@ function Macro() {
   )
 }
 
+const MIX_COLORS = ["bg-foreground", "bg-foreground/60", "bg-foreground/30", "bg-foreground/15"]
+
 function Exports() {
-  const usdMnt = quote("mnt")
   const coreShare = Math.round(((exportMix.parts[0].value + exportMix.parts[1].value) / exportMix.total) * 100)
   return (
-    <Block
-      id="exports"
-      title="Экспорт юунаас бүрдэв"
-      lead={`${exportMix.label}: нийт ${exportMix.total} тэрбум $, жилээр ▲ ${exportMix.growth}%. Зэс, нүүрс хоёр л ${coreShare}%.`}
-    >
-      <div className="bg-card rounded-xl border p-5 sm:p-6">
-        <ExportMix parts={exportMix.parts} total={exportMix.total} />
-        <SourceLine>
-          Тиймээс зэс, нүүрсний үнэ валютын нөөц, төсөвт шууд нөлөөлнө.{usdMnt ? ` Төгрөг ам.доллартай ${usdMnt.price} (${usdMnt.asOf}).` : ""} Эх сурвалж:{" "}
-          <a href={exportMix.href}>{exportMix.source}</a> · <Link to="/story/reserves-record-september">Нөөцийн тойм</Link>
-        </SourceLine>
+    <section id="exports" className="scroll-mt-20">
+      <Head kicker={`Экспорт · ${exportMix.label}`} title={`$${exportMix.total} тэрбум, жилээр ▲ ${exportMix.growth}%. Зэс, нүүрс хоёр л ${coreShare}%.`} />
+      <div className="flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+        {exportMix.parts.map((part, index) => (
+          <span key={part.key} className={MIX_COLORS[index]} style={{ width: `${(part.value / exportMix.total) * 100}%` }} />
+        ))}
       </div>
-    </Block>
+      <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+        {exportMix.parts.map((part, index) => (
+          <div key={part.key}>
+            <dt className="text-muted-foreground flex items-center gap-2 text-[12px]">
+              <span className={cn("size-2 rounded-full", MIX_COLORS[index])} />
+              {part.label}
+            </dt>
+            <dd className="mt-1 text-[15px] font-semibold tabular-nums">
+              ${part.value} тэрбум
+              <span className="text-muted-foreground ml-2 text-[12px] font-normal">
+                {Math.round((part.value / exportMix.total) * 100)}%{part.growth !== undefined ? ` · ▲ ${part.growth}%` : ""}
+              </span>
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <SourceLine>
+        <a href={exportMix.href}>{exportMix.source}</a> · <Link to="/story/reserves-record-september">Нөөцийн тойм</Link>
+      </SourceLine>
+    </section>
   )
 }
 
 function Exchange() {
-  const stat = (label: string) => sessionStats.find((item) => item.label === label)?.value ?? ""
+  const stat = (name: string) => sessionStats.find((item) => item.label === name)?.value ?? ""
   const cap = mongoliaIndices.find((item) => item.id === "cap")
   const otherIndices = mongoliaIndices.filter((item) => item.denom.kind === "index")
+  const stocks = [...fridayCloses].sort((a, b) => b.pct - a.pct)
+  const maxFlow = Math.max(...fridayFlow.map((row) => parseNumber(row.value)))
   return (
-    <Block
-      id="exchange"
-      title="Монголын хөрөнгийн бирж"
-      lead={
-        <>
-          Хувьцаа, арилжааны дүн нь <a className="underline" href={top20.reportHref}>{top20.reportLabel}</a>. Биржийн шинэ тайлан уншигдахуйц хэлбэрээр гараагүй байна.
-        </>
-      }
-    >
-      <dl className="bg-card mb-4 grid grid-cols-2 divide-y rounded-xl border sm:grid-cols-4 sm:divide-x sm:divide-y-0 [&>*:nth-child(odd)]:border-r sm:[&>*:nth-child(odd)]:border-r-0">
+    <section id="exchange" className="scroll-mt-20">
+      <Head
+        kicker="Монголын хөрөнгийн бирж"
+        title="Хувьцаа, арилжаа"
+        note={
+          <>
+            <a className="underline" href={top20.reportHref}>{top20.reportLabel}</a>. Биржийн шинэ тайлан уншигдахуйц хэлбэрээр гараагүй байна.
+          </>
+        }
+      />
+      <dl className="mb-8 flex flex-wrap gap-x-10 gap-y-3 border-y py-4">
         {[
           ["Арилжааны дүн", stat("Үнийн дүн")],
           ["Хэлцэл", stat("Хэлцэл")],
           ["Арилжсан компани", stat("Үнэт цаас")],
           ["Биржийн үнэлгээ", cap ? formatValue(cap.price, cap.denom) : ""],
-        ].map(([label, figure]) => (
-          <div key={label} className="px-4 py-3 sm:px-5 sm:py-4">
-            <dt className="text-muted-foreground text-[12px]">{label}</dt>
-            <dd className="mt-0.5 text-[17px] font-semibold tracking-tight tabular-nums sm:text-xl">{figure}</dd>
+          ...otherIndices.map((item) => [/индекс/i.test(item.label) ? item.label : `${item.label} индекс`, item.price, item.pct] as const),
+        ].map(([name, value, pct]) => (
+          <div key={name as string}>
+            <dt className="text-muted-foreground text-[12px]">{name}</dt>
+            <dd className="mt-0.5 flex items-baseline gap-2 text-[17px] font-semibold tabular-nums">
+              {value}
+              {typeof pct === "number" ? <Move pct={pct} className="text-[12px]" /> : null}
+            </dd>
           </div>
         ))}
       </dl>
 
-      <StockExplorer rows={fridayCloses} reportHref={top20.reportHref} />
+      <div className="grid gap-12 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] [&>*]:min-w-0">
+        <table className="w-full text-[14px]">
+          <caption className="text-muted-foreground mb-2 text-left text-[12px]">Хаалтын үнэ, өөрчлөлтөөр эрэмбэлэв</caption>
+          <thead>
+            <tr className="text-muted-foreground border-b text-left text-[11px]">
+              <th className="py-2 font-medium">Компани</th>
+              <th className="py-2 text-right font-medium">Хаалт</th>
+              <th className="py-2 text-right font-medium">Өөрчлөлт</th>
+              <th className="hidden py-2 text-right font-medium sm:table-cell">Ширхэг</th>
+            </tr>
+          </thead>
+          <tbody>
+            {stocks.map((row) => (
+              <tr key={row.symbol} id={row.symbol.toLowerCase()} className="target:bg-muted scroll-mt-24 border-b">
+                <td className="py-2.5">
+                  {row.name} <span className="text-muted-foreground ml-1 font-mono text-[11px]">{row.symbol}</span>
+                </td>
+                <td className="py-2.5 text-right tabular-nums">{money(row.price, row.currency)}</td>
+                <td className="py-2.5 text-right">
+                  <Move pct={row.pct} />
+                </td>
+                <td className="text-muted-foreground hidden py-2.5 text-right tabular-nums sm:table-cell">{row.volume}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
-        <div className="bg-card rounded-xl border p-5 sm:p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h4 className="font-semibold">Хамгийн их арилжаалагдсан</h4>
-            <p className="text-muted-foreground text-xs">Нэг өдөрт гар солисон дүн</p>
-          </div>
-          <div className="mt-4">
-            <ValueBars rows={fridayFlow.map((row) => ({ key: row.symbol, name: row.name, value: row.value, weight: parseNumber(row.value) }))} />
-          </div>
+        <div>
+          <p className="text-muted-foreground mb-2 text-[12px]">Хамгийн их арилжаалагдсан (гар солисон дүн)</p>
+          <ol className="border-t">
+            {fridayFlow.map((row) => (
+              <li key={row.symbol} className="border-b py-2.5">
+                <div className="flex items-baseline justify-between gap-3 text-[14px]">
+                  <span className="truncate">{row.name}</span>
+                  <span className="shrink-0 tabular-nums">{row.value}</span>
+                </div>
+                <div className="bg-foreground/[0.06] mt-1.5 h-[3px] rounded-full">
+                  <div className="bg-foreground/70 h-full rounded-full" style={{ width: `${(parseNumber(row.value) / maxFlow) * 100}%` }} />
+                </div>
+              </li>
+            ))}
+          </ol>
           <SourceLine>Хаан банк, Худалдаа хөгжлийн банк, Ард санхүүгийн нэгдлийн хаалтын үнэ энэ өдрийн тайланд байхгүй.</SourceLine>
         </div>
-        <ul className="bg-card divide-y self-start rounded-xl border">
-          {otherIndices.map((item) => (
-            <li key={item.id} id={item.id} className="target:bg-muted flex scroll-mt-20 items-center justify-between gap-3 px-5 py-4">
-              <span>
-                <span className="text-muted-foreground block text-[12px]">{/индекс/i.test(item.label) ? item.label : `${item.label} индекс`}</span>
-                <span className="mt-0.5 block text-lg font-semibold tabular-nums">
-                  {item.price} <span className="text-muted-foreground font-sans text-xs font-normal">оноо</span>
-                </span>
-              </span>
-              <ChangePill pct={item.pct} />
-            </li>
-          ))}
-        </ul>
       </div>
-    </Block>
+    </section>
   )
 }
 
@@ -480,127 +482,170 @@ const sinceOf = (item: { price: string; prev?: string }) =>
 
 function WorldRoom() {
   return (
-    <div className="flex flex-col gap-14">
-      <Performance />
-      <div className="grid gap-14 xl:grid-cols-2 xl:gap-8 [&>*]:min-w-0">
-        <Block
-          id="indices"
-          title="Хувьцааны индекс"
-          lead="Сүүлийн өдрийн өөрчлөлтөөр эрэмбэлэв."
-        >
-          <IndexRanking quotes={worldIndices} describe={(id) => plain[id] ?? ""} region={regionOf} />
+    <div className="flex flex-col gap-16">
+      <Movers />
+      <div className="grid gap-16 xl:grid-cols-2 xl:gap-12 [&>*]:min-w-0">
+        <section id="indices" className="scroll-mt-20">
+          <Head kicker="Хувьцааны индекс" title="Дэлхийн гол биржүүд" />
+          <QuoteTable items={[...worldIndices].sort((a, b) => b.pct - a.pct)} />
           <SourceLine>
-            АНУ, Европ, Япон, Шанхай: 10.08-ны хаалт. Hang Seng: 10.09. <Link to="/story/wall-street-chip-selloff">Чип үйлдвэрлэгчдийн уналтын тойм</Link>
+            АНУ, Европ, Япон, Шанхай: 10.08-ны хаалт, Hang Seng: 10.09 · <Link to="/story/wall-street-chip-selloff">Чип үйлдвэрлэгчдийн уналтын тойм</Link>
           </SourceLine>
-        </Block>
-        <Block id="commodities" title="Түүхий эд" lead="Монголын экспортын орлого, шатахууны үнэ эндээс хамаарна. Бүгд ам.доллараар.">
-          <QuoteBoard ids={["copper", "coal", "gold", "brent", "wti"]} />
+        </section>
+        <section id="commodities" className="scroll-mt-20">
+          <Head kicker="Түүхий эд" title="Экспорт, шатахууны үнэ эндээс хамаарна" />
+          <QuoteTable items={["copper", "coal", "gold", "brent", "wti"].map((id) => quote(id)!)} />
           <SourceLine>
             Зэсийн компаниуд (10.02):{" "}
             {miners.map((row, index) => (
               <span key={row.symbol}>
-                {index > 0 ? " · " : ""}
-                {row.name} {money(row.price, row.currency)}{" "}
-                <span className={row.pct >= 0 ? "text-[var(--up)]" : "text-[var(--down)]"}>
-                  {row.pct >= 0 ? "▲" : "▼"} {row.move.replace(/^[+-]/, "")}
-                </span>
+                {index > 0 ? ", " : ""}
+                {row.name} {money(row.price, row.currency)} <Move pct={row.pct} />
               </span>
             ))}
             . Тойм: <Link to="/story/copper-weekly-gain">зэс</Link>, <Link to="/story/brent-hormuz-october">нефть</Link>, <Link to="/story/gold-yields-ease">алт</Link>.
           </SourceLine>
-        </Block>
+        </section>
       </div>
       <Currency />
     </div>
   )
 }
 
-function Performance() {
+type Period = "since" | "ytd" | "year"
+
+/** Every market, one measure, sorted: a quiet list instead of a heatmap. */
+function Movers() {
+  const [period, setPeriod] = useState<Period>("since")
   const groupOf = (id: string) =>
     commodities.some((item) => item.id === id) ? "Түүхий эд" : fx.some((item) => item.id === id) ? "Валют" : regionOf(id) || "Индекс"
-  const rows: PerformanceRow[] = [
-    { id: "top20", label: "ТОП-20", group: "Монгол", since: sinceOf(top20), year: parseNumber(top20.year), detail: `10.02: ${top20.prev} → ${top20.price}` },
+  const rows = [
+    { id: "top20", label: "ТОП-20", group: "Монгол", since: sinceOf(top20), ytd: undefined as number | undefined, year: parseNumber(top20.year) as number | undefined },
     ...allQuotes
       .filter((item) => item.denom.kind !== "percent")
-      .map((item) => ({
-        id: item.id,
-        label: friendlyName[item.id] ?? item.label,
-        group: groupOf(item.id),
-        since: sinceOf(item),
-        ytd: item.ytd,
-        year: item.year,
-        detail: item.prev ? `10.02: ${item.prev} → ${item.price}` : undefined,
-      })),
+      .map((item) => ({ id: item.id, label: friendlyName[item.id] ?? item.label, group: groupOf(item.id), since: sinceOf(item), ytd: item.ytd, year: item.year })),
+  ]
+    .map((row) => ({ ...row, value: period === "since" ? row.since : period === "ytd" ? (row.ytd ?? row.year) : (row.year ?? row.ytd) }))
+    .filter((row): row is typeof row & { value: number } => row.value !== undefined)
+    .sort((a, b) => b.value - a.value)
+  const max = Math.max(...rows.map((row) => Math.abs(row.value)))
+  const periods: [Period, string][] = [
+    ["since", "10.02-оос хойш"],
+    ["ytd", "Оны эхнээс"],
+    ["year", "12 сард"],
   ]
   return (
-    <Block id="performance" title="Бүх зах зээл нэг дор" lead="Хугацаагаа сонгоод аль нь өсөж, аль нь унасныг нэг харцаар. Валютын өсөлт нь ам.доллар чангарсныг илтгэнэ.">
-      <PerformanceChart rows={rows} />
-    </Block>
+    <section id="performance" className="scroll-mt-20">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+        <Head kicker="Бүх зах зээл нэг дор" title="Юу өсөж, юу унав" />
+        <div className="mb-4 flex gap-4 text-[13px]">
+          {periods.map(([key, text]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={period === key}
+              onClick={() => setPeriod(key)}
+              className={cn("border-b-2 pb-1 transition-colors", period === key ? "border-foreground font-medium" : "text-muted-foreground hover:text-foreground border-transparent")}
+            >
+              {text}
+            </button>
+          ))}
+        </div>
+      </div>
+      <ul className="gap-x-12 border-t md:columns-2">
+        {rows.map((row) => (
+          <li key={row.id} className="grid break-inside-avoid grid-cols-[minmax(0,1fr)_5rem_4.5rem] items-center gap-3 border-b py-2.5 text-[14px]">
+            <span className="min-w-0 truncate">
+              {row.label} <span className="text-muted-foreground ml-1 text-[11px]">{row.group}</span>
+            </span>
+            <span className="bg-foreground/[0.06] relative h-[3px] rounded-full" aria-hidden>
+              <span
+                className={cn("absolute inset-y-0 rounded-full", row.value >= 0 ? "left-1/2 bg-[var(--up)]" : "right-1/2 bg-[var(--down)]")}
+                style={{ width: `${(Math.abs(row.value) / max) * 50}%` }}
+              />
+            </span>
+            <Move pct={row.value} className="text-right text-[13px]" />
+          </li>
+        ))}
+      </ul>
+      <SourceLine>Валютын өсөлт нь ам.доллар (эсвэл евро) чангарсныг илтгэнэ. Оны эхний өөрчлөлт байхгүй бол 12 сарынхыг харуулав.</SourceLine>
+    </section>
   )
 }
 
-/** Compact rows: name and what it is, price with its unit, the day's move, date and source. */
-function QuoteBoard({ ids }: { ids: string[] }) {
+/** Name and what it is, price with unit, the day's move. Sources collected under the table. */
+function QuoteTable({ items }: { items: (Quote | undefined)[] }) {
+  const rows = items.filter((item): item is Quote => Boolean(item))
+  const sources = [...new Map(rows.map((item) => [item.source, item.href])).entries()]
   return (
-    <ul className="bg-card divide-y rounded-xl border">
-      {ids.map((id) => {
-        const item = quote(id)
-        if (!item) return null
-        const per = item.denom.kind === "money" ? item.denom.per : undefined
-        const hint = per ? unitHint[per] : undefined
-        const flatNote = item.pct === 0 && (!/\d/.test(item.move) || item.denom.kind === "percent") ? item.move : ""
-        return (
-          <li key={id} id={id} className="target:bg-muted grid scroll-mt-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5">
-            <div className="min-w-0">
-              <p className="truncate text-[15px] font-semibold">{friendlyName[id] ?? item.label}</p>
-              <p className="text-muted-foreground truncate text-[12px]">{plain[id]}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[17px] font-semibold tracking-tight whitespace-nowrap tabular-nums sm:text-[19px]">
-                {formatValue(item.price, item.denom)}
-                {per ? <span className="text-muted-foreground ml-1 font-sans text-[11px] font-normal">/ {per}</span> : null}
-              </p>
-              <p className="mt-0.5 flex items-center justify-end gap-2">
-                {/\d/.test(item.move) && !item.move.endsWith("%") && item.pct !== 0 ? (
-                  <span className="text-muted-foreground font-mono text-[11px] tabular-nums">{formatMove(item.move, item.denom)}</span>
-                ) : null}
-                {flatNote ? <span className="text-muted-foreground text-[11px]">{flatNote}</span> : <ChangePill pct={item.pct} />}
-              </p>
-            </div>
-            <p className="text-muted-foreground col-span-2 text-[10.5px]">
-              {hint ? `${hint} · ` : ""}
-              {item.asOf} · {item.href ? <a className="underline" href={item.href}>{item.source}</a> : item.source}
-            </p>
-          </li>
-        )
-      })}
-    </ul>
+    <>
+      <ul className="border-t">
+        {rows.map((item) => {
+          const per = item.denom.kind === "money" ? item.denom.per : undefined
+          const flatNote = item.pct === 0 ? (!/\d/.test(item.move) || item.denom.kind === "percent" ? item.move : "Өөрчлөлтгүй") : ""
+          return (
+            <li key={item.id} id={item.id} className="target:bg-muted grid scroll-mt-24 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b py-3">
+              <span className="min-w-0">
+                <span className="block text-[14.5px] font-medium">{friendlyName[item.id] ?? item.label}</span>
+                <span className="text-muted-foreground block truncate text-[12px]">
+                  {plain[item.id]}
+                  {per && unitHint[per] ? ` · ${unitHint[per]}` : ""}
+                </span>
+              </span>
+              <span className="text-right">
+                <span className="block text-[15px] font-semibold whitespace-nowrap tabular-nums">
+                  {formatValue(item.price, item.denom)}
+                  {per ? <span className="text-muted-foreground ml-1 text-[11px] font-normal">/ {per}</span> : null}
+                </span>
+                {flatNote ? (
+                  <span className="text-muted-foreground block text-[12px]">{flatNote}</span>
+                ) : (
+                  <span className="block text-[12.5px]">
+                    {/\d/.test(item.move) && !item.move.endsWith("%") ? <span className="text-muted-foreground mr-2 tabular-nums">{formatMove(item.move, item.denom)}</span> : null}
+                    <Move pct={item.pct} />
+                  </span>
+                )}
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+      <SourceLine>
+        {rows[0]?.asOf} ·{" "}
+        {sources.map(([name, href], index) => (
+          <span key={name}>
+            {index > 0 ? ", " : ""}
+            {href ? <a href={href}>{name}</a> : name}
+          </span>
+        ))}
+      </SourceLine>
+    </>
   )
 }
 
 function Currency() {
   return (
-    <Block id="currency" title="Валют ба хүү" lead="Төгрөг, гол валютын ханш ба дэлхийн зээлийн хүүний жишиг.">
-      <div className="grid gap-4 xl:grid-cols-2 [&>*]:min-w-0">
-        <QuoteBoard ids={fx.map((item) => item.id)} />
-        <div className="bg-card rounded-xl border p-5 sm:p-6">
-          <h4 className="font-semibold">АНУ-ын бондын өгөөжийн муруй</h4>
-          <p className="text-muted-foreground text-xs">Хугацаагаар · {usCurve.asOf}</p>
-          <div className="mt-4 max-w-[520px]">
+    <section id="currency" className="scroll-mt-20">
+      <Head kicker="Валют ба хүү" title="Төгрөг, гол валют, дэлхийн зээлийн хүү" />
+      <div className="grid gap-12 xl:grid-cols-2 [&>*]:min-w-0">
+        <div>
+          <QuoteTable items={fx} />
+        </div>
+        <div>
+          <p className="text-muted-foreground mb-2 text-[12px]">АНУ-ын бондын өгөөжийн муруй · {usCurve.asOf}</p>
+          <div className="max-w-[520px]">
             <YieldCurve points={usCurve.points} />
           </div>
-          <p className="mt-4 text-[13.5px] leading-relaxed">
-            30 жилийн зээл 2 жилийнхээс <strong className="tabular-nums">{(usCurve.points[2].yield - usCurve.points[0].yield).toFixed(2)} нэгжээр</strong> үнэтэй. Хөрөнгө
-            оруулагчид инфляц, төсвийн алдагдлын эрсдэлд нэмэлт хүү шаардаж байна. 10 жилийн өгөөж 10.08-нд {usCurve.high10}% хүрч, 2002 оноос хойших дээд түвшинд гарсан.
-            Монголын гадаад зээлийн хүү энэ өгөөж дээр эрсдэлийн нэмэгдэл нэмж тогтдог.
+          <p className="mt-4 text-[14px] leading-relaxed">
+            30 жилийн зээл 2 жилийнхээс <strong className="tabular-nums">{(usCurve.points[2].yield - usCurve.points[0].yield).toFixed(2)} нэгжээр</strong> үнэтэй. 10 жилийн
+            өгөөж 10.08-нд {usCurve.high10}% хүрч, 2002 оноос хойших дээд түвшинд гарсан. Монголын гадаад зээлийн хүү энэ өгөөж дээр эрсдэлийн нэмэгдэл нэмж тогтдог.
           </p>
           <SourceLine>
-            <a href={usCurve.href}>{usCurve.source}</a> · Японы 10 жилийн өгөөж {usCurve.japan10.yield}% ·{" "}
-            <Link to="/story/treasury-yields-24-year-high">АНУ-ын өгөөжийн тойм</Link>
+            <a href={usCurve.href}>{usCurve.source}</a> · Японы 10 жилийн өгөөж {usCurve.japan10.yield}% · <Link to="/story/treasury-yields-24-year-high">АНУ-ын өгөөжийн тойм</Link>
           </SourceLine>
         </div>
       </div>
-    </Block>
+    </section>
   )
 }
 

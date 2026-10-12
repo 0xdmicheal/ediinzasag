@@ -147,21 +147,57 @@ function stockChart(item: EarningsEvent): ChartPick | null {
 const all = [...worldIndices, ...commodities, ...fx]
 const q = (id: string) => all.find((item) => item.id === id)
 
-/** The watchlist: what Mongolian readers follow, then the big indices and rates. */
-export const WATCHLIST: ChartPick[] = [
-  { label: "Зэс", symbol: "OANDA:XCUUSD", code: "XCUUSD", quote: q("copper") },
-  { label: "Алт", symbol: "OANDA:XAUUSD", code: "XAUUSD", quote: q("gold") },
-  { label: "Брент", symbol: "TVC:UKOIL", code: "UKOIL", quote: q("brent") },
-  { label: "Ам.доллар/төгрөг", symbol: "FX_IDC:USDMNT", code: "USDMNT", quote: q("mnt") },
-  { label: "Ам.доллар/юань", symbol: "FX_IDC:USDCNY", code: "USDCNY", quote: q("cny") },
-  { label: "S&P 500", symbol: "CAPITALCOM:US500", code: "US500", quote: q("spx") },
-  { label: "Nasdaq 100", symbol: "CAPITALCOM:US100", code: "US100" },
-  { label: "Nikkei", symbol: "CAPITALCOM:J225", code: "J225", quote: q("nikkei") },
-  { label: "Hang Seng", symbol: "CAPITALCOM:HK50", code: "HK50", quote: q("hsi") },
-  { label: "Долларын индекс", symbol: "CAPITALCOM:DXY", code: "DXY" },
-  { label: "Евро/ам.доллар", symbol: "FX:EURUSD", code: "EURUSD", quote: q("eur") },
-  { label: "АНУ 10 жил", symbol: "FRED:DGS10", code: "DGS10", quote: q("ust") },
+/** Everything the chart can switch to, in groups (each symbol checked to render in the free widget). */
+const GROUPS: { id: string; title: string; items: ChartPick[] }[] = [
+  {
+    id: "mongolia",
+    title: "Монголд хамаатай",
+    items: [
+      { label: "Зэс", symbol: "OANDA:XCUUSD", code: "XCUUSD", quote: q("copper") },
+      { label: "Алт", symbol: "OANDA:XAUUSD", code: "XAUUSD", quote: q("gold") },
+      { label: "Мөнгө", symbol: "OANDA:XAGUSD", code: "XAGUSD" },
+      { label: "Брент", symbol: "TVC:UKOIL", code: "UKOIL", quote: q("brent") },
+      { label: "WTI", symbol: "TVC:USOIL", code: "USOIL", quote: q("wti") },
+      { label: "Ам.доллар/төгрөг", symbol: "FX_IDC:USDMNT", code: "USDMNT", quote: q("mnt") },
+      { label: "Ам.доллар/юань", symbol: "FX_IDC:USDCNY", code: "USDCNY", quote: q("cny") },
+      { label: "Ам.доллар/рубль", symbol: "FX_IDC:USDRUB", code: "USDRUB" },
+    ],
+  },
+  {
+    id: "fx",
+    title: "Валют, хүү",
+    items: [
+      CURRENCY_CHART.USD,
+      { ...CURRENCY_CHART.EUR, quote: q("eur") },
+      CURRENCY_CHART.GBP,
+      { ...CURRENCY_CHART.JPY, quote: q("jpy") },
+      CURRENCY_CHART.CHF,
+      CURRENCY_CHART.CAD,
+      CURRENCY_CHART.AUD,
+      CURRENCY_CHART.NZD,
+      { label: "Ам.доллар/вон", symbol: "FX_IDC:USDKRW", code: "USDKRW" },
+      { label: "АНУ 10 жилийн өгөөж", symbol: "FRED:DGS10", code: "DGS10", quote: q("ust") },
+    ],
+  },
+  {
+    id: "indices",
+    title: "Индекс",
+    items: [
+      { label: "S&P 500", symbol: "CAPITALCOM:US500", code: "US500", quote: q("spx") },
+      { label: "Nasdaq 100", symbol: "CAPITALCOM:US100", code: "US100" },
+      { label: "Dow", symbol: "CAPITALCOM:US30", code: "US30", quote: q("dow") },
+      { label: "Euro Stoxx 50", symbol: "CAPITALCOM:EU50", code: "EU50" },
+      { label: "DAX", symbol: "XETR:DAX", code: "DAX", quote: q("dax") },
+      { label: "FTSE 100", symbol: "CAPITALCOM:UK100", code: "UK100", quote: q("ftse") },
+      { label: "Nikkei", symbol: "CAPITALCOM:J225", code: "J225", quote: q("nikkei") },
+      { label: "Hang Seng", symbol: "CAPITALCOM:HK50", code: "HK50", quote: q("hsi") },
+      { label: "Шанхай", symbol: "SSE:000001", code: "000001", quote: q("shanghai") },
+    ],
+  },
 ]
+
+/** Flat list, for the page's "today" tiles. */
+export const WATCHLIST: ChartPick[] = GROUPS.flatMap((group) => group.items)
 
 /* ------------------------------------------------------------------ */
 /* Items on the timeline                                               */
@@ -298,6 +334,15 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
     }
   }
 
+  // This and next weeks' reporting companies the chart can show.
+  const companies = useMemo(() => {
+    const seen = new Set<string>()
+    return earnings
+      .filter((item) => item.reportDate >= today && item.reportDate < addDays(today, 21))
+      .map(stockChart)
+      .filter((item): item is ChartPick => item !== null && !seen.has(item.symbol) && Boolean(seen.add(item.symbol)))
+  }, [earnings, today])
+
   const lastDay = [...econ.map((cluster) => cluster.day), ...earnings.map((item) => item.reportDate)].sort().at(-1) ?? today
   const canBack = week > weekStart(today)
   const canForward = addDays(week, 7) <= lastDay
@@ -343,18 +388,22 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
             setWeek(next)
             setDay(next <= today && today < addDays(next, 7) ? today : next)
           }}
-          onDay={setDay}
+          onDay={(target) => {
+            setDay(target)
+            document.getElementById(`agenda-${target}`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }}
           onPick={choose}
         />
 
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_25rem] [&>*]:min-w-0">
-          <div className="order-2 flex min-w-0 flex-col gap-2 xl:order-1">
+        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem] [&>*]:min-w-0">
+          <div className="order-2 flex min-w-0 flex-col gap-3 xl:order-1">
             <Watchlist
               current={chart}
               linked={linked}
-              onPick={(item) => {
+              companies={companies}
+              onPick={(item, fromCompanies) => {
                 setChart(item)
-                setLinked(false)
+                setLinked(fromCompanies)
               }}
             />
             <TradingViewChart
@@ -362,7 +411,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
               title={chart.label}
               theme="dark"
               background={STUDIO}
-              className="h-[420px] rounded-xl border border-white/10 sm:h-[560px]"
+              className="h-[480px] rounded-xl border border-white/10 sm:h-[640px] xl:h-[760px]"
             />
           </div>
           <div className="order-1 flex min-w-0 flex-col gap-4 xl:order-2">
@@ -371,7 +420,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
           </div>
         </div>
 
-        <Agenda econ={econ} earnings={earnings} day={day} today={today} now={now} pick={pick} onPick={choose} />
+        <Agenda econ={econ} earnings={earnings} week={week} day={day} today={today} now={now} pick={pick} onPick={choose} />
 
         <p className="mt-6 text-[11px] leading-relaxed text-white/45">
           Календарь: Forex Factory, Yahoo Finance (шинжээчдийн дундаж таамаг); тайлбарыг хиймэл оюун ухаанаар бэлдэв
@@ -575,41 +624,64 @@ function Timeline(props: {
 /* Watchlist chips above the chart                                     */
 /* ------------------------------------------------------------------ */
 
-function Watchlist({ current, linked, onPick }: { current: ChartPick; linked: boolean; onPick: (item: ChartPick) => void }) {
-  const inList = WATCHLIST.some((item) => item.symbol === current.symbol)
+function Watchlist({ current, linked, companies, onPick }: { current: ChartPick; linked: boolean; companies: ChartPick[]; onPick: (item: ChartPick, fromCompanies: boolean) => void }) {
+  const groups = [...GROUPS, ...(companies.length ? [{ id: "companies", title: "Тайлан гаргах компаниуд", items: companies }] : [])]
+  const home = groups.find((group) => group.items.some((item) => item.symbol === current.symbol))?.id ?? groups[0].id
+  const [open, setOpen] = useState(home)
+  // Follow the chart: when news switches it, show the group that holds the new market.
+  useEffect(() => setOpen(home), [home])
+  const group = groups.find((entry) => entry.id === open) ?? groups[0]
+
   return (
-    <div className="flex items-stretch gap-2">
-      {linked || !inList ? (
-        <div className="border-brand/60 bg-brand/15 flex shrink-0 flex-col justify-center rounded-lg border px-3 py-1.5">
-          <span className="text-brand text-[9.5px] font-semibold tracking-[0.12em] uppercase">Мэдээтэй холбоотой</span>
-          <span className="max-w-[11rem] truncate text-[13px] font-semibold">{current.label}</span>
+    <div className={cn(panel, "p-2")}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div role="tablist" aria-label="Зах зээлийн бүлэг" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
+          {groups.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              role="tab"
+              aria-selected={entry.id === open}
+              onClick={() => setOpen(entry.id)}
+              className={cn(
+                "h-8 shrink-0 rounded-lg px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors",
+                entry.id === open ? "bg-white text-[#16181c]" : "text-white/60 hover:bg-white/8 hover:text-white",
+              )}
+            >
+              {entry.title}
+              <span className="ml-1.5 font-mono text-[10.5px] opacity-55">{entry.items.length}</span>
+            </button>
+          ))}
         </div>
-      ) : null}
-      <div className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none]">
-        {WATCHLIST.map((item) => {
+        <p className="flex min-w-0 items-center gap-2 px-2 text-[12px]">
+          {linked ? <span className="text-brand shrink-0 text-[10px] font-semibold tracking-[0.12em] uppercase">Мэдээтэй холбоотой</span> : null}
+          <span className="truncate font-semibold">{current.label}</span>
+          <span className="shrink-0 font-mono text-[11px] text-white/40">{current.code}</span>
+        </p>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-1.5 border-t border-white/[0.07] pt-2">
+        {group.items.map((item) => {
           const active = item.symbol === current.symbol
           return (
             <button
               key={item.symbol}
               type="button"
               aria-pressed={active}
-              onClick={() => onPick(item)}
+              onClick={() => onPick(item, group.id === "companies")}
               className={cn(
-                "flex shrink-0 flex-col justify-center rounded-lg border px-3 py-1.5 text-left transition-colors",
-                active ? "border-white/40 bg-white/12" : "border-white/10 hover:bg-white/6",
+                "flex items-center gap-2 rounded-lg border px-2.5 py-1.5 text-left transition-colors",
+                active ? "border-brand bg-brand/20" : "border-white/10 hover:border-white/25 hover:bg-white/6",
               )}
             >
               <span className="text-[12.5px] font-medium whitespace-nowrap">{item.label}</span>
-              <span className="flex items-center gap-1.5 text-[11px] whitespace-nowrap">
-                {item.quote ? (
-                  <>
-                    <span className="text-white/70 tabular-nums">{item.quote.denom.kind === "index" || item.quote.denom.kind === "percent" ? item.quote.price : formatValue(item.quote.price, item.quote.denom)}</span>
-                    {item.quote.pct !== 0 ? <Change pct={item.quote.pct} /> : null}
-                  </>
-                ) : (
-                  <span className="font-mono text-white/40">{item.code}</span>
-                )}
-              </span>
+              {item.quote ? (
+                <span className="flex items-center gap-1.5 text-[11px] whitespace-nowrap">
+                  <span className="text-white/60 tabular-nums">{item.quote.denom.kind === "index" || item.quote.denom.kind === "percent" ? item.quote.price : formatValue(item.quote.price, item.quote.denom)}</span>
+                  {item.quote.pct !== 0 ? <Change pct={item.quote.pct} /> : null}
+                </span>
+              ) : (
+                <span className="font-mono text-[10.5px] text-white/35">{item.code}</span>
+              )}
             </button>
           )
         })}
@@ -876,121 +948,123 @@ function UpNext({ econ, earnings, now, today, pick, onPick }: { econ: Cluster[];
 }
 
 /* ------------------------------------------------------------------ */
-/* Agenda: the chosen day, releases and reports together              */
+/* Agenda: the whole week, every release and report, compact           */
 /* ------------------------------------------------------------------ */
 
-function Agenda({ econ, earnings, day, today, now, pick, onPick }: { econ: Cluster[]; earnings: EarningsEvent[]; day: string; today: string; now: number; pick: Pick | null; onPick: (pick: Pick) => void }) {
-  const [onlyHigh, setOnlyHigh] = useState(false)
-  const releases = econ.filter((cluster) => cluster.day === day).flatMap((cluster) => cluster.events)
-  const shown = onlyHigh ? releases.filter((event) => event.impact === "High") : releases
-  const reports = earnings.filter((item) => item.reportDate === day).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
+function Agenda({ econ, earnings, week, day, today, now, pick, onPick }: { econ: Cluster[]; earnings: EarningsEvent[]; week: string; day: string; today: string; now: number; pick: Pick | null; onPick: (pick: Pick) => void }) {
+  const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
+    .map((target) => ({
+      day: target,
+      releases: econ.filter((cluster) => cluster.day === target).flatMap((cluster) => cluster.events),
+      reports: earnings.filter((item) => item.reportDate === target).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0)),
+    }))
+    .filter((entry) => entry.releases.length || entry.reports.length)
+  const total = days.reduce((sum, entry) => sum + entry.releases.length + entry.reports.length, 0)
+  const toTop = () => document.getElementById("desk-title")?.scrollIntoView({ behavior: "smooth", block: "start" })
 
   return (
-    <div className="mt-8">
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className={label}>Өдрийн хөтөлбөр</p>
-          <h3 className="mt-1 text-[20px] font-semibold">{dayName(day, today)}</h3>
-        </div>
-        <div className="flex gap-1 rounded-full bg-white/[0.06] p-1 text-[12.5px]">
-          {[
-            [false, `Бүгд ${releases.length + reports.length}`],
-            [true, `Өндөр нөлөөтэй ${releases.filter((event) => event.impact === "High").length}`],
-          ].map(([value, text]) => (
-            <button
-              key={String(value)}
-              type="button"
-              aria-pressed={onlyHigh === value}
-              onClick={() => setOnlyHigh(value as boolean)}
-              className={cn("h-8 rounded-full px-3 font-medium transition-colors", onlyHigh === value ? "bg-white text-[#16181c]" : "text-white/60 hover:text-white")}
-            >
-              {text as string}
-            </button>
-          ))}
-        </div>
+    <div className="mt-10">
+      <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-white/10 pb-3">
+        <h3 className="text-[20px] font-semibold">Долоо хоногийн хөтөлбөр</h3>
+        <p className="font-mono text-[11.5px] text-white/45 tabular-nums">
+          {Number(week.slice(5, 7))}.{Number(week.slice(8))}–{Number(addDays(week, 6).slice(5, 7))}.{Number(addDays(week, 6).slice(8))} · {total}
+        </p>
       </div>
 
-      {!shown.length && !(reports.length && !onlyHigh) ? (
-        <p className={cn(panel, "px-4 py-8 text-center text-sm text-white/50")}>Энэ өдөр {onlyHigh ? "өндөр нөлөөтэй " : ""}мэдээ алга. Дээрх цагийн шугамаас өөр өдөр сонгоно уу.</p>
+      {!days.length ? (
+        <p className="py-8 text-center text-sm text-white/50">Энэ долоо хоногт мэдээ алга.</p>
       ) : (
-        <div className={cn(panel, "divide-y divide-white/[0.07] overflow-hidden")}>
-          {shown.map((event) => {
-            const selected = pick?.kind === "econ" && pick.id === event.id
-            const past = Date.parse(event.startsAt) < now - 5 * 60_000
-            return (
-              <button
-                key={event.id}
-                type="button"
-                onClick={() => {
-                  onPick({ kind: "econ", id: event.id })
-                  document.getElementById("desk")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                }}
-                className={cn(
-                  "grid w-full grid-cols-[3.25rem_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 px-4 py-3 text-left transition-colors sm:grid-cols-[3.5rem_minmax(0,1fr)_7rem_14rem]",
-                  selected ? "bg-brand/15" : "hover:bg-white/[0.04]",
-                  past && !selected ? "opacity-60" : "",
-                )}
-              >
-                <span className="font-mono text-[13px] tabular-nums">{ubParts(event.startsAt).time}</span>
-                <span className="min-w-0">
-                  <span className="block text-[14px] leading-snug font-medium">{event.mnTitle || event.title}</span>
-                  <span className="block text-[11.5px] text-white/45">{event.country}</span>
-                </span>
-                <span className="justify-self-end sm:justify-self-start">
-                  <Impact high={event.impact === "High"} compact />
-                </span>
-                <span className="col-span-3 grid grid-cols-3 gap-2 font-mono text-[12px] tabular-nums sm:col-span-1">
-                  {[
-                    ["Таамаг", event.forecast],
-                    ["Өмнөх", event.previous],
-                    ["Бодит", event.actual],
-                  ].map(([name, value]) => (
-                    <span key={name}>
-                      <span className="block font-sans text-[10px] text-white/40">{name}</span>
-                      <span className={value ? (name === "Бодит" ? "text-brand font-semibold" : "") : "text-white/25"}>{value || "–"}</span>
-                    </span>
-                  ))}
-                </span>
-              </button>
-            )
-          })}
-          {!onlyHigh && reports.length ? (
-            <div className="px-4 py-3">
-              <p className="mb-2 text-[11px] text-white/45">Өдөржин · ашгийн тайлан</p>
-              <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-                {reports.map((item) => {
+        <div className="gap-x-10 lg:columns-2">
+          {days.map((entry) => (
+            <section key={entry.day} id={`agenda-${entry.day}`} className="mb-7 scroll-mt-20 break-inside-avoid">
+              <h4 className={cn("mb-1 flex items-baseline gap-2 text-[13px] font-semibold", entry.day === day ? "text-brand" : "", entry.day < today ? "opacity-60" : "")}>
+                {dayName(entry.day, today)}
+                <span className="font-mono text-[11px] font-normal text-white/35">{entry.releases.length + entry.reports.length}</span>
+              </h4>
+              <ul className="divide-y divide-white/[0.06]">
+                {entry.releases.map((event) => {
+                  const selected = pick?.kind === "econ" && pick.id === event.id
+                  const past = Date.parse(event.startsAt) < now - 5 * 60_000
+                  const high = event.impact === "High"
+                  return (
+                    <li key={event.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onPick({ kind: "econ", id: event.id })
+                          toTop()
+                        }}
+                        className={cn(
+                          "grid w-full grid-cols-[2.75rem_0.5rem_minmax(0,1fr)_auto] items-baseline gap-x-2 rounded-md px-1.5 py-2 text-left transition-colors",
+                          selected ? "bg-brand/20" : "hover:bg-white/[0.05]",
+                          past && !selected ? "opacity-50" : "",
+                        )}
+                      >
+                        <span className="font-mono text-[12px] text-white/60 tabular-nums">{ubParts(event.startsAt).time}</span>
+                        <span className={cn("size-1.5 self-center rounded-full", high ? "" : "bg-white/25")} style={high ? { background: HOT } : undefined} aria-label={high ? "Өндөр нөлөө" : "Дунд нөлөө"} />
+                        <span className="min-w-0 text-[13px] leading-snug">
+                          {event.mnTitle || event.title}
+                          <span className="ml-1.5 text-[11px] text-white/40">{event.country}</span>
+                        </span>
+                        <span className="font-mono text-[11.5px] whitespace-nowrap tabular-nums">
+                          {event.actual ? (
+                            <span className="text-brand font-semibold">{event.actual}</span>
+                          ) : event.forecast ? (
+                            <span className="text-white/55">
+                              <span className="font-sans text-[10px] text-white/30">таамаг </span>
+                              {event.forecast}
+                            </span>
+                          ) : null}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+                {entry.reports.map((item) => {
                   const upside = upsideOf(item)
                   const selected = pick?.kind === "earn" && pick.symbol === item.symbol
                   return (
-                    <button
-                      key={item.symbol}
-                      type="button"
-                      onClick={() => {
-                        onPick({ kind: "earn", symbol: item.symbol })
-                        document.getElementById("desk")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                      }}
-                      className={cn("flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-left transition-colors", selected ? "border-brand bg-brand/15" : "border-white/10 hover:bg-white/6")}
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-[13px] font-medium">{item.name}</span>
-                        <span className="block truncate text-[11px] text-white/45">
-                          {item.countryName} · EPS {item.epsEstimate !== null ? plainNumber(item.epsEstimate) : "–"}
+                    <li key={item.symbol}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onPick({ kind: "earn", symbol: item.symbol })
+                          toTop()
+                        }}
+                        className={cn(
+                          "grid w-full grid-cols-[2.75rem_0.5rem_minmax(0,1fr)_auto] items-baseline gap-x-2 rounded-md px-1.5 py-2 text-left transition-colors",
+                          selected ? "bg-brand/20" : "hover:bg-white/[0.05]",
+                          entry.day < today && !selected ? "opacity-50" : "",
+                        )}
+                      >
+                        <span className="text-[10.5px] text-white/40">Тайлан</span>
+                        <span className="size-1.5 self-center rounded-sm bg-white/80" aria-hidden />
+                        <span className="min-w-0 text-[13px] leading-snug">
+                          {item.name}
+                          <span className="ml-1.5 text-[11px] text-white/40">{item.countryName}</span>
                         </span>
-                      </span>
-                      {upside !== null ? (
-                        <span className={cn("shrink-0 font-mono text-[12px] font-semibold tabular-nums", upside >= 0 ? UP : DOWN)}>
-                          {upside >= 0 ? "▲ +" : "▼ "}
-                          {upside.toFixed(1)}%
-                        </span>
-                      ) : null}
-                    </button>
+                        {upside !== null ? (
+                          <span className={cn("font-mono text-[11.5px] font-semibold whitespace-nowrap tabular-nums", upside >= 0 ? UP : DOWN)}>
+                            {upside >= 0 ? "+" : ""}
+                            {upside.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                      </button>
+                    </li>
                   )
                 })}
-              </div>
-            </div>
-          ) : null}
+              </ul>
+            </section>
+          ))}
         </div>
       )}
+      <p className="text-[11px] text-white/40">
+        <span className="mr-1 inline-block size-1.5 rounded-full align-middle" style={{ background: HOT }} /> өндөр нөлөөтэй ·{" "}
+        <span className="mr-1 inline-block size-1.5 rounded-full bg-white/25 align-middle" /> дунд · тайлангийн хувь нь шинжээчдийн зорилтот үнэ одоогийнхоос хэр зөрөхийг заана. Мөрийг дарвал дээрх график,
+        тайлбар нээгдэнэ.
+      </p>
     </div>
   )
 }
