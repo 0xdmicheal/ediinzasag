@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowRight, ExternalLink, FilePlus2, Search, Undo2, X } from "lucide-react"
+import { ArrowRight, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, Undo2, X } from "lucide-react"
+import { cn } from "cn"
+
+import { RunDetailsView } from "@/admin/AgentRunDetails"
+import { isEditor } from "@/admin/rules"
 
 import { useTeam } from "@/admin/session"
-import type { NewsItem } from "@/admin/types"
+import type { NewsItem, NewsRun } from "@/admin/types"
 import { buttonClass, inputClass, Notice } from "@/admin/ui"
 
 /*
@@ -66,7 +70,11 @@ function Tabs<T extends string>({ value, options, onChange, label }: { value: T;
 }
 
 export function InboxPage() {
-  const { backend } = useTeam()
+  const { backend, member } = useTeam()
+  const [runs, setRuns] = useState<NewsRun[]>([])
+  const [running, setRunning] = useState(false)
+  const [runResult, setRunResult] = useState<{ text: string; problem: string } | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const [items, setItems] = useState<NewsItem[] | null>(null)
   const [error, setError] = useState("")
   const [status, setStatus] = useState<StatusFilter>("new")
@@ -85,6 +93,7 @@ export function InboxPage() {
       .listNewsItems()
       .then(setItems)
       .catch((failure) => setError(failure instanceof Error ? failure.message : "Ачаалж чадсангүй"))
+    backend.listNewsRuns().then(setRuns, () => setRuns([]))
     backend
       .listTags()
       .then((tags) => setTagLabels(new Map(tags.map((tag) => [tag.slug, tag.label]))))
@@ -112,6 +121,23 @@ export function InboxPage() {
     const time = (item: NewsItem) => Date.parse(item.publishedAt ?? item.seenAt)
     return list.sort((a, b) => (byScore ? b.priority - a.priority : 0) || time(b) - time(a))
   }, [items, status, desk, query, byScore, touched])
+
+  async function runAgent() {
+    setRunning(true)
+    setRunResult(null)
+    try {
+      const result = await backend.runNewsAgent()
+      const [list, nextRuns] = await Promise.all([backend.listNewsItems(), backend.listNewsRuns()])
+      setItems(list)
+      setRuns(nextRuns)
+      setRunResult({ text: result.created ? `${result.created} карт нэмэгдлээ.` : "Шинэ карт нэмэгдсэнгүй.", problem: "" })
+    } catch (failure) {
+      setRunResult({ text: "Мэдээ татаж чадсангүй. Дэлгэрэнгүйг харна уу.", problem: failure instanceof Error ? failure.message : String(failure) })
+      setDetailsOpen(true)
+    } finally {
+      setRunning(false)
+    }
+  }
 
   function patch(id: string, change: Partial<NewsItem>) {
     setItems((list) => list?.map((item) => (item.id === id ? { ...item, ...change } : item)) ?? null)
@@ -155,14 +181,42 @@ export function InboxPage() {
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6">
-      <header>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
         <p className="text-muted-foreground font-mono text-[11px] uppercase">Мэдээний агент</p>
         <h1 className="font-news mt-1 text-3xl">Мэдээний урсгал</h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-[13px]">
           Агентын уншсан бүх мэдээ (сүүлийн 14 хоног). Хамгийн чухлыг нь агент өглөө бүр карт болгодог. Бусдаас нь хүссэнээ
           <strong className="text-foreground"> Карт болгох</strong>-оор самбарт нэмж засна, хэрэггүйг нь хаана.
         </p>
+        </div>
+        {isEditor(member) ? (
+          <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
+            <RefreshCw className={cn("size-4", running && "animate-spin")} />
+            {running ? "Татаж байна…" : "Одоо татах"}
+          </button>
+        ) : null}
       </header>
+
+      <div className="bg-card rounded-xl border px-4 py-3 text-[13px]">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="text-muted-foreground">
+            {runResult?.text ??
+              (runs[0]
+                ? `Сүүлд ажилласан: ${runs[0].trigger === "cron" ? "автомат" : "гараар"} · ${runs[0].details?.fresh ?? runs[0].scanned} мэдээ уншсан · ${runs[0].created} карт`
+                : "Агент одоогоор ажиллаагүй байна. Өдөр бүр 08:00-д автоматаар ажиллана.")}
+          </span>
+          <button type="button" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)} className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 text-[12px]">
+            <ChevronDown className={cn("size-3.5 transition-transform", detailsOpen && "rotate-180")} />
+            Дэлгэрэнгүй
+          </button>
+        </div>
+        {detailsOpen ? (
+          <div className="mt-3 border-t pt-3">
+            <RunDetailsView run={runs[0]} problem={runResult?.problem ?? ""} />
+          </div>
+        ) : null}
+      </div>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 

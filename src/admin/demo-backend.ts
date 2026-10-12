@@ -357,6 +357,24 @@ export function createDemoBackend(): Backend {
       const fresh = demoBriefings(3, known)
       store.articles.push(...fresh)
       const now = new Date().toISOString()
+      // Like the real run: every story read lands in the inbox, the auto-filed ones already "filed".
+      store.inbox ??= demoNewsItems()
+      const stamp = Date.now()
+      store.inbox.unshift(
+        ...fresh.map((article, index) => ({
+          ...demoNewsItems()[index],
+          id: `news-${stamp}-f${index}`,
+          link: article.sourceUrl,
+          title: article.title,
+          image: article.coverUrl,
+          status: "filed" as const,
+          articleId: article.id,
+          seenAt: now,
+        })),
+        ...demoNewsItems()
+          .slice(3, 7)
+          .map((item, index) => ({ ...item, id: `news-${stamp}-n${index}`, link: `${item.link}-${stamp}`, seenAt: now })),
+      )
       const run: NewsRun = {
         id: `run-${Date.now()}`,
         startedAt: now,
