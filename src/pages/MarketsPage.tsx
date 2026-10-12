@@ -120,7 +120,6 @@ export function MarketsPage() {
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b pb-4">
           <div>
             <h2 className="font-news text-2xl leading-none sm:text-4xl">Тоон мэдээлэл</h2>
-            <p className="text-muted-foreground mt-2 text-[14px]">Сүүлийн хаалтын үнэ, эх сурвалж бүртэй. {sessionShort}.</p>
           </div>
           <nav aria-label="Тоон мэдээллийн хэсэг" className="bg-muted flex gap-1 rounded-full p-1">
             {rooms.map(({ id, label, hint, icon: Icon }) => (
@@ -192,9 +191,6 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
               Өнөөдөр юу хөдөлсөн бэ
             </h1>
           </div>
-          <p className="text-ink-foreground/60 max-w-md text-[13px] leading-relaxed">
-            Монголын түрийвчинд хамгийн их нөлөөлдөг зургаан тоо. Дарвал доорх EZ Desk-ийн график тэр зах зээл рүү шилжинэ.
-          </p>
         </div>
 
         <div className="mt-6 grid grid-cols-2 overflow-hidden rounded-xl border border-white/10 sm:mt-8 md:grid-cols-3 xl:grid-cols-6">
@@ -231,7 +227,6 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
             </button>
           ))}
         </div>
-        <p className="text-ink-foreground/45 mt-3 text-[11px]">Сүүлийн хаалтын үнэ, шууд ханш биш. Эх сурвалж бүрийг тухайн хэсэгт заасан.</p>
       </div>
     </section>
   )
@@ -568,7 +563,6 @@ function Movers() {
           </li>
         ))}
       </ul>
-      <SourceLine>Валютын өсөлт нь ам.доллар (эсвэл евро) чангарсныг илтгэнэ. Оны эхний өөрчлөлт байхгүй бол 12 сарынхыг харуулав.</SourceLine>
     </section>
   )
 }
@@ -676,9 +670,6 @@ function Glossary() {
         ))}
       </div>
       {current ? <p className="bg-card mt-3 max-w-3xl rounded-xl border p-4 text-[14px] leading-relaxed">{current.text}</p> : null}
-      <p className="text-muted-foreground mt-4 text-[11px] leading-relaxed">
-        Энэ хуудас нийтийн эх сурвалжийн хаалтын үнийг нэгтгэсэн мэдээлэл. Шууд ханш биш, хөрөнгө оруулалтын зөвлөгөө биш.
-      </p>
     </section>
   )
 }

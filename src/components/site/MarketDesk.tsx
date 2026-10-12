@@ -6,7 +6,7 @@ import { signedPct } from "@/components/site/market-marks"
 import { formatValue } from "@/components/site/money"
 import { TradingViewChart } from "@/components/site/TradingViewChart"
 import { loadCalendar, recommendationLabel, type CalendarData, type EarningsEvent, type EconEvent } from "@/content/calendar"
-import { commodities, fx, sessionShort, worldIndices, type Quote } from "@/content/markets"
+import { commodities, fx, worldIndices, type Quote } from "@/content/markets"
 
 /*
  * EZ Desk: the calendar and the chart as one tool, on the fixed-dark studio
@@ -362,7 +362,6 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
               <h2 id="desk-title" className="font-news text-2xl leading-none sm:text-3xl">
                 EZ Desk
               </h2>
-              <p className="mt-1 text-[13px] text-muted-foreground">Мэдээ хэзээ гарах, юуг хөдөлгөхийг нэг дор. Мэдээг дарвал график тэр зах зээл рүү шилжинэ.</p>
             </div>
           </div>
           <p className="font-mono text-[12px] text-muted-foreground tabular-nums">
@@ -417,10 +416,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
 
       <div className="px-[10px] pb-10">
         <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
-          Календарь: Forex Factory, Yahoo Finance (шинжээчдийн дундаж таамаг); тайлбарыг хиймэл оюун ухаанаар бэлдэв
-          {data?.updatedAt ? `, шинэчилсэн ${ubParts(data.updatedAt).day.slice(5).replace("-", ".")} ${ubParts(data.updatedAt).time}` : ""}
-          {data?.demo ? " (демо: жишээ өгөгдөл)" : ""}. График: TradingView (шууд эсвэл хоцрогдолтой), индексийг CFD хэлбэрээр харуулав. Жагсаалтын үнэ: эх сурвалжийн{" "}
-          {sessionShort}. Хөрөнгө оруулалтын зөвлөгөө биш.
+          Forex Factory · Yahoo Finance · TradingView{data?.demo ? " · демо" : ""}. Зөвлөгөө биш.
         </p>
       </div>
     </section>
@@ -431,7 +427,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
 /* Pairs: the chart's watchlist, a rail on the right                   */
 /* ------------------------------------------------------------------ */
 
-function PairRail({ current, linked, companies, onPick }: { current: ChartPick; linked: boolean; companies: ChartPick[]; onPick: (item: ChartPick, fromCompanies: boolean) => void }) {
+function PairRail({ current, companies, onPick }: { current: ChartPick; linked: boolean; companies: ChartPick[]; onPick: (item: ChartPick, fromCompanies: boolean) => void }) {
   const groups = [...GROUPS, ...(companies.length ? [{ id: "companies", title: "Компаниуд", items: companies }] : [])]
   const home = groups.find((group) => group.items.some((item) => item.symbol === current.symbol))?.id ?? groups[0].id
   const [open, setOpen] = useState(home)
@@ -442,11 +438,6 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
 
   return (
     <aside aria-label="Зах зээлүүд" className={cn(panel, "flex min-w-0 flex-col xl:h-0 xl:min-h-full")}>
-      <div className="border-b border-border px-3 pt-3 pb-2.5">
-        <p className={label}>{linked ? <span className="text-brand-strong">Мэдээтэй холбоотой</span> : "Графикт"}</p>
-        <p className="mt-1 truncate text-[14px] font-semibold">{current.label}</p>
-        <p className="font-mono text-[11px] text-muted-foreground">{current.code}</p>
-      </div>
       <div role="tablist" aria-label="Бүлэг" className="grid grid-cols-2 gap-1 border-b border-border p-1.5">
         {groups.map((entry) => (
           <button
@@ -495,7 +486,6 @@ function PairRail({ current, linked, companies, onPick }: { current: ChartPick; 
           )
         })}
       </ul>
-      <p className="border-t border-border px-3 py-2 text-[10.5px] leading-snug text-muted-foreground">Үнэ: эх сурвалжийн сүүлийн хаалт. График дээрх хайлтаар бусад зах зээлийг нээнэ.</p>
     </aside>
   )
 }
@@ -537,30 +527,17 @@ function When({ ms, now, allDay }: { ms: number; now: number; allDay?: boolean }
   )
 }
 
-function LinkedNote({ chart, linked }: { chart: ChartPick; linked: boolean }) {
-  if (!linked) return null
-  return (
-    <p className="mt-4 flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-foreground/80 dark:bg-blue-800/50">
-      <CandlestickChart className="text-brand-strong size-4 shrink-0" />
-      <span>
-        Графикт: <strong className="text-foreground">{chart.label}</strong>. Мэдээ гарахаас өмнө ба дараа нь хэрхэн хөдөлснийг харна уу.
-      </span>
-    </p>
-  )
-}
-
-function EconFocus({ event, cluster, now, chart, linked, onPick }: { event: EconEvent; cluster: Cluster; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
+function EconFocus({ event, cluster, now, onPick }: { event: EconEvent; cluster: Cluster; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
   const actual = figure(event.actual)
   const forecast = figure(event.forecast)
   const verdict = actual === null || forecast === null ? null : actual > forecast ? "Таамгаас өндөр" : actual < forecast ? "Таамгаас доогуур" : "Таамагтай тэнцүү"
   return (
-    <article className="border-brand mx-1 mb-2 border-l-2 py-2 pr-2 pl-4" aria-live="polite">
+    <article className="p-4" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-md bg-foreground/[0.06] px-2 py-0.5 text-[11.5px] font-medium">{event.country}</span>
         <Impact high={event.impact === "High"} />
       </div>
       <h3 className="mt-2.5 text-[17px] leading-snug font-semibold">{event.mnTitle || event.title}</h3>
-      {event.mnTitle ? <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{event.title}</p> : null}
       <div className="mt-3">
         <When ms={Date.parse(event.startsAt)} now={now} />
       </div>
@@ -579,12 +556,11 @@ function EconFocus({ event, cluster, now, chart, linked, onPick }: { event: Econ
       </dl>
       {verdict ? (
         <p className="mt-2 text-[11.5px] text-muted-foreground">
-          <strong className="text-foreground">{verdict}</strong> гарлаа. Өндөр нь үргэлж сайн гэсэн үг биш: ажилгүйдэл, инфляцын хувьд эсрэгээрээ.
+          <strong className="text-foreground">{verdict}</strong>
         </p>
       ) : null}
 
       {event.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-foreground/80">{event.mnSummary}</p> : null}
-      <LinkedNote chart={chart} linked={linked} />
 
       {cluster.events.length > 1 ? (
         <div className="mt-4 border-t border-border pt-3">
@@ -609,14 +585,14 @@ function EconFocus({ event, cluster, now, chart, linked, onPick }: { event: Econ
 
 const RATINGS = ["sell", "underperform", "hold", "buy", "strong_buy"]
 
-function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: EarningsEvent; sameDay: EarningsEvent[]; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
+function EarningsFocus({ item, sameDay, now, onPick }: { item: EarningsEvent; sameDay: EarningsEvent[]; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
   const upside = upsideOf(item)
   const { targetLow: low, targetHigh: high, targetMean: mean, price } = item
   const range = low !== null && high !== null && mean !== null && high > low
   const pos = (value: number) => `${Math.min(100, Math.max(0, ((value - low!) / (high! - low!)) * 100))}%`
   const rating = RATINGS.indexOf(item.recommendation)
   return (
-    <article className="border-brand mx-1 mb-2 border-l-2 py-2 pr-2 pl-4" aria-live="polite">
+    <article className="p-4" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-md bg-foreground/[0.06] px-2 py-0.5 text-[11.5px] font-medium">
           {item.countryName} · <span className="font-mono">{item.symbol}</span>
@@ -683,11 +659,9 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
       ) : null}
 
       {item.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-foreground/80">{item.mnSummary}</p> : null}
-      {stockChart(item) ? (
-        <LinkedNote chart={chart} linked={linked && chart.code === item.symbol} />
-      ) : (
+      {stockChart(item) ? null : (
         <p className="mt-4 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-foreground/80 dark:bg-blue-800/50">
-          Энэ биржийн график TradingView-ийн нээлттэй хувилбарт байхгүй.{" "}
+          График байхгүй.{" "}
           <a className="text-brand-strong underline" href={`https://finance.yahoo.com/quote/${encodeURIComponent(item.symbol)}`} target="_blank" rel="noreferrer">
             Yahoo Finance дээр харах
           </a>
@@ -730,20 +704,31 @@ function DayRail(props: {
   onWeek: (step: number) => void
   onDay: (day: string) => void
   onPick: (pick: Pick) => void
-  /** The picked item's explanation, shown under its line. */
+  /** The picked item's explanation: replaces the list until «Буцах». */
   detail: ReactNode
 }) {
   const { econ, earnings, week, day, today, now, pick, onDay, onPick, detail } = props
-  const [collapsed, setCollapsed] = useState(false)
+  // List or one item's page; the list keeps its scroll position across the round trip.
+  const [reading, setReading] = useState(false)
   const list = useRef<HTMLUListElement>(null)
+  const scroll = useRef(0)
+  const page = useRef<HTMLDivElement>(null)
   const pickKey = pick ? (pick.kind === "econ" ? pick.id : pick.symbol) : ""
-  // A new pick opens; keep its line in view inside the list (without scrolling the page).
   useEffect(() => {
-    setCollapsed(false)
-    const node = list.current?.querySelector<HTMLElement>("[data-picked]")
-    if (list.current && node) list.current.scrollTop = Math.max(0, node.offsetTop - 48)
-  }, [pickKey, day])
-  const toggle = (next: Pick, selected: boolean) => (selected ? setCollapsed((value) => !value) : onPick(next))
+    if (reading) page.current?.scrollTo({ top: 0 })
+  }, [pickKey, reading])
+  useEffect(() => {
+    if (!reading && list.current) list.current.scrollTop = scroll.current
+  }, [reading])
+  useEffect(() => {
+    scroll.current = 0
+    setReading(false)
+  }, [day])
+  const open = (next: Pick) => {
+    scroll.current = list.current?.scrollTop ?? 0
+    onPick(next)
+    setReading(true)
+  }
   const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
   const releasesOf = (target: string) => econ.filter((cluster) => cluster.day === target).flatMap((cluster) => cluster.events)
   const reportsOf = (target: string) => earnings.filter((item) => item.reportDate === target).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
@@ -753,10 +738,27 @@ function DayRail(props: {
 
   return (
     // xl: as tall as the chart beside it; the list scrolls inside.
-    <aside aria-label="Календарь" className={cn(panel, "flex min-w-0 flex-col xl:h-0 xl:min-h-full")}>
+    <aside aria-label="Календарь" className={cn(panel, "flex min-w-0 flex-col overflow-hidden xl:h-0 xl:min-h-full")}>
+      {reading ? (
+        <>
+          <div className="flex items-center justify-between gap-2 border-b px-2 py-2">
+            <button type="button" onClick={() => setReading(false)} className="hover:bg-foreground/[0.05] flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] font-medium transition-colors">
+              <span className="text-[17px] leading-none" aria-hidden>
+                ‹
+              </span>
+              Буцах
+            </button>
+            <span className="text-muted-foreground pr-2 text-[11.5px]">{dayName(day, today)}</span>
+          </div>
+          <div ref={page} className="max-h-[640px] min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin] xl:max-h-none">
+            {detail}
+          </div>
+        </>
+      ) : (
+        <>
       <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
         <p className={label}>
-          Календарь · {Number(week.slice(5, 7))}-р сарын {Number(week.slice(8))}–{Number(addDays(week, 6).slice(8))}
+          {Number(week.slice(5, 7))}-р сарын {Number(week.slice(8))}–{Number(addDays(week, 6).slice(8))}
         </p>
         <div className="flex gap-1">
           <button type="button" className={weekArrow} onClick={() => props.onWeek(-1)} disabled={!props.canBack} aria-label="Өмнөх долоо хоног">
@@ -794,10 +796,6 @@ function DayRail(props: {
           )
         })}
       </div>
-      <p className="flex items-baseline justify-between px-3 pt-2.5 pb-1">
-        <span className="text-[12.5px] font-semibold">{dayName(day, today)}</span>
-        <span className="font-mono text-[10.5px] text-muted-foreground">{releases.length + reports.length}</span>
-      </p>
       <ul ref={list} className="relative max-h-[560px] min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1.5 [scrollbar-width:thin] xl:max-h-none">
         {props.loading ? <li className="mx-2 my-2 h-40 animate-pulse rounded-lg bg-muted" /> : null}
         {!props.loading && !releases.length && !reports.length ? <li className="px-2 py-6 text-center text-[12px] text-muted-foreground">Энэ өдөр мэдээ алга.</li> : null}
@@ -809,8 +807,7 @@ function DayRail(props: {
             <li key={event.id} data-picked={selected || undefined}>
               <button
                 type="button"
-                aria-expanded={selected && !collapsed}
-                onClick={() => toggle({ kind: "econ", id: event.id }, selected)}
+                onClick={() => open({ kind: "econ", id: event.id })}
                 title={`${event.mnTitle || event.title} · ${event.country}`}
                 className={cn(row, selected ? "bg-blue-100 dark:bg-blue-800" : "hover:bg-foreground/[0.04]", past && !selected ? "opacity-50" : "")}
               >
@@ -819,7 +816,6 @@ function DayRail(props: {
                 <span className="truncate text-[12.5px]">{event.mnTitle || event.title}</span>
                 <span className="font-mono text-[11px] text-muted-foreground tabular-nums">{event.actual ? <span className="text-brand-strong font-semibold">{event.actual}</span> : event.forecast}</span>
               </button>
-              {selected && !collapsed ? <div className="pt-1">{detail}</div> : null}
             </li>
           )
         })}
@@ -830,8 +826,7 @@ function DayRail(props: {
             <li key={item.symbol} data-picked={selected || undefined}>
               <button
                 type="button"
-                aria-expanded={selected && !collapsed}
-                onClick={() => toggle({ kind: "earn", symbol: item.symbol }, selected)}
+                onClick={() => open({ kind: "earn", symbol: item.symbol })}
                 title={`${item.name} · ${item.countryName}`}
                 className={cn(row, selected ? "bg-blue-100 dark:bg-blue-800" : "hover:bg-foreground/[0.04]", day < today && !selected ? "opacity-50" : "")}
               >
@@ -842,11 +837,12 @@ function DayRail(props: {
                   {upside === null ? "–" : `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`}
                 </span>
               </button>
-              {selected && !collapsed ? <div className="pt-1">{detail}</div> : null}
             </li>
           )
         })}
       </ul>
+        </>
+      )}
     </aside>
   )
 }
