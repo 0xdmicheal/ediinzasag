@@ -318,7 +318,7 @@ const RANK_SCHEMA = {
         properties: {
           index: { type: "integer" },
           priority: { type: "integer", description: "1-10, how much this matters to Mongolian readers today" },
-          why: { type: "string" },
+          why: { type: "string", description: "In Mongolian (Cyrillic), one short sentence: why it matters to Mongolian readers" },
         },
         required: ["index", "priority", "why"],
         additionalProperties: false,
@@ -746,7 +746,9 @@ export function polish(briefing: Briefing, sourceText: string) {
   const source = flat(sourceText)
   const numbers = flat(draft.body.replace(/<[^>]+>/g, " ")).match(/\d+(?:[.,]\d+)?/g) ?? []
   // Small numbers (days, ordinals, "2 дахин") are too common to check usefully.
-  const unsourced = [...new Set(numbers)].filter((n) => Number(n.replace(",", ".")) > 31 && !source.includes(n) && !source.includes(n.replace(".", ",")))
+  // Years (1900–2099) are dates, not figures to trace.
+  const isYear = (n: string) => /^(19|20)\d\d$/.test(n)
+  const unsourced = [...new Set(numbers)].filter((n) => Number(n.replace(",", ".")) > 31 && !isYear(n) && !source.includes(n) && !source.includes(n.replace(".", ",")))
   if (unsourced.length) notes.push(`Эх сурвалжид олдоогүй тоо: ${unsourced.slice(0, 8).join(", ")}. Тооцоолсон бол «ойролцоогоор» гэж тэмдэглэнэ, эс бөгөөс хасна.`)
   return {
     ...briefing,

@@ -200,7 +200,7 @@ export function lintStyle(draft: StyleDraft): StyleHit[] {
   const unglossed = new Set<string>()
   const seen = new Set<string>()
   for (const sentence of sentencesOf(outsideQuotes(body))) {
-    for (const match of sentence.matchAll(/(?<![A-Za-z])[a-z][a-z-]{3,}(?: [a-z][a-z-]{2,})?(?![A-Za-z])/g)) {
+    for (const match of sentence.matchAll(/(?<![A-Za-z.])[a-z][a-z-]{3,}(?: [a-z][a-z-]{2,})?(?![A-Za-z]|\.[a-z])/g)) {
       const term = match[0]
       if (seen.has(term) || LATIN_OK.has(term) || /https?|www/.test(term)) continue
       seen.add(term)
