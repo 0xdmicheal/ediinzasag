@@ -889,6 +889,67 @@ create policy "team dismisses news items" on public.news_items for update to aut
 revoke insert, update, delete on public.news_items from anon, authenticated;
 grant update (status) on public.news_items to authenticated;
 
+-- ---------------------------------------------------------------- market calendar
+-- Markets → Календарь. Filled by supabase/functions/market-calendar: economic
+-- events from Forex Factory (this week), earnings dates, estimates and analyst
+-- targets from Yahoo Finance for the large caps of the top 20 economies
+-- (_shared/large-caps.ts). Gemini writes the Mongolian. Everyone may read;
+-- only the function (service role) writes.
+create table if not exists public.econ_events (
+  id text primary key,                         -- start time + currency + title
+  starts_at timestamptz not null,
+  currency text not null,                      -- as Forex Factory lists it: USD, EUR, CNY…
+  title text not null,                         -- English, as published
+  impact text not null,                        -- High · Medium
+  forecast text not null default '',
+  previous text not null default '',
+  actual text not null default '',
+  updated_at timestamptz not null default now()
+);
+create index if not exists econ_events_time on public.econ_events (starts_at);
+
+-- One Mongolian name and short explanation per indicator, written once and reused every week.
+create table if not exists public.econ_glossary (
+  title text not null,
+  currency text not null,
+  mn_title text not null,
+  mn_summary text not null,
+  model text not null default '',
+  created_at timestamptz not null default now(),
+  primary key (title, currency)
+);
+
+create table if not exists public.earnings_events (
+  symbol text primary key,                     -- Yahoo ticker
+  country text not null,                       -- ECONOMIES code
+  name text not null default '',
+  currency text not null default '',
+  report_date date,                            -- next report (Yahoo can lag: old dates are hidden on the site)
+  eps_estimate numeric,
+  revenue_estimate numeric,
+  price numeric,
+  target_mean numeric,
+  target_low numeric,
+  target_high numeric,
+  analysts integer,
+  recommendation text not null default '',     -- Yahoo key: strong_buy · buy · hold · underperform · sell
+  mn_summary text not null default '',         -- Gemini: what analysts expect, in Mongolian
+  summary_for text not null default '',        -- the report_date that summary was written for
+  updated_at timestamptz not null default now()
+);
+create index if not exists earnings_events_date on public.earnings_events (report_date);
+
+alter table public.econ_events enable row level security;
+alter table public.econ_glossary enable row level security;
+alter table public.earnings_events enable row level security;
+drop policy if exists "anyone reads econ events" on public.econ_events;
+create policy "anyone reads econ events" on public.econ_events for select to anon, authenticated using (true);
+drop policy if exists "anyone reads econ glossary" on public.econ_glossary;
+create policy "anyone reads econ glossary" on public.econ_glossary for select to anon, authenticated using (true);
+drop policy if exists "anyone reads earnings" on public.earnings_events;
+create policy "anyone reads earnings" on public.earnings_events for select to anon, authenticated using (true);
+revoke insert, update, delete on public.econ_events, public.econ_glossary, public.earnings_events from anon, authenticated;
+
 -- ---------------------------------------------------------------- admin insights
 -- Everything /admin/insights shows, computed here so personal details (age,
 -- region, gender) only leave the database as counts, and only for admins.
