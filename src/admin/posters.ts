@@ -1,45 +1,92 @@
-import { deskLabel } from "@/content/stories"
 import type { Desk } from "@/admin/types"
 import { publicUrl } from "@/lib/public-url"
 
 /*
  * Social posters for an article, drawn on a canvas in the browser so they cost
  * nothing to make and come out at the exact pixel sizes the networks want.
- * Brand book v2: Geologica headlines, Onest text, JetBrains Mono kickers,
- * soft black #16181C with Blue 500 #298DFF accents (large type and graphics only).
+ * Layout: full-bleed photo, a dark fade from the bottom, the headline in
+ * Geologica Medium (parts marked *like this* in Blue 500), the white logo and
+ * the date in Geologica ExtraLight. Every element can be moved and scaled in
+ * PosterDialog; positions are in poster pixels.
  */
 
 export type PosterFormat = "post" | "story"
+export type PosterLang = "mn" | "en"
+export type PosterElement = "photo" | "headline" | "logo" | "date"
 
 export const posterFormats: Record<PosterFormat, { width: number; height: number; label: string; hint: string }> = {
   post: { width: 1080, height: 1350, label: "Пост 1080×1350", hint: "Facebook, Instagram, X" },
   story: { width: 1080, height: 1920, label: "Стори 1080×1920", hint: "Instagram, Facebook story" },
 }
 
+/** What the editor opens the dialog with. */
 export interface PosterInput {
   title: string
   dek: string
   desk: Desk
   coverUrl: string
+  /** ISO date the poster shows; today when empty. */
+  date?: string
 }
 
-const INK = "#16181c"
-const TEXT = "#eef0f3"
+export interface PosterLayout {
+  /** Photo offset from centred cover-fit, and zoom (1 = just covers the poster). */
+  photo: { x: number; y: number; scale: number }
+  /** Bottom-left of the headline block (more lines grow upward), its wrap width and font size. */
+  headline: { x: number; y: number; w: number; size: number }
+  logo: { x: number; y: number; h: number }
+  /** `x` is the date's centre. */
+  date: { x: number; y: number; size: number }
+  /** Dark fade from the bottom: how dark (0–1) and how far up (share of the height). */
+  fade: { amount: number; height: number }
+}
+
+export interface PosterContent {
+  headline: string
+  date: string
+  coverUrl: string
+}
+
+export interface PosterAssets {
+  cover: HTMLImageElement | null
+  logo: HTMLImageElement | null
+}
+
+export type Box = { x: number; y: number; w: number; h: number }
+
 const BRAND = "#298dff"
-const HEADING = '"Geologica Variable", "Segoe UI", sans-serif'
-const BODY = '"Onest Variable", "Segoe UI", sans-serif'
-const MONO = '"JetBrains Mono Variable", Consolas, monospace'
-const SITE = "ediinzasag.mn"
+const WHITE = "#ffffff"
+const FONT = '"Geologica Variable", "Segoe UI", sans-serif'
+const LOGO_RATIO = 285 / 112
+
+export function defaultLayout(format: PosterFormat): PosterLayout {
+  const { width, height } = posterFormats[format]
+  const story = format === "story"
+  const pad = 60
+  const size = story ? 84 : 76
+  // Instagram covers the bottom ~300px of a story with its own UI, so the text sits higher there.
+  const headlineBottom = story ? height - 380 : height - 150
+  const logoH = story ? 96 : 84
+  return {
+    photo: { x: 0, y: 0, scale: 1 },
+    headline: { x: pad, y: headlineBottom, w: width - pad * 2 - Math.round(logoH * LOGO_RATIO) - 24, size },
+    logo: { x: width - pad - Math.round(logoH * LOGO_RATIO), y: headlineBottom - logoH, h: logoH },
+    date: { x: width / 2, y: story ? height - 300 : height - 64, size: 30 },
+    fade: { amount: 0.85, height: story ? 0.6 : 0.62 },
+  }
+}
+
+/** Today (or the given ISO date) as 2026/10/11. */
+export function posterDate(iso?: string) {
+  const date = iso ? new Date(iso) : new Date()
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`
+}
 
 /** Cyrillic sample so the browser fetches the glyph ranges with Ө and Ү, not just Latin. */
 async function loadFonts() {
-  const sample = "ӨөҮүАБВ EZ"
-  await Promise.all([
-    document.fonts.load(`700 80px ${HEADING}`, sample),
-    document.fonts.load(`400 34px ${BODY}`, sample),
-    document.fonts.load(`500 28px ${MONO}`, sample),
-    document.fonts.load(`600 26px ${MONO}`, sample),
-  ])
+  const sample = "ӨөҮүАБВ EZ 0123"
+  await Promise.all([document.fonts.load(`500 80px ${FONT}`, sample), document.fonts.load(`200 30px ${FONT}`, sample)])
 }
 
 function loadImage(src: string) {
@@ -53,164 +100,134 @@ function loadImage(src: string) {
   })
 }
 
-/** Word wrap; a word longer than the line is split by characters. */
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  const lines: string[] = []
-  let line = ""
-  for (const word of text.trim().split(/\s+/)) {
-    const next = line ? `${line} ${word}` : word
-    if (ctx.measureText(next).width <= maxWidth) {
-      line = next
-      continue
-    }
-    if (line) lines.push(line)
-    line = word
-    while (ctx.measureText(line).width > maxWidth && line.length > 1) {
-      let cut = line.length - 1
-      while (cut > 1 && ctx.measureText(line.slice(0, cut)).width > maxWidth) cut--
-      lines.push(line.slice(0, cut))
-      line = line.slice(cut)
-    }
-  }
-  if (line) lines.push(line)
-  return lines
-}
-
-/** Trims to `max` lines, ending the last one with an ellipsis. */
-function clamp(ctx: CanvasRenderingContext2D, lines: string[], max: number, maxWidth: number) {
-  if (lines.length <= max) return lines
-  const kept = lines.slice(0, max)
-  let last = kept[max - 1]
-  while (last && ctx.measureText(`${last}…`).width > maxWidth) last = last.replace(/\s*\S+$/, "")
-  kept[max - 1] = `${last}…`
-  return kept
-}
-
-/** The largest headline size (step 4px) that fits in `maxLines`. */
-function fitHeadline(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, maxLines: number, from: number, to: number) {
-  for (let size = from; size >= to; size -= 4) {
-    ctx.font = `700 ${size}px ${HEADING}`
-    const lines = wrap(ctx, text, maxWidth)
-    if (lines.length <= maxLines) return { size, lines }
-  }
-  ctx.font = `700 ${to}px ${HEADING}`
-  return { size: to, lines: clamp(ctx, wrap(ctx, text, maxWidth), maxLines, maxWidth) }
-}
-
-/** Draws `image` to fill the box, cropped like CSS object-fit: cover (biased slightly above centre, where faces usually are). */
-function drawCover(ctx: CanvasRenderingContext2D, image: HTMLImageElement, x: number, y: number, w: number, h: number) {
-  const scale = Math.max(w / image.naturalWidth, h / image.naturalHeight)
-  const sw = w / scale
-  const sh = h / scale
-  const sx = (image.naturalWidth - sw) / 2
-  const sy = (image.naturalHeight - sh) * 0.4
-  ctx.drawImage(image, sx, sy, sw, sh, x, y, w, h)
-}
-
-function fade(ctx: CanvasRenderingContext2D, y0: number, y1: number, stops: [number, number][]) {
-  const gradient = ctx.createLinearGradient(0, y0, 0, y1)
-  for (const [at, alpha] of stops) gradient.addColorStop(at, `rgb(22 24 28 / ${alpha})`)
-  ctx.fillStyle = gradient
-  ctx.fillRect(0, y0, ctx.canvas.width, y1 - y0)
-}
-
-/** Renders one poster and returns the canvas (call `toBlob` on it to save). */
-export async function renderPoster(input: PosterInput, format: PosterFormat) {
-  const { width, height } = posterFormats[format]
-  const story = format === "story"
-  const canvas = document.createElement("canvas")
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext("2d")!
-
+export async function loadPosterAssets(coverUrl: string): Promise<PosterAssets> {
   const [cover, logo] = await Promise.all([
-    input.coverUrl ? loadImage(input.coverUrl).catch(() => null) : Promise.resolve(null),
+    coverUrl ? loadImage(coverUrl).catch(() => null) : Promise.resolve(null),
     loadImage(publicUrl("brand/logo-white.png")).catch(() => null),
     loadFonts().catch(() => undefined),
   ])
+  return { cover, logo }
+}
 
-  const pad = 64
-  const textWidth = width - pad * 2
-  // Instagram covers the top ~250px and bottom ~300px of a story with its own UI.
-  const top = story ? 220 : pad
-  const bottom = height - (story ? 300 : pad)
-  const logoHeight = 64
+/** "*5.73* хувь" → [{ text: "5.73", blue: true }, { text: "хувь", blue: false }], one entry per word. */
+function words(text: string) {
+  const result: { text: string; blue: boolean }[] = []
+  text.split(/(\*[^*]+\*)/).forEach((part) => {
+    const blue = /^\*[^*]+\*$/.test(part)
+    for (const word of (blue ? part.slice(1, -1) : part).split(/\s+/)) if (word) result.push({ text: word, blue })
+  })
+  return result
+}
 
-  // Lay the text out first (stacked upward from the footer) so the photo's shade can sit right behind it.
-  const headline = fitHeadline(ctx, input.title || "Гарчиг", textWidth, story ? 6 : 5, story ? 96 : 84, story ? 60 : 52)
-  const lineHeight = Math.round(headline.size * 1.12)
-  const dekSize = story ? 38 : 34
-  const dekLineHeight = Math.round(dekSize * 1.4)
-  ctx.font = `400 ${dekSize}px ${BODY}`
-  const dekLines = input.dek.trim() ? clamp(ctx, wrap(ctx, input.dek, textWidth), headline.lines.length > 3 ? 2 : 3, textWidth) : []
+/** Word wrap into lines of words. A word wider than the line keeps its own line. */
+function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
+  const space = ctx.measureText(" ").width
+  const lines: { text: string; blue: boolean }[][] = []
+  let line: { text: string; blue: boolean }[] = []
+  let width = 0
+  for (const word of words(text)) {
+    const w = ctx.measureText(word.text).width
+    if (line.length && width + space + w > maxWidth) {
+      lines.push(line)
+      line = []
+      width = 0
+    }
+    width += (line.length ? space : 0) + w
+    line.push(word)
+  }
+  if (line.length) lines.push(line)
+  return lines
+}
 
-  const dekTop = bottom - 72 - dekLineHeight * Math.max(0, dekLines.length - 1)
-  const headlineBase = dekLines.length ? dekTop - dekSize - 36 : bottom - 72
-  const headlineTop = headlineBase - lineHeight * (headline.lines.length - 1)
-  const kickerHeight = 48
-  const kickerTop = headlineTop - headline.size - 28 - kickerHeight
+function photoBox(image: HTMLImageElement, width: number, height: number, photo: PosterLayout["photo"]): Box {
+  const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * photo.scale
+  const w = image.naturalWidth * scale
+  const h = image.naturalHeight * scale
+  return { x: (width - w) / 2 + photo.x, y: (height - h) / 2 + photo.y, w, h }
+}
 
-  ctx.fillStyle = INK
-  ctx.fillRect(0, 0, width, height)
-
-  if (cover) {
-    drawCover(ctx, cover, 0, 0, width, height)
-    fade(ctx, 0, top + logoHeight + 140, [[0, 0.75], [1, 0]]) // keeps the logo readable on bright photos
-    const shadeFrom = Math.max(top + logoHeight + 40, kickerTop - 320)
-    fade(ctx, shadeFrom, kickerTop + 40, [[0, 0], [1, 0.88]])
-    ctx.fillStyle = "rgb(22 24 28 / 0.88)"
-    ctx.fillRect(0, kickerTop + 40, width, height - kickerTop - 40)
-  } else {
-    // No cover: a blue arc so the poster still has a shape.
-    ctx.strokeStyle = BRAND
-    ctx.lineWidth = 6
-    ctx.globalAlpha = 0.5
-    ctx.beginPath()
-    ctx.arc(width * 0.9, story ? 520 : 300, story ? 520 : 380, 0, Math.PI * 2)
-    ctx.stroke()
-    ctx.globalAlpha = 1
+/**
+ * Draws a poster and returns where each element landed, so the editor can
+ * hit-test drags. Synchronous: load assets once with loadPosterAssets.
+ */
+export function drawPoster(ctx: CanvasRenderingContext2D, format: PosterFormat, content: PosterContent, layout: PosterLayout, assets: PosterAssets) {
+  const { width, height } = posterFormats[format]
+  const boxes: Record<PosterElement, Box> = {
+    photo: { x: 0, y: 0, w: width, h: height },
+    headline: { x: 0, y: 0, w: 0, h: 0 },
+    logo: { x: 0, y: 0, w: 0, h: 0 },
+    date: { x: 0, y: 0, w: 0, h: 0 },
   }
 
-  if (logo) ctx.drawImage(logo, pad, top, (logo.naturalWidth / logo.naturalHeight) * logoHeight, logoHeight)
+  ctx.fillStyle = "#16181c"
+  ctx.fillRect(0, 0, width, height)
+  if (assets.cover) {
+    boxes.photo = photoBox(assets.cover, width, height, layout.photo)
+    ctx.drawImage(assets.cover, boxes.photo.x, boxes.photo.y, boxes.photo.w, boxes.photo.h)
+  }
+
+  // The fade: clear at its top, `amount` black at the bottom, eased so it has no visible edge.
+  const fadeTop = height * (1 - layout.fade.height)
+  const gradient = ctx.createLinearGradient(0, fadeTop, 0, height)
+  for (const [at, share] of [[0, 0], [0.35, 0.45], [0.7, 0.85], [1, 1]] as const) {
+    gradient.addColorStop(at, `rgb(0 0 0 / ${(layout.fade.amount * share).toFixed(3)})`)
+  }
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, fadeTop, width, height - fadeTop)
 
   ctx.textBaseline = "alphabetic"
 
-  // Kicker: a solid Blue 500 label with black text (6.35:1), readable on any photo.
-  ctx.font = `600 26px ${MONO}`
-  const kicker = `${deskLabel[input.desk].toUpperCase()} · EZ ТОЙМ`
-  const kickerWidth = ctx.measureText(kicker).width + 40
-  ctx.fillStyle = BRAND
-  ctx.beginPath()
-  ctx.roundRect(pad, kickerTop, kickerWidth, kickerHeight, kickerHeight / 2)
-  ctx.fill()
-  ctx.fillStyle = INK
-  ctx.fillText(kicker, pad + 20, kickerTop + 33)
+  const { headline } = layout
+  ctx.font = `500 ${headline.size}px ${FONT}`
+  const lines = wrap(ctx, content.headline.trim() || "Гарчиг", headline.w)
+  const lineHeight = headline.size * 1.12
+  const top = headline.y - lineHeight * lines.length
+  const space = ctx.measureText(" ").width
+  let widest = 0
+  lines.forEach((line, index) => {
+    let x = headline.x
+    const y = top + headline.size * 0.92 + index * lineHeight
+    line.forEach((word) => {
+      ctx.fillStyle = word.blue ? BRAND : WHITE
+      ctx.fillText(word.text, x, y)
+      x += ctx.measureText(word.text).width + space
+    })
+    widest = Math.max(widest, x - space - headline.x)
+  })
+  boxes.headline = { x: headline.x, y: top, w: Math.max(widest, 40), h: lineHeight * lines.length }
 
-  ctx.font = `700 ${headline.size}px ${HEADING}`
-  ctx.fillStyle = TEXT
-  headline.lines.forEach((line, index) => ctx.fillText(line, pad, headlineTop + index * lineHeight))
-
-  if (dekLines.length) {
-    ctx.font = `400 ${dekSize}px ${BODY}`
-    ctx.globalAlpha = 0.78
-    dekLines.forEach((line, index) => ctx.fillText(line, pad, dekTop + index * dekLineHeight))
-    ctx.globalAlpha = 1
+  if (assets.logo) {
+    const w = layout.logo.h * (assets.logo.naturalWidth / assets.logo.naturalHeight)
+    ctx.drawImage(assets.logo, layout.logo.x, layout.logo.y, w, layout.logo.h)
+    boxes.logo = { x: layout.logo.x, y: layout.logo.y, w, h: layout.logo.h }
   }
 
-  // Footer: site address, plus a call to read on for the story.
-  ctx.font = `500 28px ${MONO}`
-  ctx.globalAlpha = 0.75
-  ctx.fillText(story ? `Бүтнээр нь уншаарай · ${SITE}` : SITE, pad, bottom)
-  ctx.globalAlpha = 1
-  ctx.fillStyle = BRAND
-  ctx.fillRect(width - pad - 96, bottom - 12, 96, 6)
+  if (content.date.trim()) {
+    ctx.font = `200 ${layout.date.size}px ${FONT}`
+    ctx.fillStyle = WHITE
+    ctx.textAlign = "center"
+    ctx.fillText(content.date, layout.date.x, layout.date.y)
+    ctx.textAlign = "left"
+    const w = ctx.measureText(content.date).width
+    boxes.date = { x: layout.date.x - w / 2, y: layout.date.y - layout.date.size, w, h: layout.date.size * 1.25 }
+  }
 
+  return boxes
+}
+
+/** Renders one poster at full size for download. */
+export async function renderPoster(format: PosterFormat, content: PosterContent, layout: PosterLayout, assets?: PosterAssets) {
+  const { width, height } = posterFormats[format]
+  const canvas = document.createElement("canvas")
+  canvas.width = width
+  canvas.height = height
+  drawPoster(canvas.getContext("2d")!, format, content, layout, assets ?? (await loadPosterAssets(content.coverUrl)))
   return canvas
 }
 
-export function posterFileName(slug: string, format: PosterFormat) {
+export function posterFileName(slug: string, format: PosterFormat, lang: PosterLang) {
   const { width, height } = posterFormats[format]
-  return `ez-${slug || "poster"}-${width}x${height}.png`
+  return `ez-${slug || "poster"}-${lang}-${width}x${height}.png`
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement) {

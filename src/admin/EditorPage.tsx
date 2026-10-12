@@ -480,7 +480,7 @@ export function EditorPage() {
             </button>
             <button
               type="button"
-              onClick={() => setPosterInput({ title: draft.title, dek: draft.dek, desk: draft.desk, coverUrl: draft.coverUrl })}
+              onClick={() => setPosterInput({ title: draft.title, dek: draft.dek, desk: draft.desk, coverUrl: draft.coverUrl, date: article?.publishedAt ?? undefined })}
               title="Facebook, Instagram, X-д зориулсан постер"
               className={buttonClass.ghost}
             >
