@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react"
-import { Download, RotateCcw, X } from "lucide-react"
+import { Download, ImageUp, RotateCcw, Undo2, X } from "lucide-react"
 import { cn } from "cn"
 
 import {
   canvasToBlob,
+  clampPhoto,
   defaultLayout,
   drawPoster,
   joinWords,
@@ -103,24 +104,45 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
   const [assets, setAssets] = useState<PosterAssets | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
+  /** A photo someone picked for this poster only; the article's cover is left as it is. */
+  const [upload, setUpload] = useState<{ url: string; name: string } | null>(null)
+  const coverUrl = upload?.url ?? input.coverUrl
+  const fileRef = useRef<HTMLInputElement>(null)
 
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const drag = useRef<{ startX: number; startY: number; from: PosterLayout["photo"] } | null>(null)
 
   const layout = layouts[format]
   const setLayout = useCallback((next: (current: PosterLayout) => PosterLayout) => setLayouts((all) => ({ ...all, [format]: next(all[format]) })), [format])
-  const zoomTo = useCallback(
-    (scale: number) => setLayout((current) => ({ ...current, photo: { ...current.photo, scale: Math.min(ZOOM.max, Math.max(ZOOM.min, scale)) } })),
-    [setLayout],
+  const cover = assets?.cover ?? null
+  /** Every move and zoom goes through clampPhoto, so the photo always fills the poster. */
+  const setPhoto = useCallback(
+    (next: (photo: PosterLayout["photo"]) => PosterLayout["photo"]) => setLayout((current) => ({ ...current, photo: clampPhoto(cover, format, next(current.photo)) })),
+    [setLayout, cover, format],
   )
+  const zoomTo = useCallback((scale: number) => setPhoto((photo) => ({ ...photo, scale: Math.min(ZOOM.max, Math.max(ZOOM.min, scale)) })), [setPhoto])
+
+  function pickPhoto(file: File | undefined) {
+    if (!file) return
+    if (!file.type.startsWith("image/")) return setError("Зөвхөн зураг оруулна уу (JPG, PNG, WebP).")
+    if (file.size > 20_000_000) return setError("Зураг 20MB-аас бага байх ёстой.")
+    setError("")
+    // A data URL, so the canvas stays exportable (no cross-site image).
+    const reader = new FileReader()
+    reader.onload = () => {
+      setUpload({ url: String(reader.result), name: file.name })
+      setLayouts((all) => ({ post: { ...all.post, photo: defaultLayout().photo }, story: { ...all.story, photo: defaultLayout().photo } }))
+    }
+    reader.readAsDataURL(file)
+  }
 
   useEffect(() => {
     let cancelled = false
-    loadPosterAssets(input.coverUrl).then((loaded) => !cancelled && setAssets(loaded))
+    loadPosterAssets(coverUrl).then((loaded) => !cancelled && setAssets(loaded))
     return () => {
       cancelled = true
     }
-  }, [input.coverUrl])
+  }, [coverUrl])
 
   useEffect(() => {
     try {
@@ -133,8 +155,8 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas || !assets) return
-    drawPoster(canvas.getContext("2d")!, format, { headline: text[lang], date, coverUrl: input.coverUrl }, layout, assets)
-  }, [assets, format, layout, text, lang, date, input.coverUrl])
+    drawPoster(canvas.getContext("2d")!, format, { headline: text[lang], date, coverUrl }, layout, assets)
+  }, [assets, format, layout, text, lang, date, coverUrl])
 
   const toPoster = (event: { clientX: number; clientY: number }) => {
     const rect = canvasRef.current!.getBoundingClientRect()
@@ -152,7 +174,7 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
     if (!drag.current) return
     const point = toPoster(event)
     const { startX, startY, from } = drag.current
-    setLayout((current) => ({ ...current, photo: { ...current.photo, x: Math.round(from.x + point.x - startX), y: Math.round(from.y + point.y - startY) } }))
+    setPhoto((photo) => ({ ...photo, x: from.x + point.x - startX, y: from.y + point.y - startY }))
   }
 
   // Wheel zooms the photo. Not a React handler: those are passive and can't stop the page scrolling.
@@ -178,7 +200,7 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
     setError("")
     try {
       for (const item of which) {
-        const canvas = await renderPoster(item.format, { headline: text[item.lang], date, coverUrl: input.coverUrl }, layouts[item.format], assets ?? undefined)
+        const canvas = await renderPoster(item.format, { headline: text[item.lang], date, coverUrl }, layouts[item.format], assets ?? undefined)
         save(await canvasToBlob(canvas), posterFileName(slug, item.format, item.lang))
       }
     } catch {
@@ -280,6 +302,23 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
 
           <div className="flex flex-col gap-3">
             <span className="text-[12px] font-medium">Зураг</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => fileRef.current?.click()} className={cn(buttonClass.ghost, "h-8 px-3 text-[12px]")}>
+                <ImageUp className="size-3.5" />
+                {upload ? "Өөр зураг" : "Зураг солих"}
+              </button>
+              {upload ? (
+                <button type="button" onClick={() => setUpload(null)} className={cn(buttonClass.ghost, "h-8 px-3 text-[12px]")}>
+                  <Undo2 className="size-3.5" />
+                  Нийтлэлийн зураг
+                </button>
+              ) : null}
+              <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => {
+                pickPhoto(event.target.files?.[0])
+                event.target.value = ""
+              }} />
+            </div>
+            {upload ? <span className="text-muted-foreground truncate text-[11px]">Зөвхөн постерт: {upload.name}</span> : null}
             <Slider label="Томруулах" value={layout.photo.scale} min={ZOOM.min} max={ZOOM.max} step={0.01} onChange={zoomTo} />
           </div>
 
@@ -295,9 +334,9 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
           </button>
 
           {error ? <Notice tone="error">{error}</Notice> : null}
-          {!input.coverUrl ? <Notice>Нүүр зураггүй байна. Нүүр зураг нэмбэл постер илүү анхаарал татна.</Notice> : null}
-          {input.coverUrl && assets && !assets.cover ? <Notice tone="error">Нүүр зургийг ачаалж чадсангүй.</Notice> : null}
-          {input.coverUrl && !coverCleared ? (
+          {!coverUrl ? <Notice>Зураггүй байна. "Зураг солих"-оор постерт зураг нэмнэ үү.</Notice> : null}
+          {coverUrl && assets && !assets.cover ? <Notice tone="error">Зургийг ачаалж чадсангүй.</Notice> : null}
+          {!upload && input.coverUrl && !coverCleared ? (
             <Notice tone="error">Агентын оруулсан зургийг ашиглах эрхийг баталгаажуулаагүй байна. Сошиалд тавихаас өмнө шалгана уу.</Notice>
           ) : null}
         </aside>

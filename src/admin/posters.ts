@@ -141,7 +141,25 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
   return lines
 }
 
-function photoBox(image: HTMLImageElement, width: number, height: number, photo: PosterLayout["photo"]) {
+/**
+ * Keeps the photo covering the whole poster: zoom never below 1 (just covers),
+ * and the offset never far enough to show an edge. The editor runs every drag
+ * and zoom through this; drawPoster does too, for layouts saved before.
+ */
+export function clampPhoto(image: HTMLImageElement | null, format: PosterFormat, photo: PosterLayout["photo"]): PosterLayout["photo"] {
+  const scale = Math.max(1, photo.scale)
+  if (!image) return { ...photo, scale }
+  const { width, height } = posterFormats[format]
+  const fit = Math.max(width / image.naturalWidth, height / image.naturalHeight) * scale
+  const spareX = (image.naturalWidth * fit - width) / 2
+  const spareY = (image.naturalHeight * fit - height) / 2
+  const within = (value: number, limit: number) => Math.round(Math.min(limit, Math.max(-limit, value)))
+  return { scale, x: within(photo.x, spareX), y: within(photo.y, spareY) }
+}
+
+function photoBox(image: HTMLImageElement, format: PosterFormat, layoutPhoto: PosterLayout["photo"]) {
+  const { width, height } = posterFormats[format]
+  const photo = clampPhoto(image, format, layoutPhoto)
   const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight) * photo.scale
   const w = image.naturalWidth * scale
   const h = image.naturalHeight * scale
@@ -156,7 +174,7 @@ export function drawPoster(ctx: CanvasRenderingContext2D, format: PosterFormat, 
   ctx.fillStyle = "#16181c"
   ctx.fillRect(0, 0, width, height)
   if (assets.cover) {
-    const photo = photoBox(assets.cover, width, height, layout.photo)
+    const photo = photoBox(assets.cover, format, layout.photo)
     ctx.drawImage(assets.cover, photo.x, photo.y, photo.w, photo.h)
   }
 
