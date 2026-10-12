@@ -8,17 +8,19 @@ import { Select } from "@/admin/Select"
 import { buttonClass, inputClass } from "@/admin/ui"
 import type { Article, Member, Tag } from "@/admin/types"
 import { deskLabel, type Desk } from "@/content/stories"
+import { publicUrl } from "@/lib/public-url"
 
 /*
  * The board: four tiles (what to do, drafts, in review, published) are the only
- * navigation; each row says what to do with it in one button. Search covers
+ * navigation; each card shows the cover (or an EZ default), tag, headline and
+ * opening text, and says what to do with it in one button. Search covers
  * every article; the rarer filters hide behind "Шүүлтүүр". Tile, search and
  * filters live in the URL, so back from the editor lands on the same view.
  */
 
 export type BoardTile = "todo" | "drafts" | "review" | "published"
 
-const STEP = 30
+const STEP = 24
 
 const tiles: { key: BoardTile; label: string; hint: string }[] = [
   { key: "todo", label: "Хийх ажил", hint: "Таны хийх зүйл" },
@@ -65,44 +67,81 @@ function StatusText({ article }: { article: Article }) {
   return <span className={tone}>{statusMeta[article.status].label}</span>
 }
 
-function Row({ article, member, tags }: { article: Article; member: Member; tags: Map<string, string> }) {
+/** The card's text: the summary, else the body's opening, else a placeholder. */
+function excerpt(article: Article) {
+  if (article.dek.trim()) return { text: article.dek.trim(), placeholder: false }
+  const body = article.body.replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim()
+  if (body) return { text: body.slice(0, 220), placeholder: false }
+  return { text: "Товч агуулга хараахан бичигдээгүй байна.", placeholder: true }
+}
+
+/** No cover yet: a dark EZ panel with the logo, so the card still looks finished. */
+function DefaultCover({ article }: { article: Article }) {
+  return (
+    <div className="relative grid h-full w-full place-items-center overflow-hidden bg-[#16181c]">
+      <div className="absolute -right-20 -bottom-28 size-52 rounded-full border-[6px] border-[#298dff]/40" aria-hidden />
+      <img src={publicUrl("brand/logo-white.png")} alt="" className="relative h-9 w-auto opacity-90" />
+      <span className="absolute bottom-2.5 left-3 font-mono text-[10px] tracking-wider text-white/60 uppercase">{deskLabel[article.desk]}</span>
+    </div>
+  )
+}
+
+function Card({ article, member, tags }: { article: Article; member: Member; tags: Map<string, string> }) {
   const label = action(article, member)
   const primary = label !== "Нээх"
-  const firstTag = article.tags[0]
+  const tag = article.tags[0] ? tags.get(article.tags[0]) ?? article.tags[0] : deskLabel[article.desk]
+  const text = excerpt(article)
   return (
     <li>
-      <Link to={`/edit/${article.id}`} className="hover:bg-foreground/[0.025] group flex items-center gap-4 px-5 py-4 transition-colors">
-        <div className="min-w-0 flex-1">
-          <p className="font-news line-clamp-2 text-[16px] leading-snug">
-            {article.origin === "bot" ? <Bot className="text-muted-foreground mr-1.5 inline size-4 align-[-2px]" aria-label="Агентын мэдээ" /> : null}
-            {article.title || <span className="text-muted-foreground">Гарчиггүй ноорог</span>}
-          </p>
-          <p className="text-muted-foreground mt-1 flex flex-wrap items-center gap-x-1.5 text-[13px]">
-            <span>{article.authorName || "Агент"}</span>
-            <span aria-hidden>·</span>
-            <span title={formatWhen(article.updatedAt)}>{timeAgo(article.publishedAt && article.status === "published" ? article.publishedAt : article.updatedAt)}</span>
-            {firstTag ? (
-              <>
-                <span aria-hidden>·</span>
-                <span>#{tags.get(firstTag) ?? firstTag}</span>
-              </>
-            ) : null}
-            <span aria-hidden>·</span>
-            <StatusText article={article} />
-          </p>
-          {article.status === "changes_requested" && article.reviewNote ? (
-            <p className="mt-1.5 line-clamp-1 text-[13px] text-[var(--down)]">Редактор: “{article.reviewNote}”</p>
-          ) : null}
-        </div>
-        <span
-          className={cn(
-            "inline-flex h-9 shrink-0 items-center gap-1 rounded-full px-4 text-[13px] font-medium transition-colors",
-            primary ? "bg-foreground text-background group-hover:bg-foreground/85" : "text-muted-foreground group-hover:text-foreground border",
+      <Link
+        to={`/edit/${article.id}`}
+        className="bg-card hover:border-foreground/30 group flex h-full flex-col overflow-hidden rounded-xl border shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-colors"
+      >
+        <div className="bg-muted aspect-[16/9] overflow-hidden">
+          {article.coverUrl ? (
+            <img
+              src={article.coverUrl}
+              alt=""
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              onError={(event) => (event.currentTarget.style.display = "none")}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          ) : (
+            <DefaultCover article={article} />
           )}
-        >
-          {label}
-          <ArrowRight className="size-3.5" />
-        </span>
+        </div>
+        <div className="flex flex-1 flex-col gap-2 p-4">
+          <span className="text-brand-strong flex items-center gap-1.5 font-mono text-[11px] font-medium tracking-wide uppercase">
+            {article.origin === "bot" ? <Bot className="size-3.5" aria-label="Агентын мэдээ" /> : null}#{tag}
+          </span>
+          <h3 className="font-news line-clamp-2 text-[17px] leading-snug">
+            {article.title || <span className="text-muted-foreground">Гарчиггүй ноорог</span>}
+          </h3>
+          {article.status === "changes_requested" && article.reviewNote ? (
+            <p className="line-clamp-2 text-[13px] text-[var(--down)]">Редактор: “{article.reviewNote}”</p>
+          ) : (
+            <p className={cn("line-clamp-2 text-[13px] leading-relaxed", text.placeholder ? "text-muted-foreground/70 italic" : "text-muted-foreground")}>{text.text}</p>
+          )}
+          <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+            <p className="text-muted-foreground min-w-0 truncate text-[12px]">
+              <StatusText article={article} />
+              <span aria-hidden> · </span>
+              {article.authorName || "Агент"}
+              <span aria-hidden> · </span>
+              <span title={formatWhen(article.updatedAt)}>{timeAgo(article.publishedAt && article.status === "published" ? article.publishedAt : article.updatedAt)}</span>
+            </p>
+            <span
+              className={cn(
+                "inline-flex h-8 shrink-0 items-center gap-1 rounded-full px-3.5 text-[12px] font-medium transition-colors",
+                primary ? "bg-foreground text-background group-hover:bg-foreground/85" : "text-muted-foreground group-hover:text-foreground border",
+              )}
+            >
+              {label}
+              <ArrowRight className="size-3.5" />
+            </span>
+          </div>
+        </div>
       </Link>
     </li>
   )
@@ -269,11 +308,11 @@ export function BoardList({ articles, tags, member }: { articles: Article[] | nu
         <p className="text-muted-foreground mb-2 px-1 text-[13px]">
           {searching ? `“${query.trim()}” — ${list.length.toLocaleString("en-US")} илэрц` : `${current.label} · ${list.length.toLocaleString("en-US")}`}
         </p>
-        <div className="bg-card overflow-hidden rounded-xl border">
+        <div>
           {articles === null ? (
-            <p className="text-muted-foreground px-5 py-12 text-center text-[14px]">Ачаалж байна…</p>
+            <p className="bg-card text-muted-foreground rounded-xl border px-5 py-12 text-center text-[14px]">Ачаалж байна…</p>
           ) : shown.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 px-5 py-12 text-center">
+            <div className="bg-card flex flex-col items-center gap-3 rounded-xl border px-5 py-12 text-center">
               <p className="text-muted-foreground text-[14px]">
                 {searching
                   ? "Илэрц олдсонгүй."
@@ -291,9 +330,9 @@ export function BoardList({ articles, tags, member }: { articles: Article[] | nu
               ) : null}
             </div>
           ) : (
-            <ul className="divide-y">
+            <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((article) => (
-                <Row key={article.id} article={article} member={member} tags={tagLabels} />
+                <Card key={article.id} article={article} member={member} tags={tagLabels} />
               ))}
             </ul>
           )}
