@@ -394,31 +394,31 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
 
       </div>
 
-      {/* The working row runs edge to edge, 10px from each side: calendar | chart | explanation. */}
-      <div className="mt-4 grid gap-[10px] px-[10px] xl:grid-cols-[17.5rem_minmax(0,1fr)_21rem] 2xl:grid-cols-[19rem_minmax(0,1fr)_23rem] [&>*]:min-w-0">
-        <DayRail econ={econ} earnings={earnings} week={week} day={day} today={today} now={now} pick={pick} onDay={setDay} onPick={choose} />
-        <div className="order-2 flex min-w-0 flex-col gap-[10px]">
-          <Watchlist
-            current={chart}
-            linked={linked}
-            companies={companies}
-            onPick={(item, fromCompanies) => {
-              setChart(item)
-              setLinked(fromCompanies)
-            }}
-          />
-          <TradingViewChart
-            symbol={chart.symbol}
-            title={chart.label}
-            theme="dark"
-            background={STUDIO}
-            className="h-[480px] rounded-xl border border-white/10 sm:h-[640px] xl:h-[760px]"
-          />
+      {/* The working row runs edge to edge, 10px from each side: calendar + explanation | chart | pairs. */}
+      <div className="mt-4 grid gap-[10px] px-[10px] xl:grid-cols-[21rem_minmax(0,1fr)_16rem] 2xl:grid-cols-[23rem_minmax(0,1fr)_18rem] [&>*]:min-w-0">
+        {/* xl: the side columns are exactly as tall as the chart and scroll inside. */}
+        <div className="flex min-w-0 flex-col gap-[10px] xl:h-0 xl:min-h-full">
+          <DayRail econ={econ} earnings={earnings} week={week} day={day} today={today} now={now} pick={pick} onDay={setDay} onPick={choose} />
+          <div className="order-first min-h-0 rounded-xl xl:order-none xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-width:thin]">
+            <Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />
+          </div>
         </div>
-        <div className="order-1 flex min-w-0 flex-col gap-[10px] xl:order-3">
-          <Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />
-          <UpNext econ={econ} earnings={earnings} now={now} today={today} pick={pick} onPick={choose} />
-        </div>
+        <TradingViewChart
+          symbol={chart.symbol}
+          title={chart.label}
+          theme="dark"
+          background={STUDIO}
+          className="h-[480px] rounded-xl border border-white/10 sm:h-[640px] xl:h-[820px]"
+        />
+        <PairRail
+          current={chart}
+          linked={linked}
+          companies={companies}
+          onPick={(item, fromCompanies) => {
+            setChart(item)
+            setLinked(fromCompanies)
+          }}
+        />
       </div>
 
       <div className="px-[10px] pb-10">
@@ -621,72 +621,75 @@ function Timeline(props: {
 }
 
 /* ------------------------------------------------------------------ */
-/* Watchlist chips above the chart                                     */
+/* Pairs: the chart's watchlist, a rail on the right                   */
 /* ------------------------------------------------------------------ */
 
-function Watchlist({ current, linked, companies, onPick }: { current: ChartPick; linked: boolean; companies: ChartPick[]; onPick: (item: ChartPick, fromCompanies: boolean) => void }) {
-  const groups = [...GROUPS, ...(companies.length ? [{ id: "companies", title: "Тайлан гаргах компаниуд", items: companies }] : [])]
+function PairRail({ current, linked, companies, onPick }: { current: ChartPick; linked: boolean; companies: ChartPick[]; onPick: (item: ChartPick, fromCompanies: boolean) => void }) {
+  const groups = [...GROUPS, ...(companies.length ? [{ id: "companies", title: "Компаниуд", items: companies }] : [])]
   const home = groups.find((group) => group.items.some((item) => item.symbol === current.symbol))?.id ?? groups[0].id
   const [open, setOpen] = useState(home)
   // Follow the chart: when news switches it, show the group that holds the new market.
   useEffect(() => setOpen(home), [home])
   const group = groups.find((entry) => entry.id === open) ?? groups[0]
+  const short: Record<string, string> = { mongolia: "Монгол", fx: "Валют", indices: "Индекс", companies: "Компани" }
 
   return (
-    <div className={cn(panel, "p-2")}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div role="tablist" aria-label="Зах зээлийн бүлэг" className="flex gap-1 overflow-x-auto [scrollbar-width:none]">
-          {groups.map((entry) => (
-            <button
-              key={entry.id}
-              type="button"
-              role="tab"
-              aria-selected={entry.id === open}
-              onClick={() => setOpen(entry.id)}
-              className={cn(
-                "h-8 shrink-0 rounded-lg px-3 text-[12.5px] font-medium whitespace-nowrap transition-colors",
-                entry.id === open ? "bg-white text-[#16181c]" : "text-white/60 hover:bg-white/8 hover:text-white",
-              )}
-            >
-              {entry.title}
-              <span className="ml-1.5 font-mono text-[10.5px] opacity-55">{entry.items.length}</span>
-            </button>
-          ))}
-        </div>
-        <p className="flex min-w-0 items-center gap-2 px-2 text-[12px]">
-          {linked ? <span className="text-brand shrink-0 text-[10px] font-semibold tracking-[0.12em] uppercase">Мэдээтэй холбоотой</span> : null}
-          <span className="truncate font-semibold">{current.label}</span>
-          <span className="shrink-0 font-mono text-[11px] text-white/40">{current.code}</span>
-        </p>
+    <aside aria-label="Зах зээлүүд" className={cn(panel, "flex min-w-0 flex-col xl:h-0 xl:min-h-full")}>
+      <div className="border-b border-white/10 px-3 pt-3 pb-2.5">
+        <p className={label}>{linked ? <span className="text-brand">Мэдээтэй холбоотой</span> : "Графикт"}</p>
+        <p className="mt-1 truncate text-[14px] font-semibold">{current.label}</p>
+        <p className="font-mono text-[11px] text-white/40">{current.code}</p>
       </div>
-      <div className="mt-2 flex flex-wrap gap-1.5 border-t border-white/[0.07] pt-2">
+      <div role="tablist" aria-label="Бүлэг" className="grid grid-cols-2 gap-1 border-b border-white/10 p-1.5">
+        {groups.map((entry) => (
+          <button
+            key={entry.id}
+            type="button"
+            role="tab"
+            aria-selected={entry.id === open}
+            title={entry.title}
+            onClick={() => setOpen(entry.id)}
+            className={cn(
+              "flex h-8 items-center justify-between rounded-md px-2.5 text-[12px] font-medium transition-colors",
+              entry.id === open ? "bg-white text-[#16181c]" : "text-white/60 hover:bg-white/8 hover:text-white",
+            )}
+          >
+            {short[entry.id] ?? entry.title}
+            <span className="font-mono text-[10px] opacity-50">{entry.items.length}</span>
+          </button>
+        ))}
+      </div>
+      <ul className="max-h-[360px] min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 [scrollbar-width:thin] xl:max-h-none">
         {group.items.map((item) => {
           const active = item.symbol === current.symbol
           return (
-            <button
-              key={item.symbol}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onPick(item, group.id === "companies")}
-              className={cn(
-                "flex items-center gap-2 rounded-md border px-2 py-1 text-left transition-colors",
-                active ? "border-brand bg-brand/20" : "border-white/10 hover:border-white/25 hover:bg-white/6",
-              )}
-            >
-              <span className="text-[12.5px] font-medium whitespace-nowrap">{item.label}</span>
-              {item.quote ? (
-                <span className="flex items-center gap-1.5 text-[11px] whitespace-nowrap">
-                  <span className="text-white/60 tabular-nums">{item.quote.denom.kind === "index" || item.quote.denom.kind === "percent" ? item.quote.price : formatValue(item.quote.price, item.quote.denom)}</span>
-                  {item.quote.pct !== 0 ? <Change pct={item.quote.pct} /> : null}
+            <li key={item.symbol}>
+              <button
+                type="button"
+                aria-pressed={active}
+                onClick={() => onPick(item, group.id === "companies")}
+                className={cn(
+                  "grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-2 rounded-md border-l-2 px-2.5 py-2 text-left transition-colors",
+                  active ? "border-brand bg-white/10" : "border-transparent hover:bg-white/6",
+                )}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-[13px] font-medium">{item.label}</span>
+                  <span className="block font-mono text-[10.5px] text-white/40">{item.code}</span>
                 </span>
-              ) : (
-                <span className="font-mono text-[10.5px] text-white/35">{item.code}</span>
-              )}
-            </button>
+                {item.quote ? (
+                  <span className="flex flex-col items-end gap-0.5">
+                    <span className="text-[12px] text-white/75 tabular-nums">{item.quote.denom.kind === "index" || item.quote.denom.kind === "percent" ? item.quote.price : formatValue(item.quote.price, item.quote.denom)}</span>
+                    {item.quote.pct !== 0 ? <Change pct={item.quote.pct} /> : null}
+                  </span>
+                ) : null}
+              </button>
+            </li>
           )
         })}
-      </div>
-    </div>
+      </ul>
+      <p className="border-t border-white/10 px-3 py-2 text-[10.5px] leading-snug text-white/40">Үнэ: эх сурвалжийн сүүлийн хаалт. График дээрх хайлтаар бусад зах зээлийг нээнэ.</p>
+    </aside>
   )
 }
 
@@ -903,51 +906,6 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
 }
 
 /* ------------------------------------------------------------------ */
-/* Up next                                                             */
-/* ------------------------------------------------------------------ */
-
-function UpNext({ econ, earnings, now, today, pick, onPick }: { econ: Cluster[]; earnings: EarningsEvent[]; now: number; today: string; pick: Pick | null; onPick: (pick: Pick) => void }) {
-  const items = [
-    ...econ.filter((cluster) => cluster.at > now - 5 * 60_000).map((cluster) => ({ at: cluster.at, pick: { kind: "econ", id: cluster.events[0].id } as Pick, title: cluster.events[0].mnTitle || cluster.events[0].title, sub: cluster.events.length > 1 ? `${cluster.events[0].country} · +${cluster.events.length - 1}` : cluster.events[0].country, high: cluster.high, time: ubParts(cluster.at).time })),
-    ...earnings.filter((item) => item.reportDate >= today).map((item) => ({ at: dayStartMs(item.reportDate) + 1, pick: { kind: "earn", symbol: item.symbol } as Pick, title: item.name, sub: `${item.countryName} · ашгийн тайлан`, high: false, time: "Өдөржин" })),
-  ]
-    .sort((a, b) => a.at - b.at)
-    .slice(0, 5)
-  if (!items.length) return null
-  return (
-    <div className={cn(panel, "p-2")}>
-      <p className={cn(label, "px-3 pt-2 pb-1")}>Дараа нь</p>
-      <ul>
-        {items.map((item) => {
-          const selected = JSON.stringify(item.pick) === JSON.stringify(pick)
-          return (
-            <li key={JSON.stringify(item.pick)}>
-              <button
-                type="button"
-                onClick={() => onPick(item.pick)}
-                className={cn("grid w-full grid-cols-[3.5rem_minmax(0,1fr)] items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors", selected ? "bg-white/10" : "hover:bg-white/6")}
-              >
-                <span className="font-mono text-[12px] text-white/60 tabular-nums">
-                  <span className="block text-[10px] text-white/35">{ubParts(item.at).day === today ? "Өнөөдөр" : shortWeekdays[weekdayOf(ubParts(item.at).day)]}</span>
-                  {item.time}
-                </span>
-                <span className="min-w-0">
-                  <span className="flex items-center gap-1.5">
-                    {item.high ? <span className="size-1.5 shrink-0 rounded-full" style={{ background: HOT }} /> : null}
-                    <span className="truncate text-[13px] font-medium">{item.title}</span>
-                  </span>
-                  <span className="block truncate text-[11px] text-white/45">{item.sub}</span>
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
 /* Day rail: the calendar beside the chart, one line per item          */
 /* ------------------------------------------------------------------ */
 
@@ -961,7 +919,7 @@ function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }:
 
   return (
     // xl: as tall as the chart beside it; the list scrolls inside.
-    <aside aria-label="Календарь" className={cn(panel, "order-3 flex min-w-0 flex-col xl:order-1 xl:h-0 xl:min-h-full")}>
+    <aside aria-label="Календарь" className={cn(panel, "flex min-w-0 flex-col xl:max-h-[48%] xl:min-h-0 xl:shrink-0")}>
       <div role="tablist" aria-label="Өдөр" className="grid grid-cols-7 gap-0.5 border-b border-white/10 p-1.5">
         {days.map((target) => {
           const count = releasesOf(target).length + reportsOf(target).length
