@@ -29,6 +29,7 @@ import { rankByRules, score, sourceCard } from "./rules.ts"
 import { EXEMPLARS, STYLE_CARD, STYLE_PAIRS } from "../_shared/style-card.ts"
 import { lintStyle } from "../_shared/style-lint.ts"
 import { termsFor } from "../_shared/termbase.ts"
+import { flashBackups, geminiAsk } from "../_shared/gemini.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
@@ -388,7 +389,6 @@ const geminiServed = new Set<string>()
 /** Supabase stops an edge function at ~150 s; after this budget no new draft is started. */
 const TIME_BUDGET_MS = Math.max(30, Number(Deno.env.get("NEWS_TIME_BUDGET_S") ?? "110") || 110) * 1000
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** One structured JSON call; returns null when the model declines. Retries brief overloads (free tiers hit these often). */
 async function ask<T>(system: string, prompt: string, schema: object, effort: "low" | "medium" | "high"): Promise<T | null> {
@@ -405,118 +405,11 @@ async function ask<T>(system: string, prompt: string, schema: object, effort: "l
 }
 
 /** Gemini's response schema is an OpenAPI subset: no additionalProperties. */
-function toGeminiSchema(schema: unknown): unknown {
-  if (Array.isArray(schema)) return schema.map(toGeminiSchema)
-  if (!schema || typeof schema !== "object") return schema
-  return Object.fromEntries(
-    Object.entries(schema as Record<string, unknown>)
-      .filter(([key]) => key !== "additionalProperties")
-      .map(([key, value]) => [key, toGeminiSchema(value)]),
-  )
-}
 
-class GeminiBusy extends Error {
-  constructor(message: string, readonly retryAfterMs: number, readonly daily: boolean) {
-    super(message)
-  }
-}
-
-/** One call to one Gemini model. 429 (quota) and 500/503 (overloaded) throw GeminiBusy so the caller can wait or switch. */
-async function callGemini<T>(model: string, system: string, prompt: string, schema: object): Promise<T | null> {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: toGeminiSchema(schema), temperature: 0.3 },
-    }),
-    signal: AbortSignal.timeout(90_000),
-  })
-  const data = await response.json().catch(() => null)
-  if (!response.ok) {
-    const message = data?.error?.message ?? `HTTP ${response.status}`
-    if (response.status === 429 || response.status === 500 || response.status === 503) {
-      const details: { "@type"?: string; retryDelay?: string; violations?: { quotaId?: string }[] }[] = data?.error?.details ?? []
-      // Google says how long to wait ("RetryInfo", e.g. "23s"); a per-day quota won't recover within the run.
-      const delay = details.find((detail) => detail.retryDelay)?.retryDelay
-      const daily = details.some((detail) => detail.violations?.some((violation) => /PerDay/i.test(violation.quotaId ?? "")))
-      const label = response.status === 429 ? "үнэгүй хязгаарт хүрлээ" : "ачаалал ихтэй байна"
-      throw new GeminiBusy(`Gemini (${model}) ${label}: ${message}`, delay ? parseFloat(delay) * 1000 : 0, daily)
-    }
-    throw new Error(`Gemini (${model}): ${message}`)
-  }
-  const candidate = data?.candidates?.[0]
-  if (!candidate || candidate.finishReason === "SAFETY" || candidate.finishReason === "PROHIBITED_CONTENT") {
-    console.warn("declined:", candidate?.finishReason ?? data?.promptFeedback?.blockReason ?? "no candidate")
-    return null
-  }
-  if (candidate.finishReason === "MAX_TOKENS") throw new Error(`Gemini (${model}) хариу тасарсан (MAX_TOKENS)`)
-  geminiServed.add(model)
-  const text = (candidate.content?.parts ?? []).map((part: { text?: string }) => part.text ?? "").join("")
-  return JSON.parse(text) as T
-}
-
-/**
- * Gemini with patience: on quota or overload, wait as long as Google asks (up
- * to 25 s) and try again once; if the model is still busy, or its daily quota
- * is gone, move to the fallback model. Other errors are thrown straight away.
- */
-let geminiBackups: Promise<string[]> | null = null
-
-/**
- * Backup models when GEMINI_MODEL is busy. "auto" asks Google which models this
- * key may call (old ones get retired for new users without notice) and keeps the
- * text Flash models, newest first, full Flash before Flash-Lite.
- */
-function backupModels(): Promise<string[]> {
-  if (GEMINI_FALLBACK === "none") return Promise.resolve([])
-  if (GEMINI_FALLBACK !== "auto") return Promise.resolve(GEMINI_FALLBACK === GEMINI_MODEL ? [] : [GEMINI_FALLBACK])
-  geminiBackups ??= fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", {
-    headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" },
-    signal: AbortSignal.timeout(10_000),
-  })
-    .then((response) => (response.ok ? response.json() : { models: [] }))
-    .then((data: { models?: { name: string; supportedGenerationMethods?: string[] }[] }) => {
-      const version = (name: string) => Number(name.match(/gemini-(\d+(?:\.\d+)?)/)?.[1] ?? 0)
-      return (data.models ?? [])
-        .filter((model) => model.supportedGenerationMethods?.includes("generateContent"))
-        .map((model) => model.name.replace(/^models\//, ""))
-        .filter((name) => /^gemini-[\d.]+-flash(-lite)?$/.test(name) && name !== GEMINI_MODEL)
-        .sort((a, b) => Number(a.includes("lite")) - Number(b.includes("lite")) || version(b) - version(a))
-        // Two backups at most, so one draft can't wait its way past Supabase's time limit.
-        .slice(0, 2)
-    })
-    .catch(() => [])
-  return geminiBackups
-}
-
-/**
- * Gemini with patience: on quota or overload, wait as long as Google asks (up
- * to 25 s) and try again once; if the model is still busy, its daily quota is
- * gone, or it isn't available to this key, move to the next backup model.
- * Other errors (bad key, bad request) are thrown straight away.
- */
-async function askGemini<T>(system: string, prompt: string, schema: object): Promise<T | null> {
-  let last: Error | null = null
-  let models = [GEMINI_MODEL]
-  for (let index = 0; index < models.length; index++) {
-    const model = models[index]
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        return await callGemini<T>(model, system, prompt, schema)
-      } catch (error) {
-        const retired = error instanceof Error && /no longer available|not found|is not supported/i.test(error.message)
-        if (!(error instanceof GeminiBusy) && !(retired && index > 0)) throw error
-        last = error as Error
-        console.warn((error as Error).message)
-        if (retired || (error as GeminiBusy).daily || attempt === 1) break
-        await sleep(Math.min(25_000, (error as GeminiBusy).retryAfterMs || 6_000))
-      }
-    }
-    if (index === 0) models = [GEMINI_MODEL, ...(await backupModels())]
-  }
-  throw last ?? new Error("Gemini хариу өгсөнгүй")
+/** Gemini with patience (see _shared/gemini.ts): GEMINI_MODEL first, then backups when it's busy. */
+function askGemini<T>(system: string, prompt: string, schema: object): Promise<T | null> {
+  const backups = () => (GEMINI_FALLBACK === "none" ? Promise.resolve([]) : GEMINI_FALLBACK === "auto" ? flashBackups(GEMINI_MODEL) : Promise.resolve([GEMINI_FALLBACK]))
+  return geminiAsk<T>({ system, prompt, schema, models: [GEMINI_MODEL], backups, served: geminiServed })
 }
 
 function parseModelJson<T>(text: string): T {
