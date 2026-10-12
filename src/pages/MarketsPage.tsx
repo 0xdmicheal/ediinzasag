@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
-import { CalendarDays, CandlestickChart, Globe2, Landmark } from "lucide-react"
+import { Globe2, Landmark } from "lucide-react"
 import { cn } from "cn"
 
-import { MarketCalendar } from "@/components/site/MarketCalendar"
-import { MarketTerminal } from "@/components/site/MarketTerminal"
+import { MarketDesk, WATCHLIST } from "@/components/site/MarketDesk"
 import { signedPct } from "@/components/site/market-marks"
 import {
   ChangePill,
@@ -36,36 +35,43 @@ import {
 } from "@/content/markets"
 
 /*
- * /markets: one "today" band with the six numbers that matter most to a
- * Mongolian reader, then four rooms instead of one long scroll:
- * Монгол (TOP-20, macro, exchange), Дэлхий (all markets at a glance, indices,
- * commodities, currencies), Календарь, График. Old links such as
- * /markets#copper or /markets#calendar open the right room and scroll to it.
+ * /markets. The product is EZ Desk (calendar + chart as one tool), right
+ * under a "today" band of the six numbers that matter most to a Mongolian
+ * reader; tapping a tile points the desk's chart at it. Below the desk, the
+ * reference numbers in two rooms: Монгол (TOP-20, macro, exchange) and
+ * Дэлхий (all markets at a glance, indices, commodities, currencies).
+ * Old links (/markets#copper, #lend, #calendar, #chart) still land right.
  */
 
 const narrow = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
 
-type Room = "mongolia" | "world" | "calendar" | "chart"
+type Room = "mongolia" | "world"
 
 const rooms: { id: Room; label: string; hint: string; icon: typeof Landmark }[] = [
   { id: "mongolia", label: "Монгол", hint: "ТОП-20, макро, бирж", icon: Landmark },
   { id: "world", label: "Дэлхий", hint: "Индекс, түүхий эд, валют", icon: Globe2 },
-  { id: "calendar", label: "Календарь", hint: "Мэдээ, ашгийн тайлан", icon: CalendarDays },
-  { id: "chart", label: "График", hint: "Шууд график", icon: CandlestickChart },
 ]
 
 const allQuotes = [...worldIndices, ...commodities, ...fx]
 const quote = (id: string) => allQuotes.find((item) => item.id === id)
 const regionOf = (id: string) => regions.find((region) => region.ids.includes(id))?.title ?? ""
 
-/** Which room an old anchor (#copper, #lend, #top20, #calendar…) belongs to. */
+/** Which room an old anchor (#copper, #lend, #top20…) belongs to. */
 function roomOf(anchor: string): Room | null {
   if (!anchor) return null
-  if ((rooms.map((room) => room.id) as string[]).includes(anchor)) return anchor as Room
-  if (["top20", "macro", "exports", "exchange", "glossary"].includes(anchor)) return "mongolia"
+  if (anchor === "mongolia" || anchor === "world") return anchor
+  if (["top20", "macro", "exports", "exchange"].includes(anchor)) return "mongolia"
   if (mongoliaIndices.some((item) => item.id === anchor) || fridayCloses.some((row) => row.symbol.toLowerCase() === anchor)) return "mongolia"
   if (["performance", "indices", "commodities", "currency"].includes(anchor) || allQuotes.some((item) => item.id === anchor)) return "world"
   return null
+}
+
+/** Today-band tiles the desk's chart can show. */
+const TILE_CHART: Record<string, string> = {
+  mnt: "FX_IDC:USDMNT",
+  copper: "OANDA:XCUUSD",
+  gold: "OANDA:XAUUSD",
+  brent: "TVC:UKOIL",
 }
 
 function Lead({ children }: { children: ReactNode }) {
@@ -75,7 +81,7 @@ function Lead({ children }: { children: ReactNode }) {
 /** A titled block inside a room: small heading, one-line lead, then content. */
 function Block({ id, title, lead, aside, children, className }: { id?: string; title: string; lead?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section id={id} className={cn("min-w-0 scroll-mt-40", className)}>
+    <section id={id} className={cn("min-w-0 scroll-mt-20", className)}>
       <header className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
         <div className="min-w-0">
           <h3 className="text-[19px] leading-tight font-semibold tracking-tight sm:text-[22px]">{title}</h3>
@@ -100,63 +106,71 @@ export function MarketsPage() {
   const { hash } = useLocation()
   const anchor = decodeURIComponent(hash.replace(/^#/, "")).toLowerCase()
   const [room, setRoom] = useState<Room>(() => roomOf(anchor) ?? "mongolia")
-  const bar = useRef<HTMLDivElement>(null)
+  const [deskRequest, setDeskRequest] = useState<{ symbol: string; n: number } | null>(null)
+  const rest = useRef<HTMLDivElement>(null)
 
-  // A link such as /markets#copper opens the room that holds it and scrolls there.
+  // Old links: /markets#copper opens the room that holds it; #chart, #calendar, #desk go to the desk.
   useEffect(() => {
+    if (["chart", "calendar", "desk"].includes(anchor)) {
+      const timer = window.setTimeout(() => document.getElementById("desk")?.scrollIntoView({ behavior: "smooth", block: "start" }), 150)
+      return () => window.clearTimeout(timer)
+    }
     const target = roomOf(anchor)
     if (!target) return
     setRoom(target)
     const timer = window.setTimeout(() => {
       const node = document.getElementById(anchor)
-      if (node && !(rooms.map((item) => item.id) as string[]).includes(anchor)) node.scrollIntoView({ behavior: "smooth", block: "start" })
-      else bar.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-    }, 120)
+      ;(node ?? rest.current)?.scrollIntoView({ behavior: "smooth", block: "start" })
+    }, 150)
     return () => window.clearTimeout(timer)
   }, [anchor])
 
-  const open = (next: Room, focus?: string) => {
+  const openRoom = (next: Room, focus?: string) => {
     setRoom(next)
     window.history.replaceState(null, "", `#${focus ?? next}`)
     window.setTimeout(() => {
       const node = focus ? document.getElementById(focus) : null
-      if (node) node.scrollIntoView({ behavior: "smooth", block: "start" })
-      else if (bar.current && bar.current.getBoundingClientRect().top < 0) bar.current.scrollIntoView({ behavior: "smooth", block: "start" })
+      ;(node ?? rest.current)?.scrollIntoView({ behavior: "smooth", block: "start" })
     }, 60)
+  }
+
+  const openTile = (id: string, tileRoom: Room) => {
+    const symbol = TILE_CHART[id]
+    if (symbol && WATCHLIST.some((item) => item.symbol === symbol)) setDeskRequest({ symbol, n: Date.now() })
+    else openRoom(tileRoom, id)
   }
 
   return (
     <>
-      <Pulse onOpen={open} />
+      <Pulse onOpen={openTile} />
+      <MarketDesk request={deskRequest} />
 
-      <div ref={bar} className="bg-background/90 sticky top-14 z-30 scroll-mt-14 border-b backdrop-blur-md">
-        <nav aria-label="Зах зээлийн хэсгүүд" className={`${narrow} grid grid-cols-4 gap-1 py-2 sm:flex sm:gap-2`}>
-          {rooms.map(({ id, label, hint, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              aria-current={room === id ? "page" : undefined}
-              onClick={() => open(id)}
-              className={cn(
-                "flex min-w-0 flex-col items-center gap-0.5 rounded-lg px-2 py-1.5 text-center transition-colors sm:flex-row sm:gap-2.5 sm:px-3.5 sm:py-2 sm:text-left",
-                room === id ? "bg-foreground text-background" : "hover:bg-foreground/[0.05] text-muted-foreground hover:text-foreground",
-              )}
-            >
-              <Icon className="size-4 shrink-0" strokeWidth={2} />
-              <span className="min-w-0">
-                <span className="block truncate text-[12.5px] font-semibold sm:text-[14px]">{label}</span>
-                <span className={cn("hidden text-[11px] leading-tight md:block", room === id ? "opacity-70" : "")}>{hint}</span>
-              </span>
-            </button>
-          ))}
-        </nav>
-      </div>
-
-      <div className={`${narrow} pt-8 pb-20 sm:pt-10`}>
-        {room === "mongolia" ? <MongoliaRoom /> : null}
-        {room === "world" ? <WorldRoom /> : null}
-        {room === "calendar" ? <MarketCalendar /> : null}
-        {room === "chart" ? <MarketTerminal /> : null}
+      <div ref={rest} className={`${narrow} scroll-mt-14 pt-12 pb-20 sm:pt-16`}>
+        <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b pb-4">
+          <div>
+            <h2 className="font-news text-2xl leading-none sm:text-4xl">Тоон мэдээлэл</h2>
+            <p className="text-muted-foreground mt-2 text-[14px]">Сүүлийн хаалтын үнэ, эх сурвалж бүртэй. {sessionShort}.</p>
+          </div>
+          <nav aria-label="Тоон мэдээллийн хэсэг" className="bg-muted flex gap-1 rounded-full p-1">
+            {rooms.map(({ id, label, hint, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                aria-current={room === id ? "page" : undefined}
+                onClick={() => openRoom(id)}
+                title={hint}
+                className={cn(
+                  "flex h-9 items-center gap-2 rounded-full px-4 text-[13.5px] font-medium transition-colors",
+                  room === id ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+        {room === "mongolia" ? <MongoliaRoom /> : <WorldRoom />}
         <Glossary />
       </div>
     </>
@@ -186,7 +200,7 @@ function pulseTiles(): PulseTile[] {
   }
   const mnt = quote("mnt")!
   return [
-    { id: "mnt", room: "world", label: "Ам.доллар", value: `${mnt.price}₮`, pct: null, note: `Дунд ханш · ${mnt.asOf.slice(5).replace(".", ".")}` },
+    { id: "mnt", room: "world", label: "Ам.доллар", value: `${mnt.price}₮`, pct: null, note: `Дунд ханш · ${mnt.asOf.slice(5)}` },
     { id: "top20", room: "mongolia", label: "ТОП-20", value: top20.price, unit: "оноо", pct: top20.pct, note: `1 жилд ${String(top20.year).replace("-", "−")}` },
     fromQuote("copper"),
     fromQuote("coal"),
@@ -195,7 +209,7 @@ function pulseTiles(): PulseTile[] {
   ]
 }
 
-function Pulse({ onOpen }: { onOpen: (room: Room, focus?: string) => void }) {
+function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
   const tiles = pulseTiles()
   return (
     <section aria-labelledby="markets-title" className="bg-ink text-ink-foreground">
@@ -208,7 +222,7 @@ function Pulse({ onOpen }: { onOpen: (room: Room, focus?: string) => void }) {
             </h1>
           </div>
           <p className="text-ink-foreground/60 max-w-md text-[13px] leading-relaxed">
-            Монголын түрийвчинд хамгийн их нөлөөлдөг зургаан тоо. Дарвал дэлгэрэнгүй нь нээгдэнэ.
+            Монголын түрийвчинд хамгийн их нөлөөлдөг зургаан тоо. Дарвал доорх EZ Desk-ийн график тэр зах зээл рүү шилжинэ.
           </p>
         </div>
 
@@ -217,7 +231,7 @@ function Pulse({ onOpen }: { onOpen: (room: Room, focus?: string) => void }) {
             <button
               key={tile.id}
               type="button"
-              onClick={() => onOpen(tile.room, tile.id)}
+              onClick={() => onOpen(tile.id, tile.room)}
               className={cn(
                 "group flex min-w-0 flex-col items-start gap-1 border-white/10 p-4 text-left transition-colors hover:bg-white/[0.06] sm:p-5",
                 index % 2 === 0 ? "border-r" : "md:border-r",
@@ -279,7 +293,7 @@ function Top20() {
   const grown = Math.round((1_000_000 * (1 + year / 100)) / 100) * 100
 
   return (
-    <section id="top20" className="bg-card flex scroll-mt-40 flex-col rounded-xl border p-5 sm:p-7">
+    <section id="top20" className="bg-card flex scroll-mt-20 flex-col rounded-xl border p-5 sm:p-7">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-[19px] font-semibold tracking-tight sm:text-[22px]">ТОП-20 индекс</h3>
@@ -362,7 +376,7 @@ function Macro() {
     },
   ]
   return (
-    <section id="macro" className="flex scroll-mt-40 flex-col">
+    <section id="macro" className="flex scroll-mt-20 flex-col">
       <h3 className="text-[19px] font-semibold tracking-tight sm:text-[22px]">Макро</h3>
       <Lead>Ханш, хувьцааны ард байгаа дөрвөн тоо.</Lead>
       <dl className="mt-4 grid grid-cols-2 gap-3">
@@ -441,7 +455,7 @@ function Exchange() {
         </div>
         <ul className="bg-card divide-y self-start rounded-xl border">
           {otherIndices.map((item) => (
-            <li key={item.id} id={item.id} className="target:bg-muted flex scroll-mt-40 items-center justify-between gap-3 px-5 py-4">
+            <li key={item.id} id={item.id} className="target:bg-muted flex scroll-mt-20 items-center justify-between gap-3 px-5 py-4">
               <span>
                 <span className="text-muted-foreground block text-[12px]">{/индекс/i.test(item.label) ? item.label : `${item.label} индекс`}</span>
                 <span className="mt-0.5 block text-lg font-semibold tabular-nums">
@@ -536,7 +550,7 @@ function QuoteBoard({ ids }: { ids: string[] }) {
         const hint = per ? unitHint[per] : undefined
         const flatNote = item.pct === 0 && (!/\d/.test(item.move) || item.denom.kind === "percent") ? item.move : ""
         return (
-          <li key={id} id={id} className="target:bg-muted grid scroll-mt-40 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5">
+          <li key={id} id={id} className="target:bg-muted grid scroll-mt-20 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 px-4 py-3.5 sm:px-5">
             <div className="min-w-0">
               <p className="truncate text-[15px] font-semibold">{friendlyName[id] ?? item.label}</p>
               <p className="text-muted-foreground truncate text-[12px]">{plain[id]}</p>
@@ -598,7 +612,7 @@ function Glossary() {
   const [open, setOpen] = useState<string | null>(null)
   const current = glossary.find((item) => item.term === open)
   return (
-    <section id="glossary" aria-label="Үгийн тайлбар" className="mt-16 scroll-mt-40 border-t pt-6">
+    <section id="glossary" aria-label="Үгийн тайлбар" className="mt-16 scroll-mt-20 border-t pt-6">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-muted-foreground mr-1 text-[12px] font-medium">Ойлгомжгүй үг үү?</span>
         {glossary.map((item) => (
