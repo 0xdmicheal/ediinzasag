@@ -20,7 +20,7 @@ const sectionContainer = "mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8"
 const MORE_LIMIT = 6
 
 export function HomePage() {
-  // Only published articles (built-in ones too in the demo build); the hero leads with the newest three.
+  // Published articles plus the built-in stories they have not replaced; the hero leads with the newest three.
   const { stories } = useStories()
   const episodes = useEpisodes()
   const all = sortByDate(stories)
