@@ -17,7 +17,9 @@
 //   GEMINI_API_KEY (free tier) or ANTHROPIC_API_KEY.
 // Agent Router (the $ credit balance, Opus 5): set ANTHROPIC_API_KEY to the sk- token,
 //   ANTHROPIC_BASE_URL=https://agentrouter.org (no /v1), AI_PROVIDER=claude, CLAUDE_MODEL=claude-opus-5.
-// Optional: AI_PROVIDER ("rules" | "gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, NEWS_PER_RUN (default 3).
+// Optional: AI_PROVIDER ("rules" | "gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, GEMINI_FALLBACK_MODEL
+// (used when GEMINI_MODEL is overloaded or out of quota; "none" turns it off), NEWS_PER_RUN (default 3),
+// NEWS_TIME_BUDGET_S (default 110: no new draft starts after this many seconds).
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase. NEWS_CRON_SECRET
 // is a password for the morning call, not an AI key. Deploy with --no-verify-jwt:
 // the cron call has no user token, so this function checks the cron secret or the editor's token itself.
@@ -377,6 +379,15 @@ export const PROVIDER: "claude" | "gemini" | "rules" = (() => {
   return "rules"
 })()
 export const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-3.8-flash"
+/** An older Flash with a bigger free quota, for when the newest one is overloaded or used up. */
+const GEMINI_FALLBACK = (Deno.env.get("GEMINI_FALLBACK_MODEL") || "gemini-2.5-flash").trim()
+/** Which Gemini models actually answered during this run, for the run log. */
+const geminiServed = new Set<string>()
+
+/** Supabase stops an edge function at ~150 s; after this budget no new draft is started. */
+const TIME_BUDGET_MS = Math.max(30, Number(Deno.env.get("NEWS_TIME_BUDGET_S") ?? "110") || 110) * 1000
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 /** One structured JSON call; returns null when the model declines. Retries brief overloads (free tiers hit these often). */
 async function ask<T>(system: string, prompt: string, schema: object, effort: "low" | "medium" | "high"): Promise<T | null> {
@@ -403,32 +414,70 @@ function toGeminiSchema(schema: unknown): unknown {
   )
 }
 
-async function askGemini<T>(system: string, prompt: string, schema: object): Promise<T | null> {
-  const key = Deno.env.get("GEMINI_API_KEY")
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`, {
+class GeminiBusy extends Error {
+  constructor(message: string, readonly retryAfterMs: number, readonly daily: boolean) {
+    super(message)
+  }
+}
+
+/** One call to one Gemini model. 429 (quota) and 500/503 (overloaded) throw GeminiBusy so the caller can wait or switch. */
+async function callGemini<T>(model: string, system: string, prompt: string, schema: object): Promise<T | null> {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", "x-goog-api-key": key ?? "" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": Deno.env.get("GEMINI_API_KEY") ?? "" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: "application/json", responseSchema: toGeminiSchema(schema), temperature: 0.3 },
     }),
-    signal: AbortSignal.timeout(110_000),
+    signal: AbortSignal.timeout(90_000),
   })
   const data = await response.json().catch(() => null)
   if (!response.ok) {
     const message = data?.error?.message ?? `HTTP ${response.status}`
-    // 429 = the free tier's per-minute or per-day limit.
-    throw new Error(response.status === 429 ? `Gemini үнэгүй хязгаарт хүрлээ: ${message}` : `Gemini: ${message}`)
+    if (response.status === 429 || response.status === 500 || response.status === 503) {
+      const details: { "@type"?: string; retryDelay?: string; violations?: { quotaId?: string }[] }[] = data?.error?.details ?? []
+      // Google says how long to wait ("RetryInfo", e.g. "23s"); a per-day quota won't recover within the run.
+      const delay = details.find((detail) => detail.retryDelay)?.retryDelay
+      const daily = details.some((detail) => detail.violations?.some((violation) => /PerDay/i.test(violation.quotaId ?? "")))
+      const label = response.status === 429 ? "үнэгүй хязгаарт хүрлээ" : "ачаалал ихтэй байна"
+      throw new GeminiBusy(`Gemini (${model}) ${label}: ${message}`, delay ? parseFloat(delay) * 1000 : 0, daily)
+    }
+    throw new Error(`Gemini (${model}): ${message}`)
   }
   const candidate = data?.candidates?.[0]
   if (!candidate || candidate.finishReason === "SAFETY" || candidate.finishReason === "PROHIBITED_CONTENT") {
     console.warn("declined:", candidate?.finishReason ?? data?.promptFeedback?.blockReason ?? "no candidate")
     return null
   }
-  if (candidate.finishReason === "MAX_TOKENS") throw new Error("Gemini хариу тасарсан (MAX_TOKENS)")
+  if (candidate.finishReason === "MAX_TOKENS") throw new Error(`Gemini (${model}) хариу тасарсан (MAX_TOKENS)`)
+  geminiServed.add(model)
   const text = (candidate.content?.parts ?? []).map((part: { text?: string }) => part.text ?? "").join("")
   return JSON.parse(text) as T
+}
+
+/**
+ * Gemini with patience: on quota or overload, wait as long as Google asks (up
+ * to 25 s) and try again once; if the model is still busy, or its daily quota
+ * is gone, move to the fallback model. Other errors are thrown straight away.
+ */
+async function askGemini<T>(system: string, prompt: string, schema: object): Promise<T | null> {
+  const models = [GEMINI_MODEL, ...(GEMINI_FALLBACK && GEMINI_FALLBACK !== "none" && GEMINI_FALLBACK !== GEMINI_MODEL ? [GEMINI_FALLBACK] : [])]
+  let last: Error | null = null
+  for (const model of models) {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        return await callGemini<T>(model, system, prompt, schema)
+      } catch (error) {
+        if (!(error instanceof GeminiBusy)) throw error
+        last = error
+        console.warn(error.message)
+        if (error.daily || attempt === 1) break
+        await sleep(Math.min(25_000, error.retryAfterMs || 6_000))
+      }
+    }
+  }
+  throw last ?? new Error("Gemini хариу өгсөнгүй")
 }
 
 function parseModelJson<T>(text: string): T {
@@ -811,6 +860,7 @@ async function fileFromInbox(db: SupabaseClient, id: number) {
 }
 
 async function run(db: SupabaseClient, trigger: "cron" | "manual") {
+  const startedAt = Date.now()
   const { data: runRow } = await db.from("news_runs").insert({ trigger }).select("id").single()
   const finish = async (patch: Record<string, unknown>) => {
     if (!runRow) return
@@ -871,10 +921,13 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     details.picked = picks.map(({ item, priority }) => ({ title: item.title.slice(0, 140), source: item.source, priority }))
 
     // Rules and Claude: all at once. Gemini's free tier: two at a time, to stay under its per-minute limit.
-    const written = await settleInBatches(picks, PROVIDER === "gemini" ? 2 : picks.length, async (pick) =>
-      Boolean(await fileStory(db, pick, tags)),
-    )
+    // Gemini: one at a time, so the free tier's per-minute limit isn't hit in a burst.
+    const written = await settleInBatches(picks, PROVIDER === "gemini" ? 1 : picks.length, async (pick) => {
+      if (Date.now() - startedAt > TIME_BUDGET_MS) throw new Error("Хугацаа хүрэлцсэнгүй. Мэдээний урсгалаас «Карт болгох»-оор нэмнэ")
+      return Boolean(await fileStory(db, pick, tags))
+    })
     const created = written.filter((result) => result.status === "fulfilled" && result.value).length
+    if (PROVIDER === "gemini" && geminiServed.size) details.provider = `gemini · ${[...geminiServed].join(" + ")}`
     details.failures = written.flatMap((result, index) =>
       result.status === "rejected"
         ? [`${picks[index].item.title.slice(0, 60)}: ${String(result.reason?.message ?? result.reason).slice(0, 160)}`]
