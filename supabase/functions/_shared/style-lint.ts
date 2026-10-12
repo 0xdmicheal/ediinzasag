@@ -142,18 +142,6 @@ export function lintStyle(draft: StyleDraft): StyleHit[] {
     hits.push({ rule: "L05", severity: "error", message: "Хөтлөгчийн нэрийг «Үлэмж» (ҮЛЭМЖ) гэж бичнэ.", sample: sampleOf(all, /УЛЭМЖ|Улэмж/g), fix: fixAll((t) => t.replace(/УЛЭМЖ/g, "ҮЛЭМЖ").replace(/Улэмж/g, "Үлэмж")), fixLabel: "Үлэмж болгох" })
   }
 
-  // L24 (lite) · a number in the title or summary must be in the body too: no headline-only figures.
-  const numbers = (text: string) => (text.match(/\d+(?:[.,]\d+)?/g) ?? []).map((n) => n.replace(",", "."))
-  const bodyNumbers = new Set(numbers(body))
-  const orphan = [...numbers(draft.title), ...numbers(draft.dek)].filter((n) => !bodyNumbers.has(n))
-  if (orphan.length) {
-    hits.push({
-      rule: "L24",
-      severity: "error",
-      message: `Гарчиг, товч тайлбар дахь тоо үндсэн текстэд байх ёстой: ${[...new Set(orphan)].join(", ")}.`,
-    })
-  }
-
   // L12 · rhetorical self-answering: «Энэ бол X биш. Энэ бол Y.»
   const selfAnswer = /Энэ бол [^.!?]{1,80} биш\.\s*Энэ бол/giu
   if (selfAnswer.test(all)) {
