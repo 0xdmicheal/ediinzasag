@@ -15,8 +15,8 @@ export type PosterFormat = "post" | "story"
 export type PosterLang = "mn" | "en"
 
 export const posterFormats: Record<PosterFormat, { width: number; height: number; label: string; hint: string }> = {
-  post: { width: 1080, height: 1350, label: "Пост 1080×1350", hint: "Facebook, Instagram, X" },
-  story: { width: 1080, height: 1920, label: "Стори 1080×1920", hint: "Instagram, Facebook story" },
+  post: { width: 1080, height: 1350, label: "Пост 4:5", hint: "Facebook, Instagram, X · 2160×2700" },
+  story: { width: 1080, height: 1920, label: "Стори 9:16", hint: "Instagram, Facebook story · 2160×3840" },
 }
 
 /** What the editor opens the dialog with. */
@@ -107,13 +107,18 @@ export async function loadPosterAssets(coverUrl: string): Promise<PosterAssets> 
 }
 
 /** "*5.73* хувь" → [{ text: "5.73", blue: true }, { text: "хувь", blue: false }], one entry per word. */
-function words(text: string) {
+export function words(text: string) {
   const result: { text: string; blue: boolean }[] = []
   text.split(/(\*[^*]+\*)/).forEach((part) => {
     const blue = /^\*[^*]+\*$/.test(part)
     for (const word of (blue ? part.slice(1, -1) : part).split(/\s+/)) if (word) result.push({ text: word, blue })
   })
   return result
+}
+
+/** The headline back as text, each blue word wrapped in *stars*: what PosterDialog's word chips write. */
+export function joinWords(list: { text: string; blue: boolean }[]) {
+  return list.map((word) => (word.blue ? `*${word.text}*` : word.text)).join(" ")
 }
 
 /** Word wrap into lines of words. A word wider than the line keeps its own line. */
@@ -193,18 +198,25 @@ export function drawPoster(ctx: CanvasRenderingContext2D, format: PosterFormat, 
 }
 
 /** Renders one poster at full size for download. */
+/** Downloads are drawn at twice the design size (2160×2700, 2160×3840) for a sharper upload. */
+export const EXPORT_SCALE = 2
+
+/** Renders one poster for download, at EXPORT_SCALE. */
 export async function renderPoster(format: PosterFormat, content: PosterContent, layout: PosterLayout, assets?: PosterAssets) {
   const { width, height } = posterFormats[format]
   const canvas = document.createElement("canvas")
-  canvas.width = width
-  canvas.height = height
-  drawPoster(canvas.getContext("2d")!, format, content, layout, assets ?? (await loadPosterAssets(content.coverUrl)))
+  canvas.width = width * EXPORT_SCALE
+  canvas.height = height * EXPORT_SCALE
+  const ctx = canvas.getContext("2d")!
+  ctx.scale(EXPORT_SCALE, EXPORT_SCALE)
+  ctx.imageSmoothingQuality = "high"
+  drawPoster(ctx, format, content, layout, assets ?? (await loadPosterAssets(content.coverUrl)))
   return canvas
 }
 
 export function posterFileName(slug: string, format: PosterFormat, lang: PosterLang) {
   const { width, height } = posterFormats[format]
-  return `ez-${slug || "poster"}-${lang}-${width}x${height}.png`
+  return `ez-${slug || "poster"}-${lang}-${width * EXPORT_SCALE}x${height * EXPORT_SCALE}.png`
 }
 
 export function canvasToBlob(canvas: HTMLCanvasElement) {

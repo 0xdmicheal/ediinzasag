@@ -6,6 +6,7 @@ import {
   canvasToBlob,
   defaultLayout,
   drawPoster,
+  joinWords,
   loadPosterAssets,
   posterDate,
   posterFileName,
@@ -16,6 +17,7 @@ import {
   type PosterInput,
   type PosterLang,
   type PosterLayout,
+  words,
 } from "@/admin/posters"
 import { buttonClass, inputClass, Notice } from "@/admin/ui"
 
@@ -187,6 +189,11 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
     }
   }
 
+  const headlineWords = words(text[lang])
+  function toggleWord(index: number) {
+    setText((all) => ({ ...all, [lang]: joinWords(words(all[lang]).map((word, i) => (i === index ? { ...word, blue: !word.blue } : word))) }))
+  }
+
   const everything = formats.flatMap((f) => langs.filter((l) => text[l.key].trim()).map((l) => ({ format: f, lang: l.key })))
   const { width, height, label, hint } = posterFormats[format]
 
@@ -241,8 +248,30 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
               placeholder={lang === "en" ? "The yield on the U.S. 30-year bond reached *5.73* percent…" : "Гарчиг"}
               className={cn(inputClass, "resize-y")}
             />
-            <span className="text-muted-foreground text-[11px]">*од* дотор бичсэн хэсэг цэнхэр болно, жишээ нь *5.73*. 4 мөрөөс урт бол дээшээ нэмэгдэнэ.</span>
           </label>
+
+          {headlineWords.length ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[12px] font-medium">Цэнхэр болгох үг</span>
+              <div className="flex flex-wrap gap-1.5">
+                {headlineWords.map((word, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    aria-pressed={word.blue}
+                    onClick={() => toggleWord(index)}
+                    className={cn(
+                      "h-7 rounded-md border px-2 text-[13px] transition-colors",
+                      word.blue ? "border-transparent bg-[#298dff] text-white" : "hover:bg-foreground/5",
+                    )}
+                  >
+                    {word.text}
+                  </button>
+                ))}
+              </div>
+              <span className="text-muted-foreground text-[11px]">Үг дээр дарж цэнхэр болгоно, дахин дарвал буцна. 4 мөрөөс урт гарчиг дээшээ нэмэгдэнэ.</span>
+            </div>
+          ) : null}
 
           <label className="flex flex-col gap-1.5">
             <span className="text-[12px] font-medium">Огноо</span>
