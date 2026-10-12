@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { ArrowDown, ArrowUp, CandlestickChart, Minus } from "lucide-react"
 import { cn } from "cn"
 
@@ -258,6 +258,8 @@ function Impact({ high, compact = false }: { high: boolean; compact?: boolean })
 
 const panel = "rounded-xl border border-white/10 bg-white/[0.03]"
 const label = "text-[10.5px] font-medium tracking-[0.14em] text-white/45 uppercase"
+const weekArrow =
+  "grid size-7 place-items-center rounded-full border border-white/15 text-[15px] leading-none transition-colors hover:bg-white/10 disabled:pointer-events-none disabled:opacity-25"
 
 /* ------------------------------------------------------------------ */
 /* Desk                                                                */
@@ -372,13 +374,19 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
 
         {failed ? <p className="mt-6 text-sm text-white/60">Календарийг ачаалж чадсангүй. Дараа дахин оролдоно уу.</p> : null}
 
-        <Timeline
+
+      </div>
+
+      {/* The working row runs edge to edge, 10px from each side: calendar (explanations open in place) | chart | pairs. */}
+      <div className="mt-4 grid gap-[10px] px-[10px] xl:grid-cols-[21rem_minmax(0,1fr)_16rem] 2xl:grid-cols-[23rem_minmax(0,1fr)_18rem] [&>*]:min-w-0">
+        {/* xl: the side columns are exactly as tall as the chart and scroll inside. */}
+        <DayRail
           econ={econ}
           earnings={earnings}
           week={week}
+          day={day}
           today={today}
           now={now}
-          day={day}
           pick={pick}
           loading={!data && !failed}
           canBack={canBack}
@@ -390,19 +398,8 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
           }}
           onDay={setDay}
           onPick={choose}
+          detail={<Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />}
         />
-
-      </div>
-
-      {/* The working row runs edge to edge, 10px from each side: calendar + explanation | chart | pairs. */}
-      <div className="mt-4 grid gap-[10px] px-[10px] xl:grid-cols-[21rem_minmax(0,1fr)_16rem] 2xl:grid-cols-[23rem_minmax(0,1fr)_18rem] [&>*]:min-w-0">
-        {/* xl: the side columns are exactly as tall as the chart and scroll inside. */}
-        <div className="flex min-w-0 flex-col gap-[10px] xl:h-0 xl:min-h-full">
-          <DayRail econ={econ} earnings={earnings} week={week} day={day} today={today} now={now} pick={pick} onDay={setDay} onPick={choose} />
-          <div className="order-first min-h-0 rounded-xl xl:order-none xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:[scrollbar-width:thin]">
-            <Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />
-          </div>
-        </div>
         <TradingViewChart
           symbol={chart.symbol}
           title={chart.label}
@@ -430,193 +427,6 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
         </p>
       </div>
     </section>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/* Timeline: the week at a glance                                      */
-/* ------------------------------------------------------------------ */
-
-function Timeline(props: {
-  econ: Cluster[]
-  earnings: EarningsEvent[]
-  week: string
-  today: string
-  now: number
-  day: string
-  pick: Pick | null
-  loading: boolean
-  canBack: boolean
-  canForward: boolean
-  onWeek: (step: number) => void
-  onDay: (day: string) => void
-  onPick: (pick: Pick) => void
-}) {
-  const { econ, earnings, week, today, now, day, pick, onPick } = props
-  const start = dayStartMs(week)
-  const span = 7 * 86_400_000
-  const at = (ms: number) => `${((ms - start) / span) * 100}%`
-  const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
-  const inWeek = (ms: number) => ms >= start && ms < start + span
-  const shown = econ.filter((cluster) => inWeek(cluster.at))
-  const reports = (target: string) => earnings.filter((item) => item.reportDate === target)
-  const scroller = useRef<HTMLDivElement>(null)
-
-  // Phones: start the scrollable week at "now".
-  useEffect(() => {
-    const node = scroller.current
-    if (!node || node.scrollWidth <= node.clientWidth || !inWeek(now)) return
-    node.scrollLeft = ((now - start) / span) * node.scrollWidth - node.clientWidth / 3
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [week])
-
-  const arrow = "grid size-8 place-items-center rounded-full border border-white/15 text-[16px] leading-none transition-colors hover:bg-white/10 disabled:pointer-events-none disabled:opacity-25"
-
-  return (
-    <div className={cn(panel, "mt-6 p-3 sm:p-4")}>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <p className={label}>
-          {Number(week.slice(5, 7))}-р сарын {Number(week.slice(8))}–{Number(addDays(week, 6).slice(8))} · {shown.length} цаг, {days.reduce((sum, target) => sum + reports(target).length, 0)} ашгийн тайлан
-        </p>
-        <div className="flex items-center gap-1.5">
-          <button type="button" className={arrow} onClick={() => props.onWeek(-1)} disabled={!props.canBack} aria-label="Өмнөх долоо хоног">
-            ‹
-          </button>
-          <button type="button" className={arrow} onClick={() => props.onWeek(1)} disabled={!props.canForward} aria-label="Дараагийн долоо хоног">
-            ›
-          </button>
-        </div>
-      </div>
-
-      <div ref={scroller} className="-mx-1 overflow-x-auto px-1 pb-1 [scrollbar-width:thin]">
-        <div className="relative min-w-[760px]">
-          {/* Day headers (pick a day for the agenda) */}
-          <div className="grid grid-cols-7">
-            {days.map((target) => {
-              const count = shown.filter((cluster) => cluster.day === target).reduce((sum, cluster) => sum + cluster.events.length, 0) + reports(target).length
-              return (
-                <button
-                  key={target}
-                  type="button"
-                  onClick={() => props.onDay(target)}
-                  aria-pressed={day === target}
-                  className={cn(
-                    "mx-0.5 flex items-baseline justify-between rounded-md px-2 py-1.5 text-left transition-colors",
-                    day === target ? "bg-white/12" : "hover:bg-white/6",
-                    target < today ? "opacity-50" : "",
-                  )}
-                >
-                  <span className="text-[12px]">
-                    <span className={cn("font-semibold", target === today ? "text-brand" : "")}>{target === today ? "Өнөөдөр" : shortWeekdays[weekdayOf(target)]}</span>{" "}
-                    <span className="text-white/50 tabular-nums">{Number(target.slice(8))}</span>
-                  </span>
-                  <span className="font-mono text-[10.5px] text-white/40 tabular-nums">{count || ""}</span>
-                </button>
-              )
-            })}
-          </div>
-
-          {/* The river: releases at their hour */}
-          <div className="relative mt-2 h-[104px] rounded-lg bg-white/[0.025]">
-            {days.map((target, index) => (
-              <span key={target} className={cn("absolute inset-y-0 border-l border-white/[0.06]", weekdayOf(target) % 6 === 0 ? "bg-white/[0.02]" : "")} style={{ left: `${(index / 7) * 100}%`, width: `${100 / 7}%` }} aria-hidden>
-                {[6, 12, 18].map((hour) => (
-                  <span key={hour} className="absolute bottom-0 h-1.5 border-l border-white/10" style={{ left: `${(hour / 24) * 100}%` }} />
-                ))}
-              </span>
-            ))}
-            <span className="absolute bottom-0 left-0 h-px w-full bg-white/10" aria-hidden />
-
-            {inWeek(now) ? (
-              <span className="bg-brand absolute inset-y-0 z-10 w-0.5" style={{ left: at(now) }} aria-hidden>
-                <span className="bg-brand absolute -top-1 left-1/2 -translate-x-1/2 rounded px-1 font-mono text-[9.5px] leading-4 font-semibold text-white">Одоо</span>
-              </span>
-            ) : null}
-
-            {props.loading ? <span className="absolute inset-0 animate-pulse rounded-lg bg-white/[0.04]" /> : null}
-
-            {shown.map((cluster) => {
-              const selected = pick?.kind === "econ" && cluster.events.some((event) => event.id === pick.id)
-              const past = cluster.at < now - 5 * 60_000
-              const first = cluster.events[0]
-              return (
-                <button
-                  key={cluster.key}
-                  type="button"
-                  onClick={() => onPick({ kind: "econ", id: first.id })}
-                  title={`${ubParts(cluster.at).time} · ${cluster.events.map((event) => event.mnTitle || event.title).join(" · ")}`}
-                  aria-label={`${dayName(cluster.day, today)} ${ubParts(cluster.at).time}: ${first.mnTitle || first.title}${cluster.events.length > 1 ? ` ба ${cluster.events.length - 1} бусад` : ""}`}
-                  className="group absolute bottom-0 z-20 flex w-5 -translate-x-1/2 flex-col items-center justify-end"
-                  style={{ left: at(cluster.at), height: cluster.high ? 84 : 52 }}
-                >
-                  <span
-                    className={cn(
-                      "grid min-w-[18px] place-items-center rounded-full px-1 font-mono text-[9.5px] leading-[18px] font-semibold transition-transform group-hover:scale-110",
-                      selected ? "bg-brand text-white ring-brand/40 ring-4" : cluster.high ? "text-white" : "bg-white/25 text-white",
-                      past && !selected ? "opacity-45" : "",
-                    )}
-                    style={!selected && cluster.high ? { background: HOT } : undefined}
-                  >
-                    {cluster.events.length > 1 ? cluster.events.length : ""}
-                  </span>
-                  <span className={cn("w-0.5 flex-1", selected ? "bg-brand" : cluster.high ? "bg-[#f0643f]/60" : "bg-white/25", past && !selected ? "opacity-45" : "")} />
-                </button>
-              )
-            })}
-          </div>
-
-          {/* Earnings lane */}
-          <div className="mt-2 grid grid-cols-7">
-            {days.map((target) => {
-              const list = reports(target)
-              const selected = pick?.kind === "earn" && list.some((item) => item.symbol === pick.symbol)
-              return (
-                <span key={target} className="mx-0.5 flex min-w-0">
-                  {list.length ? (
-                    <button
-                      type="button"
-                      onClick={() => onPick({ kind: "earn", symbol: list[0].symbol })}
-                      title={list.map((item) => item.name).join(", ")}
-                      className={cn(
-                        "flex min-w-0 flex-1 items-center gap-1.5 rounded-md border px-2 py-1 text-left text-[11px] transition-colors",
-                        selected ? "border-brand bg-brand/20" : "border-white/10 hover:bg-white/6",
-                        target < today ? "opacity-40" : "",
-                      )}
-                    >
-                      <span className="flex -space-x-1" aria-hidden>
-                        {list.slice(0, 3).map((item) => (
-                          <span key={item.symbol} className="grid size-4 place-items-center rounded-full bg-white/90 text-[8.5px] font-bold text-[#16181c] ring-1 ring-[#16181c]">
-                            {item.name.replace(/^Жишээ: /, "").charAt(0)}
-                          </span>
-                        ))}
-                      </span>
-                      <span className="truncate">
-                        {list.length} тайлан
-                      </span>
-                    </button>
-                  ) : (
-                    <span className="flex-1 rounded-md border border-dashed border-white/[0.06] py-1 text-center text-[10px] text-white/20">·</span>
-                  )}
-                </span>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      <p className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-white/45">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full" style={{ background: HOT }} /> Өндөр нөлөөтэй
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="size-2.5 rounded-full bg-white/25" /> Дунд
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="grid size-3.5 place-items-center rounded-full bg-white/25 font-mono text-[8px] text-white">3</span> Нэг цагт хэд гарах
-        </span>
-        <span>Доод мөр: компаниудын ашгийн тайлан</span>
-      </p>
-    </div>
   )
 }
 
@@ -747,12 +557,12 @@ function EconFocus({ event, cluster, now, chart, linked, onPick }: { event: Econ
   const forecast = figure(event.forecast)
   const verdict = actual === null || forecast === null ? null : actual > forecast ? "Таамгаас өндөр" : actual < forecast ? "Таамгаас доогуур" : "Таамагтай тэнцүү"
   return (
-    <article className={cn(panel, "p-5")} aria-live="polite">
+    <article className="mx-1 mb-2 rounded-lg border border-white/10 bg-white/[0.04] p-4" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11.5px] font-medium">{event.country}</span>
         <Impact high={event.impact === "High"} />
       </div>
-      <h3 className="mt-3 text-[20px] leading-snug font-semibold">{event.mnTitle || event.title}</h3>
+      <h3 className="mt-2.5 text-[17px] leading-snug font-semibold">{event.mnTitle || event.title}</h3>
       {event.mnTitle ? <p className="mt-0.5 font-mono text-[11px] text-white/40">{event.title}</p> : null}
       <div className="mt-3">
         <When ms={Date.parse(event.startsAt)} now={now} />
@@ -809,14 +619,14 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
   const pos = (value: number) => `${Math.min(100, Math.max(0, ((value - low!) / (high! - low!)) * 100))}%`
   const rating = RATINGS.indexOf(item.recommendation)
   return (
-    <article className={cn(panel, "p-5")} aria-live="polite">
+    <article className="mx-1 mb-2 rounded-lg border border-white/10 bg-white/[0.04] p-4" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <span className="rounded-md bg-white/10 px-2 py-0.5 text-[11.5px] font-medium">
           {item.countryName} · <span className="font-mono">{item.symbol}</span>
         </span>
         <span className="text-[11px] font-medium text-white/55">Ашгийн тайлан</span>
       </div>
-      <h3 className="mt-3 text-[20px] leading-snug font-semibold">{item.name}</h3>
+      <h3 className="mt-2.5 text-[17px] leading-snug font-semibold">{item.name}</h3>
       <div className="mt-2">
         <When ms={dayStartMs(item.reportDate)} now={now} allDay />
       </div>
@@ -909,7 +719,34 @@ function EarningsFocus({ item, sameDay, now, chart, linked, onPick }: { item: Ea
 /* Day rail: the calendar beside the chart, one line per item          */
 /* ------------------------------------------------------------------ */
 
-function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }: { econ: Cluster[]; earnings: EarningsEvent[]; week: string; day: string; today: string; now: number; pick: Pick | null; onDay: (day: string) => void; onPick: (pick: Pick) => void }) {
+function DayRail(props: {
+  econ: Cluster[]
+  earnings: EarningsEvent[]
+  week: string
+  day: string
+  today: string
+  now: number
+  pick: Pick | null
+  loading: boolean
+  canBack: boolean
+  canForward: boolean
+  onWeek: (step: number) => void
+  onDay: (day: string) => void
+  onPick: (pick: Pick) => void
+  /** The picked item's explanation, shown under its line. */
+  detail: ReactNode
+}) {
+  const { econ, earnings, week, day, today, now, pick, onDay, onPick, detail } = props
+  const [collapsed, setCollapsed] = useState(false)
+  const list = useRef<HTMLUListElement>(null)
+  const pickKey = pick ? (pick.kind === "econ" ? pick.id : pick.symbol) : ""
+  // A new pick opens; keep its line in view inside the list (without scrolling the page).
+  useEffect(() => {
+    setCollapsed(false)
+    const node = list.current?.querySelector<HTMLElement>("[data-picked]")
+    if (list.current && node) list.current.scrollTop = Math.max(0, node.offsetTop - 48)
+  }, [pickKey, day])
+  const toggle = (next: Pick, selected: boolean) => (selected ? setCollapsed((value) => !value) : onPick(next))
   const days = Array.from({ length: 7 }, (_, index) => addDays(week, index))
   const releasesOf = (target: string) => econ.filter((cluster) => cluster.day === target).flatMap((cluster) => cluster.events)
   const reportsOf = (target: string) => earnings.filter((item) => item.reportDate === target).sort((a, b) => (b.analysts ?? 0) - (a.analysts ?? 0))
@@ -919,7 +756,20 @@ function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }:
 
   return (
     // xl: as tall as the chart beside it; the list scrolls inside.
-    <aside aria-label="Календарь" className={cn(panel, "flex min-w-0 flex-col xl:max-h-[48%] xl:min-h-0 xl:shrink-0")}>
+    <aside aria-label="Календарь" className={cn(panel, "flex min-w-0 flex-col xl:h-0 xl:min-h-full")}>
+      <div className="flex items-center justify-between gap-2 px-3 pt-2.5">
+        <p className={label}>
+          Календарь · {Number(week.slice(5, 7))}-р сарын {Number(week.slice(8))}–{Number(addDays(week, 6).slice(8))}
+        </p>
+        <div className="flex gap-1">
+          <button type="button" className={weekArrow} onClick={() => props.onWeek(-1)} disabled={!props.canBack} aria-label="Өмнөх долоо хоног">
+            ‹
+          </button>
+          <button type="button" className={weekArrow} onClick={() => props.onWeek(1)} disabled={!props.canForward} aria-label="Дараагийн долоо хоног">
+            ›
+          </button>
+        </div>
+      </div>
       <div role="tablist" aria-label="Өдөр" className="grid grid-cols-7 gap-0.5 border-b border-white/10 p-1.5">
         {days.map((target) => {
           const count = releasesOf(target).length + reportsOf(target).length
@@ -951,17 +801,19 @@ function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }:
         <span className="text-[12.5px] font-semibold">{dayName(day, today)}</span>
         <span className="font-mono text-[10.5px] text-white/40">{releases.length + reports.length}</span>
       </p>
-      <ul className="max-h-[420px] min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1.5 [scrollbar-width:thin] xl:max-h-none">
-        {!releases.length && !reports.length ? <li className="px-2 py-6 text-center text-[12px] text-white/40">Энэ өдөр мэдээ алга.</li> : null}
+      <ul ref={list} className="relative max-h-[560px] min-h-0 flex-1 overflow-y-auto overscroll-contain px-1 pb-1.5 [scrollbar-width:thin] xl:max-h-none">
+        {props.loading ? <li className="mx-2 my-2 h-40 animate-pulse rounded-lg bg-white/[0.05]" /> : null}
+        {!props.loading && !releases.length && !reports.length ? <li className="px-2 py-6 text-center text-[12px] text-white/40">Энэ өдөр мэдээ алга.</li> : null}
         {releases.map((event) => {
           const selected = pick?.kind === "econ" && pick.id === event.id
           const past = Date.parse(event.startsAt) < now - 5 * 60_000
           const high = event.impact === "High"
           return (
-            <li key={event.id}>
+            <li key={event.id} data-picked={selected || undefined}>
               <button
                 type="button"
-                onClick={() => onPick({ kind: "econ", id: event.id })}
+                aria-expanded={selected && !collapsed}
+                onClick={() => toggle({ kind: "econ", id: event.id }, selected)}
                 title={`${event.mnTitle || event.title} · ${event.country}`}
                 className={cn(row, selected ? "bg-brand/25" : "hover:bg-white/6", past && !selected ? "opacity-50" : "")}
               >
@@ -970,6 +822,7 @@ function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }:
                 <span className="truncate text-[12.5px]">{event.mnTitle || event.title}</span>
                 <span className="font-mono text-[11px] text-white/50 tabular-nums">{event.actual ? <span className="text-brand font-semibold">{event.actual}</span> : event.forecast}</span>
               </button>
+              {selected && !collapsed ? <div className="pt-1">{detail}</div> : null}
             </li>
           )
         })}
@@ -977,10 +830,11 @@ function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }:
           const selected = pick?.kind === "earn" && pick.symbol === item.symbol
           const upside = upsideOf(item)
           return (
-            <li key={item.symbol}>
+            <li key={item.symbol} data-picked={selected || undefined}>
               <button
                 type="button"
-                onClick={() => onPick({ kind: "earn", symbol: item.symbol })}
+                aria-expanded={selected && !collapsed}
+                onClick={() => toggle({ kind: "earn", symbol: item.symbol }, selected)}
                 title={`${item.name} · ${item.countryName}`}
                 className={cn(row, selected ? "bg-brand/25" : "hover:bg-white/6", day < today && !selected ? "opacity-50" : "")}
               >
@@ -991,6 +845,7 @@ function DayRail({ econ, earnings, week, day, today, now, pick, onDay, onPick }:
                   {upside === null ? "–" : `${upside >= 0 ? "+" : ""}${upside.toFixed(1)}%`}
                 </span>
               </button>
+              {selected && !collapsed ? <div className="pt-1">{detail}</div> : null}
             </li>
           )
         })}
