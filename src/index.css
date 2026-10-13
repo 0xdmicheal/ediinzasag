@@ -153,6 +153,9 @@
     --cat-4: #eda100;
     /* On the inverted ink surface (black in light mode). */
     --up-on-ink: #2fae74;
+    /* On the fixed-dark studio surface, in both themes. */
+    --up-on-studio: #2fae74;
+    --down-on-studio: #f0643f;
     --down-on-ink: #f0643f;
     --sidebar: #ffffff;
     --sidebar-foreground: #131518;

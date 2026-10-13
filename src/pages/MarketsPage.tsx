@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { useEffect, useId, useRef, useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { Globe2, Landmark } from "lucide-react"
 import { cn } from "cn"
@@ -7,6 +7,7 @@ import { MarketDesk, WATCHLIST } from "@/components/site/MarketDesk"
 import { signedPct } from "@/components/site/market-marks"
 import { parseNumber, YieldCurve } from "@/components/site/market-charts"
 import { formatMove, formatValue, money } from "@/components/site/money"
+import { loadLiveQuotes, type LiveQuote } from "@/content/live-quotes"
 import { friendlyName, glossary, plain, regions, unitHint } from "@/content/market-guide"
 import {
   commodities,
@@ -116,7 +117,7 @@ export function MarketsPage() {
       <Pulse onOpen={openTile} />
       <MarketDesk request={deskRequest} />
 
-      <div ref={rest} className={`${narrow} scroll-mt-14 pt-12 pb-20 sm:pt-16`}>
+      <div ref={rest} className={`${narrow} scroll-mt-14 pt-8 pb-20 sm:pt-10`}>
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4 border-b pb-4">
           <div>
             <h2 className="font-news text-2xl leading-none sm:text-4xl">Тоон мэдээлэл</h2>
@@ -148,7 +149,7 @@ export function MarketsPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Pulse: the six numbers, on ink                                      */
+/* Pulse: the six numbers, on the fixed-dark studio surface           */
 /* ------------------------------------------------------------------ */
 
 interface PulseTile {
@@ -159,77 +160,186 @@ interface PulseTile {
   unit?: string
   pct: number | null
   note: string
+  /** Recent daily closes for the sparkline; empty for the hand-written fallback. */
+  spark: number[]
+  /** "10.12-ны хаалт" when the price is more than a day and a half old. */
+  stale?: string
 }
 
-function pulseTiles(): PulseTile[] {
-  const fromQuote = (id: string): PulseTile => {
-    const item = quote(id)!
-    const per = item.denom.kind === "money" ? item.denom.per : undefined
-    const longer = item.ytd !== undefined ? `Оны эхнээс ${signedPct(item.ytd).replace("-", "−")}` : item.year !== undefined ? `12 сард ${signedPct(item.year).replace("-", "−")}` : item.asOf
-    return { id, room: "world", label: friendlyName[id] ?? item.label, value: formatValue(item.price, item.denom), unit: per ? `/ ${per}` : undefined, pct: item.pct, note: longer }
+const PULSE_IDS = ["mnt", "top20", "copper", "coal", "gold", "brent"]
+const REFRESH_MS = 5 * 60_000
+
+const pctText = (pct: number) => signedPct(pct).replace("-", "−")
+const priceText = (n: number) => n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: n >= 100 ? 2 : 3 })
+
+/** The hand-written closes in content/markets.ts, used until the server job has run. */
+function staticTile(id: string): PulseTile {
+  if (id === "mnt") {
+    const mnt = quote("mnt")!
+    return { id, room: "world", label: "Ам.доллар", value: `${mnt.price}₮`, pct: null, note: `Дунд ханш · ${mnt.asOf.slice(5)}`, spark: [] }
   }
-  const mnt = quote("mnt")!
-  return [
-    { id: "mnt", room: "world", label: "Ам.доллар", value: `${mnt.price}₮`, pct: null, note: `Дунд ханш · ${mnt.asOf.slice(5)}` },
-    { id: "top20", room: "mongolia", label: "ТОП-20", value: top20.price, unit: "оноо", pct: top20.pct, note: `1 жилд ${String(top20.year).replace("-", "−")}` },
-    fromQuote("copper"),
-    fromQuote("coal"),
-    fromQuote("gold"),
-    fromQuote("brent"),
-  ]
+  if (id === "top20") return { id, room: "mongolia", label: "ТОП-20", value: top20.price, unit: "оноо", pct: top20.pct, note: `Жилд ${String(top20.year).replace("-", "−")}`, spark: [] }
+  const item = quote(id)!
+  const per = item.denom.kind === "money" ? item.denom.per : undefined
+  const note = item.ytd !== undefined ? `Оны эхнээс ${pctText(item.ytd)}` : item.year !== undefined ? `Жилд ${pctText(item.year)}` : item.asOf
+  return { id, room: "world", label: friendlyName[id] ?? item.label, value: formatValue(item.price, item.denom), unit: per ? `/ ${per}` : undefined, pct: item.pct, note, spark: [] }
+}
+
+function liveTile(id: string, live: LiveQuote, now: number): PulseTile {
+  const base = staticTile(id)
+  const value = id === "mnt" ? `${priceText(live.price)}₮` : id === "top20" ? priceText(live.price) : formatValue(priceText(live.price), quote(id)!.denom)
+  const note = live.monthPct !== null ? `Сард ${pctText(live.monthPct)}` : live.yearPct !== null ? `Жилд ${pctText(live.yearPct)}` : id === "mnt" ? "Зах зээлийн ханш" : ""
+  const asOf = new Date(live.asOf)
+  const stale = now - asOf.getTime() > 36 * 3_600_000 ? `${String(asOf.getMonth() + 1).padStart(2, "0")}.${String(asOf.getDate()).padStart(2, "0")}-ны хаалт` : undefined
+  return { ...base, value, pct: live.pct, note, spark: live.spark, stale }
+}
+
+/** "5 минутын өмнө шинэчлэгдсэн" */
+function freshness(updatedAt: number, now: number) {
+  const minutes = Math.max(0, Math.round((now - updatedAt) / 60_000))
+  if (minutes < 1) return "Дөнгөж сая шинэчлэгдсэн"
+  if (minutes < 60) return `${minutes} минутын өмнө шинэчлэгдсэн`
+  const hours = Math.round(minutes / 60)
+  if (hours < 48) return `${hours} цагийн өмнө шинэчлэгдсэн`
+  return `${Math.round(hours / 24)} хоногийн өмнө шинэчлэгдсэн`
+}
+
+/** Live quotes from the server job, re-read every few minutes and when the tab comes back. */
+function useLiveQuotes() {
+  const [quotes, setQuotes] = useState<LiveQuote[]>([])
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    let alive = true
+    const read = () =>
+      loadLiveQuotes().then(
+        (rows) => {
+          if (!alive) return
+          setQuotes(rows)
+          setNow(Date.now())
+        },
+        () => undefined,
+      )
+    read()
+    const timer = window.setInterval(read, REFRESH_MS)
+    const tick = window.setInterval(() => setNow(Date.now()), 10_000)
+    const onVisible = () => {
+      if (document.visibilityState === "visible") read()
+    }
+    document.addEventListener("visibilitychange", onVisible)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      window.clearInterval(tick)
+      document.removeEventListener("visibilitychange", onVisible)
+    }
+  }, [])
+  return { quotes, now }
+}
+
+function Sparkline({ points, tone, className = "h-10 w-full" }: { points: number[]; tone: string; className?: string }) {
+  const id = useId().replace(/:/g, "")
+  if (points.length < 2) return <div className={className} aria-hidden />
+  const low = Math.min(...points)
+  const high = Math.max(...points)
+  const span = high - low || 1
+  const xy = points.map((value, index) => [(index / (points.length - 1)) * 100, 30 - ((value - low) / span) * 26 - 2] as const)
+  const line = xy.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ")
+  return (
+    <svg viewBox="0 0 100 32" preserveAspectRatio="none" className={cn("overflow-visible", className, tone)} aria-hidden>
+      <defs>
+        <linearGradient id={`spark${id}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0" stopColor="currentColor" stopOpacity="0.22" />
+          <stop offset="1" stopColor="currentColor" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${line} L100,32 L0,32 Z`} fill={`url(#spark${id})`} />
+      <path d={line} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  )
 }
 
 function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
-  const tiles = pulseTiles()
+  const { quotes, now } = useLiveQuotes()
+  const byId = new Map(quotes.map((item) => [item.id, item]))
+  const tiles = PULSE_IDS.map((id) => {
+    const live = byId.get(id)
+    return live ? liveTile(id, live, now) : staticTile(id)
+  })
+  const updated = quotes.length ? Math.max(...quotes.map((item) => Date.parse(item.updatedAt))) : null
+
+  const clock = ubClock(now)
+
   return (
-    <section aria-labelledby="markets-title" className="bg-ink text-ink-foreground">
-      <div className={`${narrow} pt-8 pb-6 sm:pt-12 sm:pb-8`}>
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+    <section aria-labelledby="markets-title" className="bg-studio text-photo-foreground">
+      <div className={`${narrow} pt-7 pb-6 sm:pt-9 sm:pb-7`}>
+        <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div>
-            <p className="text-ink-foreground/55 text-[11px] font-medium tracking-[0.18em] uppercase">Зах зээл · {sessionShort}</p>
-            <h1 id="markets-title" className="font-news mt-2 text-[2rem] leading-none sm:text-5xl">
+            <p className="text-photo-foreground/55 text-[11px] font-medium tracking-[0.18em] uppercase">Зах зээл</p>
+            <h1 id="markets-title" className="font-news mt-2 text-[1.75rem] leading-none sm:text-4xl">
               Өнөөдөр юу хөдөлсөн бэ
             </h1>
           </div>
+          {/* Date and time in Ulaanbaatar, the reader's clock for every number below. */}
+          <div className="flex items-end gap-4">
+            <time dateTime={new Date(now).toISOString()} className="text-right">
+              <span className="block text-[13px] font-medium">{clock.date}</span>
+              <span className="text-photo-foreground/55 mt-0.5 flex items-center justify-end gap-1.5 text-[11.5px]">
+                {updated ? <span className="inline-block size-1.5 animate-pulse rounded-full bg-[var(--up-on-studio)]" aria-hidden /> : null}
+                {updated ? freshness(updated, now) : sessionShort}
+              </span>
+            </time>
+            <span className="bg-brand text-brand-foreground rounded-lg px-3 py-1.5 font-mono text-[26px] leading-none font-semibold tabular-nums sm:text-[32px]">
+              {clock.time}
+            </span>
+          </div>
         </div>
 
-        <div className="mt-6 grid grid-cols-2 overflow-hidden rounded-xl border border-white/10 sm:mt-8 md:grid-cols-3 xl:grid-cols-6">
-          {tiles.map((tile, index) => (
-            <button
-              key={tile.id}
-              type="button"
-              onClick={() => onOpen(tile.id, tile.room)}
-              className={cn(
-                "group flex min-w-0 flex-col items-start gap-1 border-white/10 p-4 text-left transition-colors hover:bg-white/[0.06] sm:p-5",
-                index % 2 === 0 ? "border-r" : "md:border-r",
-                index < tiles.length - 2 ? "border-b" : "",
-                "md:[&:nth-child(3n)]:border-r-0 md:[&:nth-child(n+4)]:border-b-0 md:[&:nth-child(-n+3)]:border-b xl:[&:nth-child(3n)]:border-r xl:[&:nth-child(n)]:border-b-0 xl:last:border-r-0",
-              )}
-            >
-              <span className="text-ink-foreground/60 flex w-full items-center justify-between gap-2 text-[12px]">
-                {tile.label}
-                <span className="text-ink-foreground/30 transition-transform group-hover:translate-x-0.5" aria-hidden>
-                  →
-                </span>
-              </span>
-              <span className="mt-1 flex min-w-0 items-baseline gap-1.5">
-                <span className="truncate text-[19px] font-semibold tracking-tight tabular-nums sm:text-[24px]">{tile.value}</span>
-                {tile.unit ? <span className="text-ink-foreground/50 shrink-0 text-[11px]">{tile.unit}</span> : null}
-              </span>
-              <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
-                {tile.pct === null ? null : (
-                  <span className={cn("font-mono font-semibold tabular-nums", Math.abs(tile.pct) < 0.005 ? "text-ink-foreground/60" : tile.pct > 0 ? "text-[var(--up-on-ink)]" : "text-[var(--down-on-ink)]")}>
-                    {Math.abs(tile.pct) < 0.005 ? "0.00%" : `${tile.pct > 0 ? "▲" : "▼"} ${signedPct(tile.pct).replace(/^[+-]/, "")}`}
+        <div className="mt-5 grid grid-cols-2 gap-[20px] sm:mt-6 md:grid-cols-3 xl:grid-cols-6">
+          {tiles.map((tile) => {
+            const flat = tile.pct === null || Math.abs(tile.pct) < 0.005
+            const trend = tile.spark.length > 1 ? tile.spark[tile.spark.length - 1] - tile.spark[0] : (tile.pct ?? 0)
+            const lineTone = trend > 0 ? "text-[var(--up-on-studio)]" : trend < 0 ? "text-[var(--down-on-studio)]" : "text-photo-foreground/40"
+            return (
+              <button
+                key={tile.id}
+                type="button"
+                onClick={() => onOpen(tile.id, tile.room)}
+                className="group border-photo-foreground/10 bg-photo-foreground/[0.03] hover:bg-photo-foreground/[0.07] grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors"
+              >
+                <span className="text-photo-foreground/60 truncate text-[11.5px]">{tile.label}</span>
+                {tile.pct === null ? (
+                  <span />
+                ) : (
+                  <span className={cn("text-right font-mono text-[11.5px] font-semibold tabular-nums", flat ? "text-photo-foreground/60" : tile.pct > 0 ? "text-[var(--up-on-studio)]" : "text-[var(--down-on-studio)]")}>
+                    {flat ? "0.00%" : `${tile.pct > 0 ? "▲" : "▼"} ${signedPct(tile.pct).replace(/^[+-]/, "")}`}
                   </span>
                 )}
-                <span className="text-ink-foreground/50">{tile.note}</span>
-              </span>
-            </button>
-          ))}
+                <span className="flex min-w-0 items-baseline gap-1">
+                  <span className="truncate text-[17px] font-semibold tracking-tight tabular-nums sm:text-[19px]">{tile.value}</span>
+                  {tile.unit ? <span className="text-photo-foreground/50 shrink-0 text-[10.5px]">{tile.unit}</span> : null}
+                </span>
+                <Sparkline points={tile.spark} tone={lineTone} className="row-span-2 h-7 w-14 sm:w-16" />
+                <span className="text-photo-foreground/45 truncate text-[10.5px]">{tile.stale ?? tile.note}</span>
+              </button>
+            )
+          })}
         </div>
       </div>
     </section>
   )
+}
+
+const UB_WEEKDAYS = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"]
+
+/** "Мягмар, 10-р сарын 13" and "20:45" in Ulaanbaatar time. */
+function ubClock(ms: number) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Ulaanbaatar", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", weekday: "short" })
+      .formatToParts(new Date(ms))
+      .map((part) => [part.type, part.value]),
+  )
+  const weekday = UB_WEEKDAYS[["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday)]
+  return { date: `${weekday}, ${parts.month}-р сарын ${parts.day}`, time: `${parts.hour}:${parts.minute}` }
 }
 
 /* ------------------------------------------------------------------ */
@@ -647,29 +757,64 @@ function Currency() {
 /* Тайлбар: small, at the end of every room                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Questions on the left, the answer on the right in a panel as tall as the list,
+ * so picking another question never moves the page. One answer is always open.
+ */
 function Glossary() {
-  const [open, setOpen] = useState<string | null>(null)
-  const current = glossary.find((item) => item.term === open)
+  const [open, setOpen] = useState(glossary[0].term)
+  const current = glossary.find((item) => item.term === open) ?? glossary[0]
+  const index = glossary.indexOf(current)
   return (
-    <section id="glossary" aria-label="Үгийн тайлбар" className="mt-16 scroll-mt-20 border-t pt-6">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-muted-foreground mr-1 text-[12px] font-medium">Ойлгомжгүй үг үү?</span>
-        {glossary.map((item) => (
-          <button
-            key={item.term}
-            type="button"
-            aria-expanded={open === item.term}
-            onClick={() => setOpen(open === item.term ? null : item.term)}
-            className={cn(
-              "h-8 rounded-full border px-3 text-[12.5px] transition-colors",
-              open === item.term ? "bg-foreground text-background border-transparent" : "bg-card hover:border-foreground/30",
-            )}
-          >
-            {item.term}
-          </button>
-        ))}
+    <section id="glossary" aria-label="Түгээмэл асуулт" className="mt-16 scroll-mt-20 border-t pt-8">
+      <Head kicker="Түгээмэл асуулт" title="Ойлгомжгүй зүйл байна уу?" />
+      <div className="grid gap-[20px] md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] [&>*]:min-w-0">
+        <ul role="tablist" aria-label="Асуултууд" aria-orientation="vertical" className="bg-card divide-y overflow-hidden rounded-xl border">
+          {glossary.map((item, at) => {
+            const active = item.term === current.term
+            return (
+              <li key={item.term}>
+                <button
+                  type="button"
+                  role="tab"
+                  id={`faq-${at}`}
+                  aria-selected={active}
+                  aria-controls="faq-answer"
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => setOpen(item.term)}
+                  onKeyDown={(event) => {
+                    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0
+                    if (!step) return
+                    event.preventDefault()
+                    const next = (at + step + glossary.length) % glossary.length
+                    setOpen(glossary[next].term)
+                    document.getElementById(`faq-${next}`)?.focus()
+                  }}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-3 border-l-2 px-4 py-3 text-left text-[13.5px] transition-colors",
+                    active ? "border-brand bg-blue-100 font-medium dark:bg-blue-800" : "border-transparent hover:bg-foreground/[0.04]",
+                  )}
+                >
+                  <span>{item.term}</span>
+                  <span className={cn("shrink-0 transition-transform", active ? "text-brand-strong" : "text-muted-foreground/50")} aria-hidden>
+                    →
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+        {/* Stretches to the list's height (md+); on phones a fixed minimum keeps short answers from jumping. */}
+        <div id="faq-answer" role="tabpanel" aria-labelledby={`faq-${index}`} className="bg-card flex min-h-[11rem] flex-col rounded-xl border p-5 sm:p-6">
+          <p className="text-muted-foreground font-mono text-[11px] tabular-nums">
+            {String(index + 1).padStart(2, "0")} / {String(glossary.length).padStart(2, "0")}
+          </p>
+          <h3 className="mt-2 text-[18px] leading-snug font-semibold">
+            {current.term}
+          </h3>
+          <p className="mt-3 max-w-prose text-[15px] leading-relaxed text-foreground/85">{current.text}</p>
+        </div>
       </div>
-      {current ? <p className="bg-card mt-3 max-w-3xl rounded-xl border p-4 text-[14px] leading-relaxed">{current.text}</p> : null}
     </section>
   )
 }

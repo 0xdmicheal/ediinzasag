@@ -13,8 +13,9 @@ import { commodities, fx, worldIndices, type Quote } from "@/content/markets"
  * surface. A week timeline puts every release at its hour (taller = more
  * market-moving) with a "now" line, and the week's earnings on their own lane.
  * Picking anything opens a focus card (countdown, figures, the Mongolian
- * explanation, analysts' targets) and switches the chart to the market that
- * news moves: US CPI → dollar index, an ASML report → ASML. The agenda under
+ * explanation, analysts' targets) and offers a button to put the market that
+ * news moves on the chart: US CPI → dollar index, an ASML report → ASML. The
+ * chart never switches on its own; the reader chooses. The agenda under
  * it lists the chosen day, releases and reports together.
  *
  * Times are Ulaanbaatar time (UTC+8, no daylight saving). Chart prices are
@@ -275,6 +276,7 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
   const [chart, setChart] = useState<ChartPick>(WATCHLIST[0])
   const [linked, setLinked] = useState(false)
   const root = useRef<HTMLElement>(null)
+  const chartRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     loadCalendar().then(setData, () => setFailed(true))
@@ -310,29 +312,22 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
     }
   }, [data, econ, earnings, pick])
 
-  const choose = (next: Pick, moveChart = true) => {
+  // Picking news only opens its card; the chart moves when the reader presses the card's chart button.
+  const choose = (next: Pick) => {
     setPick(next)
     if (next.kind === "econ") {
       const event = data?.econ.find((item) => item.id === next.id)
-      if (event) {
-        setDay(ubParts(event.startsAt).day)
-        const target = CURRENCY_CHART[event.currency]
-        if (moveChart && target) {
-          setChart(target)
-          setLinked(true)
-        }
-      }
+      if (event) setDay(ubParts(event.startsAt).day)
     } else {
       const item = earnings.find((row) => row.symbol === next.symbol)
-      if (item) {
-        setDay(item.reportDate)
-        const target = stockChart(item)
-        if (moveChart && target) {
-          setChart(target)
-          setLinked(true)
-        }
-      }
+      if (item) setDay(item.reportDate)
     }
+  }
+
+  const showChart = (target: ChartPick) => {
+    setChart(target)
+    setLinked(true)
+    if (window.matchMedia("(max-width: 1279px)").matches) chartRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
   }
 
   // This and next weeks' reporting companies the chart can show.
@@ -349,35 +344,13 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
   const canForward = addDays(week, 7) <= lastDay
 
   return (
-    <section ref={root} id="desk" aria-labelledby="desk-title" className="scroll-mt-14">
+    <section ref={root} id="desk" aria-label="Календарь ба график" className="scroll-mt-14">
       <span id="chart" className="block scroll-mt-14" aria-hidden />
       <span id="calendar" className="block scroll-mt-14" aria-hidden />
-      <div className="px-[10px] pt-2">
-        <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2 border-t border-border px-1 pt-8">
-          <div className="flex items-center gap-3">
-            <span className="bg-brand text-brand-foreground grid size-9 place-items-center rounded-lg">
-              <CandlestickChart className="size-5" strokeWidth={2.25} />
-            </span>
-            <div>
-              <h2 id="desk-title" className="font-news text-2xl leading-none sm:text-3xl">
-                EZ Desk
-              </h2>
-            </div>
-          </div>
-          <p className="font-mono text-[12px] text-muted-foreground tabular-nums">
-            <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-[var(--up)] align-middle" aria-hidden />
-            Улаанбаатар {ubParts(now).time}
-          </p>
-        </header>
+      {failed ? <p className="mx-auto max-w-[1520px] px-4 pt-6 text-sm text-muted-foreground sm:px-6 lg:px-8">Календарийг ачаалж чадсангүй. Дараа дахин оролдоно уу.</p> : null}
 
-        {failed ? <p className="mt-6 text-sm text-muted-foreground">Календарийг ачаалж чадсангүй. Дараа дахин оролдоно уу.</p> : null}
-
-
-      </div>
-
-      {/* The working row runs edge to edge, 10px from each side: calendar (explanations open in place) | chart | pairs. */}
-      <div className="mt-4 grid gap-[10px] px-[10px] xl:grid-cols-[21rem_minmax(0,1fr)_16rem] 2xl:grid-cols-[23rem_minmax(0,1fr)_18rem] [&>*]:min-w-0">
-        {/* xl: the side columns are exactly as tall as the chart and scroll inside. */}
+      {/* Calendar | chart | pairs, 50px from the page edges; the two side columns are the same width and the chart takes the rest. */}
+      <div className="mt-[20px] grid gap-[20px] px-4 sm:px-6 lg:px-[50px] xl:grid-cols-[17rem_minmax(0,1fr)_17rem] 2xl:grid-cols-[19rem_minmax(0,1fr)_19rem] [&>*]:min-w-0">
         <DayRail
           econ={econ}
           earnings={earnings}
@@ -396,13 +369,15 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
           }}
           onDay={setDay}
           onPick={choose}
-          detail={<Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} />}
+          detail={<Focus data={data} econ={econ} pick={pick} now={now} chart={chart} linked={linked} onPick={choose} onChart={showChart} />}
         />
-        <TradingViewChart
-          symbol={chart.symbol}
-          title={chart.label}
-          className="bg-card h-[480px] rounded-xl border sm:h-[640px] xl:h-[820px]"
-        />
+        <div ref={chartRef} className="scroll-mt-14">
+          <TradingViewChart
+            symbol={chart.symbol}
+            title={chart.label}
+            className="bg-card h-[480px] rounded-xl border sm:h-[640px] xl:h-[820px]"
+          />
+        </div>
         <PairRail
           current={chart}
           linked={linked}
@@ -414,11 +389,6 @@ export function MarketDesk({ request }: { request?: { symbol: string; n: number 
         />
       </div>
 
-      <div className="px-[10px] pb-10">
-        <p className="mt-6 text-[11px] leading-relaxed text-muted-foreground">
-          Forex Factory · Yahoo Finance · TradingView{data?.demo ? " · демо" : ""}. Зөвлөгөө биш.
-        </p>
-      </div>
     </section>
   )
 }
@@ -431,7 +401,7 @@ function PairRail({ current, companies, onPick }: { current: ChartPick; linked: 
   const groups = [...GROUPS, ...(companies.length ? [{ id: "companies", title: "Компаниуд", items: companies }] : [])]
   const home = groups.find((group) => group.items.some((item) => item.symbol === current.symbol))?.id ?? groups[0].id
   const [open, setOpen] = useState(home)
-  // Follow the chart: when news switches it, show the group that holds the new market.
+  // Follow the chart: when a card's chart button switches it, show the group that holds the new market.
   useEffect(() => setOpen(home), [home])
   const group = groups.find((entry) => entry.id === open) ?? groups[0]
   const short: Record<string, string> = { mongolia: "Монгол", fx: "Валют", indices: "Индекс", companies: "Компани" }
@@ -457,7 +427,7 @@ function PairRail({ current, companies, onPick }: { current: ChartPick; linked: 
           </button>
         ))}
       </div>
-      <ul className="max-h-[360px] min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 [scrollbar-width:thin] xl:max-h-none">
+      <ul className="max-h-[360px] min-h-0 flex-1 overflow-y-auto overscroll-contain p-1 [scrollbar-color:transparent_transparent] [scrollbar-width:thin] hover:[scrollbar-color:color-mix(in_oklab,currentColor_15%,transparent)_transparent] xl:max-h-none">
         {group.items.map((item) => {
           const active = item.symbol === current.symbol
           return (
@@ -494,19 +464,41 @@ function PairRail({ current, companies, onPick }: { current: ChartPick; linked: 
 /* Focus card                                                          */
 /* ------------------------------------------------------------------ */
 
-function Focus({ data, econ, pick, now, chart, linked, onPick }: { data: CalendarData | null; econ: Cluster[]; pick: Pick | null; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
+function Focus({ data, econ, pick, now, chart, linked, onPick, onChart }: { data: CalendarData | null; econ: Cluster[]; pick: Pick | null; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void; onChart: (target: ChartPick) => void }) {
   if (!data) return <div className={cn(panel, "h-[340px] animate-pulse")} />
   if (!pick) return <div className={cn(panel, "p-5 text-sm text-muted-foreground")}>Ойрын хугацаанд чухал мэдээ алга.</div>
   if (pick.kind === "earn") {
     const item = data.earnings.find((row) => row.symbol === pick.symbol)
     if (!item) return null
     const sameDay = data.earnings.filter((row) => row.reportDate === item.reportDate)
-    return <EarningsFocus item={item} sameDay={sameDay} now={now} chart={chart} linked={linked} onPick={onPick} />
+    return <EarningsFocus item={item} sameDay={sameDay} now={now} chart={chart} linked={linked} onPick={onPick} onChart={onChart} />
   }
   const cluster = econ.find((entry) => entry.events.some((event) => event.id === pick.id))
   const event = cluster?.events.find((entry) => entry.id === pick.id)
   if (!cluster || !event) return null
-  return <EconFocus event={event} cluster={cluster} now={now} chart={chart} linked={linked} onPick={onPick} />
+  return <EconFocus event={event} cluster={cluster} now={now} chart={chart} linked={linked} onPick={onPick} onChart={onChart} />
+}
+
+/** "Show on the chart": the reader's choice, never automatic. */
+function ChartButton({ target, chart, onChart }: { target: ChartPick; chart: ChartPick; onChart: (target: ChartPick) => void }) {
+  const showing = target.symbol === chart.symbol
+  return (
+    <button
+      type="button"
+      disabled={showing}
+      onClick={() => onChart(target)}
+      className={cn(
+        "mt-4 flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left text-[13px] font-medium transition-colors",
+        showing ? "border-border text-muted-foreground" : "border-brand text-brand-strong hover:bg-brand hover:text-brand-foreground",
+      )}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <CandlestickChart className="size-4 shrink-0" />
+        <span className="truncate">{showing ? "Графикт харагдаж байна" : `Графикаар харах · ${target.label}`}</span>
+      </span>
+      <span className="font-mono text-[11px] opacity-70">{target.code}</span>
+    </button>
+  )
 }
 
 function When({ ms, now, allDay }: { ms: number; now: number; allDay?: boolean }) {
@@ -527,7 +519,8 @@ function When({ ms, now, allDay }: { ms: number; now: number; allDay?: boolean }
   )
 }
 
-function EconFocus({ event, cluster, now, onPick }: { event: EconEvent; cluster: Cluster; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
+function EconFocus({ event, cluster, now, chart, onPick, onChart }: { event: EconEvent; cluster: Cluster; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void; onChart: (target: ChartPick) => void }) {
+  const target = CURRENCY_CHART[event.currency]
   const actual = figure(event.actual)
   const forecast = figure(event.forecast)
   const verdict = actual === null || forecast === null ? null : actual > forecast ? "Таамгаас өндөр" : actual < forecast ? "Таамгаас доогуур" : "Таамагтай тэнцүү"
@@ -561,6 +554,7 @@ function EconFocus({ event, cluster, now, onPick }: { event: EconEvent; cluster:
       ) : null}
 
       {event.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-foreground/80">{event.mnSummary}</p> : null}
+      {target ? <ChartButton target={target} chart={chart} onChart={onChart} /> : null}
 
       {cluster.events.length > 1 ? (
         <div className="mt-4 border-t border-border pt-3">
@@ -585,7 +579,8 @@ function EconFocus({ event, cluster, now, onPick }: { event: EconEvent; cluster:
 
 const RATINGS = ["sell", "underperform", "hold", "buy", "strong_buy"]
 
-function EarningsFocus({ item, sameDay, now, onPick }: { item: EarningsEvent; sameDay: EarningsEvent[]; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void }) {
+function EarningsFocus({ item, sameDay, now, chart, onPick, onChart }: { item: EarningsEvent; sameDay: EarningsEvent[]; now: number; chart: ChartPick; linked: boolean; onPick: (pick: Pick) => void; onChart: (target: ChartPick) => void }) {
+  const target = stockChart(item)
   const upside = upsideOf(item)
   const { targetLow: low, targetHigh: high, targetMean: mean, price } = item
   const range = low !== null && high !== null && mean !== null && high > low
@@ -659,7 +654,7 @@ function EarningsFocus({ item, sameDay, now, onPick }: { item: EarningsEvent; sa
       ) : null}
 
       {item.mnSummary ? <p className="mt-4 text-[14px] leading-relaxed text-foreground/80">{item.mnSummary}</p> : null}
-      {stockChart(item) ? null : (
+      {target ? <ChartButton target={target} chart={chart} onChart={onChart} /> : (
         <p className="mt-4 rounded-lg bg-blue-50 px-3 py-2 text-[12px] text-foreground/80 dark:bg-blue-800/50">
           График байхгүй.{" "}
           <a className="text-brand-strong underline" href={`https://finance.yahoo.com/quote/${encodeURIComponent(item.symbol)}`} target="_blank" rel="noreferrer">

@@ -950,6 +950,26 @@ drop policy if exists "anyone reads earnings" on public.earnings_events;
 create policy "anyone reads earnings" on public.earnings_events for select to anon, authenticated using (true);
 revoke insert, update, delete on public.econ_events, public.econ_glossary, public.earnings_events from anon, authenticated;
 
+-- Markets hero: the six "today" numbers (ам.доллар, TOP-20, copper, coal, gold,
+-- Brent). Filled by supabase/functions/market-quotes every 15 minutes from Yahoo
+-- Finance and Trading Economics. Everyone may read.
+create table if not exists public.market_quotes (
+  id text primary key,                         -- mnt · top20 · copper · coal · gold · brent
+  price numeric not null,
+  pct numeric not null default 0,              -- move since the previous close, %
+  month_pct numeric,                           -- over about a month, %
+  year_pct numeric,                            -- over 12 months, % (Trading Economics only)
+  spark jsonb not null default '[]',           -- recent daily closes, oldest first, last = latest
+  as_of timestamptz not null,                  -- the market's own time for the price
+  source text not null default '',
+  href text not null default '',
+  updated_at timestamptz not null default now()
+);
+alter table public.market_quotes enable row level security;
+drop policy if exists "anyone reads market quotes" on public.market_quotes;
+create policy "anyone reads market quotes" on public.market_quotes for select to anon, authenticated using (true);
+revoke insert, update, delete on public.market_quotes from anon, authenticated;
+
 -- ---------------------------------------------------------------- admin insights
 -- Everything /admin/insights shows, computed here so personal details (age,
 -- region, gender) only leave the database as counts, and only for admins.
@@ -1064,3 +1084,14 @@ create policy "team uploads covers" on storage.objects for insert to authenticat
 --       timeout_milliseconds := 300000)
 --   $cron$);
 -- 00:00 UTC is 08:00 in Ulaanbaatar. Remove with: select cron.unschedule('ez-news-agent');
+
+-- ---------------------------------------------------------------- market quotes
+-- After deploying supabase/functions/market-quotes (--no-verify-jwt), every 15 minutes:
+--   select cron.schedule('ez-market-quotes', '*/15 * * * *', $cron$
+--     select net.http_post(
+--       url := 'https://<project-ref>.supabase.co/functions/v1/market-quotes',
+--       headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<NEWS_CRON_SECRET>'),
+--       body := '{}'::jsonb,
+--       timeout_milliseconds := 60000)
+--   $cron$);
+-- Remove with: select cron.unschedule('ez-market-quotes');
