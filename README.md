@@ -1,30 +1,29 @@
 # EZ Эдийн засаг
 
-Newsroom site for [ediinzasag.mn](https://ediinzasag.mn). Mongolian economy and world markets, with the YouTube show and Substack newsletter on the same desk.
+EZ Эдийн засаг is a Mongolian-language newsroom about the Mongolian economy and world markets. It brings the team's written briefings, its YouTube show, video lessons and newsletter together in one place, and explains what the numbers mean for readers in Mongolia.
 
-Interface elements come from [Watermelon UI](https://ui.watermelon.sh/) (navigation, announcement, blog blocks, footer) on top of shadcn/ui, Tailwind CSS, and Vite.
+## What readers get
 
-## Live
+- **Home** – the latest briefings, a live price ticker and the key numbers of the day.
+- **Монгол and Дэлхий** – two desks: news on Mongolia's economy and on the world economy and markets.
+- **Markets (Ханш)** – Mongolian Stock Exchange, world indices, currencies and commodities, an interactive chart, and a calendar of economic releases and company earnings, each explained in Mongolian.
+- **Stories** – every briefing cites its public sources, and stories are grouped by topic tags.
+- **EZ Talk** – episodes of the YouTube show; new uploads appear on the site automatically.
+- **EZ Edu** – video lessons on economics and investing.
+- **Newsletter** – the archive of newsletter issues.
+- **Reader accounts** – readers can sign up, save stories to their own library, comment, and level up as they read.
 
-https://michealbuilds.site/ediinzasag/
+## How the newsroom works
 
-## Run
+The team writes and publishes from a separate editor app that readers never see.
 
-```bash
-npm.cmd install
-npm.cmd run dev
-```
+- **Roles** – journalists write drafts, editors review, edit and publish, and admins also manage the team.
+- **Workflow** – each piece moves from draft to review to approved to published, and can be scheduled to go live at a set time.
+- **News agent** – once a day it scans world and Mongolian news sources, picks stories that matter to Mongolian readers and files them for review. Nothing goes live until a journalist writes the piece and an editor approves it.
+- **Market data** – the economic calendar and earnings data refresh automatically through the day.
 
-The dev server is http://localhost:5180. On Windows, `start.bat` does the same thing.
+Briefings are written from public releases and checked by a person. EZ is not a wire feed.
 
-## Pages
+## Built with
 
-- `/` home, with the price board and the latest briefings
-- `/markets` Friday closes for MSE, world indices, and commodities
-- `/mongolia` and `/world`
-- `/story/:slug`
-- `/ez-talk` YouTube
-- `/newsletter` Substack
-- `/about`
-
-Briefings cite public releases. They are not a wire feed.
+React, TypeScript, Vite, Tailwind CSS and shadcn/ui on the front end, with Supabase for accounts, the database, storage and the background jobs.
