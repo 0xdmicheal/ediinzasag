@@ -23,7 +23,3 @@ The team writes and publishes from a separate editor app that readers never see.
 - **Market data** – the economic calendar and earnings data refresh automatically through the day.
 
 Briefings are written from public releases and checked by a person. EZ is not a wire feed.
-
-## Built with
-
-React, TypeScript, Vite, Tailwind CSS and shadcn/ui on the front end, with Supabase for accounts, the database, storage and the background jobs.
