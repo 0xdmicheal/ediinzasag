@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom"
 
-import { ArticleLayout, EndActions, excerpt, proseClass, TakeBox, type TocItem } from "@/components/site/article"
+import { ArticleLayout, EndActions, excerpt, NextCard, proseClass, TakeBox, type TocItem } from "@/components/site/article"
 import { articleAd } from "@/content/ads"
 import { sortByDate, useStories, useTagLabels } from "@/content/live"
 import { storyOutlines } from "@/content/story-outlines"
@@ -99,21 +99,13 @@ export function StoryPage() {
                 const itemArt = storyArt(item.slug)
                 return (
                   <li key={item.slug}>
-                    <Link to={`/story/${item.slug}`} className="group block">
-                      <span className="block overflow-hidden rounded-lg border">
-                        <img
-                          src={itemArt.src}
-                          alt={itemArt.alt}
-                          className="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                        />
-                      </span>
-                      <span className="text-muted-foreground mt-3 block text-[12px]">
-                        {deskLabel[item.desk]} · {formatStoryDate(item.date)}
-                      </span>
-                      <span className="font-news mt-1 line-clamp-2 block text-[17px] leading-snug group-hover:underline">
-                        {item.title}
-                      </span>
-                    </Link>
+                    <NextCard
+                      to={`/story/${item.slug}`}
+                      image={itemArt.src}
+                      alt={itemArt.alt}
+                      meta={`${deskLabel[item.desk]} · ${formatStoryDate(item.date)}`}
+                      title={item.title}
+                    />
                   </li>
                 )
               })}

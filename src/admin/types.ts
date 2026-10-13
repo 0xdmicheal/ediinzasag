@@ -11,6 +11,13 @@ export interface Member {
 }
 
 /** A registered reader, for the admin's readers list. */
+/** An e-mail left on the newsletter form, waiting to be imported into Substack. */
+export interface Subscriber {
+  email: string
+  source: string
+  createdAt: string
+}
+
 export interface ReaderRecord {
   id: string
   name: string
@@ -202,6 +209,8 @@ export interface Backend {
 
   /** Admin only: registered readers (name, e-mail, sign-up date), newest first. */
   listReaders(): Promise<ReaderRecord[]>
+  /** Admin only: e-mails left on the Нийтлэл page's subscribe form, newest first. */
+  listSubscribers(): Promise<Subscriber[]>
 
   /** Public, no login: published articles for the site. */
   listPublished(): Promise<Article[]>

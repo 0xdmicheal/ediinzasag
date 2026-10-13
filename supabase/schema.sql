@@ -279,6 +279,30 @@ create policy "admins manage invites" on public.team_invites for all to authenti
 drop policy if exists "admins read readers" on public.readers;
 create policy "admins read readers" on public.readers for select to authenticated using (public.is_admin());
 
+-- Newsletter sign-ups from /newsletter (Нийтлэл). Anyone may subscribe through
+-- subscribe_newsletter(); only admins can read the list (/admin/readers →
+-- Захиалагчид), which they export as CSV and import into Substack.
+create table if not exists public.newsletter_signups (
+  email text primary key check (email = lower(email) and email ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' and length(email) <= 254),
+  source text not null default 'newsletter',
+  created_at timestamptz not null default now()
+);
+alter table public.newsletter_signups enable row level security;
+drop policy if exists "admins read newsletter signups" on public.newsletter_signups;
+create policy "admins read newsletter signups" on public.newsletter_signups for select to authenticated using (public.is_admin());
+revoke insert, update, delete on public.newsletter_signups from anon, authenticated;
+
+-- Saves an address once (a repeat is a quiet success, so the form never says who is already on the list).
+create or replace function public.subscribe_newsletter(address text, origin text default 'newsletter') returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into public.newsletter_signups (email, source)
+  values (lower(trim(address)), left(coalesce(nullif(trim(origin), ''), 'newsletter'), 40))
+  on conflict (email) do nothing;
+end $$;
+revoke execute on function public.subscribe_newsletter(text, text) from public;
+grant execute on function public.subscribe_newsletter(text, text) to anon, authenticated;
+
 -- Only admins may change roles; anyone may update their own display name.
 create or replace function public.guard_profile_update() returns trigger
 language plpgsql as $$

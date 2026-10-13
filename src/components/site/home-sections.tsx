@@ -51,10 +51,10 @@ export function HeaderLink({ to, children }: { to: string; children: ReactNode }
   return (
     <Link
       to={to}
-      className="ez-hit group hover:bg-foreground hover:text-background inline-flex h-8 items-center gap-1 rounded-full border px-3 text-[12px] font-medium whitespace-nowrap transition-colors sm:h-9 sm:gap-1.5 sm:px-3.5 sm:text-[13px]"
+      className="ez-hit ez-glass-pill group inline-flex h-8 items-center gap-1 rounded-full px-3 text-[12px] font-medium whitespace-nowrap transition-colors sm:h-9 sm:gap-1.5 sm:px-3.5 sm:text-[13px]"
     >
       {children}
-      <ArrowUpRight className="size-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 sm:size-4" />
+      <ArrowUpRight className="size-3.5 sm:size-4" />
     </Link>
   )
 }
@@ -148,7 +148,7 @@ export function LetterBento({ posts }: { posts: SubstackPost[] }) {
               <Avatar name={feature.author} />
               {feature.author || "EZ"}
             </span>
-            <span className="bg-brand text-brand-foreground inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium transition-transform group-hover:translate-x-1">
+            <span className="ez-glass-light text-[#131518] inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13px] font-medium">
               Унших
               <ArrowRight className="size-4" />
             </span>
@@ -289,7 +289,7 @@ export function StoryRail({
   }
 
   const arrowClass =
-    "hover:bg-foreground hover:text-background grid size-9 place-items-center rounded-full border transition-colors"
+    "ez-glass-pill grid size-9 place-items-center rounded-full"
 
   return (
     <>
@@ -388,12 +388,12 @@ function minutes(seconds: number) {
   return `${Math.round(seconds / 60)} мин`
 }
 
-function EpisodeThumb({ episode, quality, className }: { episode: Episode; quality: "max" | "hq"; className: string }) {
+export function EpisodeThumb({ episode, quality, className }: { episode: Episode; quality: "max" | "hq"; className: string }) {
   const id = youtubeId(episode.href)
   const [src, setSrc] = useState(
     id ? `https://i.ytimg.com/vi/${id}/${quality === "max" ? "maxresdefault" : "hqdefault"}.jpg` : "",
   )
-  if (!src) return <div className={`bg-ink-foreground/10 ${className}`} />
+  if (!src) return <div className={`bg-photo-foreground/10 ${className}`} />
   return (
     <img
       src={src}
@@ -413,7 +413,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
   if (!latest) return null
 
   return (
-    <section className="ez-clip bg-ink text-ink-foreground grid overflow-hidden rounded-lg lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+    <section className="ez-clip bg-card text-foreground grid border overflow-hidden rounded-lg lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
       <Link to="/ez-talk" className="group relative isolate block aspect-video self-center overflow-hidden">
         <EpisodeThumb key={latest.href} episode={latest} quality="max" className={`absolute inset-0 -z-10 h-full w-full ${zoom}`} />
         <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/95 from-15% via-black/45 via-45% to-black/5" />
@@ -432,20 +432,20 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
       </Link>
 
       <div className="flex flex-col p-5 sm:p-6">
-        <p className="text-ink-foreground/65 text-[11px] tracking-[0.2em] uppercase">YouTube · @ediinzasag</p>
+        <p className="text-muted-foreground text-[11px] tracking-[0.2em] uppercase">YouTube · @ediinzasag</p>
         <h2 className="font-news mt-1.5 text-4xl leading-none">EZ Talk</h2>
-        <p className="text-ink-foreground/70 mt-3 max-w-md text-sm leading-relaxed">
+        <p className="text-muted-foreground mt-3 max-w-md text-sm leading-relaxed">
           Эдийн засагч Nio, зах зээлийн шинжээч Ulemj. Сэдэв бүрийг тоогоор нь ярина.
         </p>
-        <ul className="border-ink-foreground/15 mt-4 border-t">
+        <ul className="border-border mt-4 border-t">
           {more.slice(0, 3).map((episode) => (
-            <li key={episode.href} className="border-ink-foreground/15 border-b">
-              <Link to="/ez-talk" className="group hover:bg-ink-foreground/5 -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors">
+            <li key={episode.href} className="border-border border-b">
+              <Link to="/ez-talk" className="group hover:bg-foreground/5 -mx-2 flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors">
                 <span className="relative h-10 w-16 shrink-0 overflow-hidden rounded-sm">
                   <EpisodeThumb key={episode.href} episode={episode} quality="hq" className="h-full w-full" />
                 </span>
                 <span className="min-w-0">
-                  <span className="text-ink-foreground/65 block text-[11px] tracking-wide uppercase">
+                  <span className="text-muted-foreground block text-[11px] tracking-wide uppercase">
                     {episode.date} · {minutes(episode.seconds)}
                   </span>
                   <span className="mt-0.5 line-clamp-1 block text-sm">{episode.title}</span>
@@ -457,7 +457,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
         <div className="mt-auto flex flex-wrap gap-2 pt-5">
           <Link
             to="/ez-talk"
-            className="bg-brand text-brand-foreground inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium transition-transform hover:-translate-y-0.5"
+            className="bg-foreground text-background inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium"
           >
             Бүх дугаар
             <ArrowRight className="size-4" />
@@ -466,7 +466,7 @@ export function TalkBand({ episodes }: { episodes: Episode[] }) {
             href={channels.youtube}
             target="_blank"
             rel="noreferrer"
-            className="border-ink-foreground/25 hover:bg-ink-foreground/10 inline-flex h-10 items-center gap-1.5 rounded-full border px-4 text-[13px] font-medium transition-colors"
+            className="ez-glass-pill inline-flex h-10 items-center gap-1.5 rounded-full px-4 text-[13px] font-medium"
           >
             Суваг
             <ArrowUpRight className="size-4" />

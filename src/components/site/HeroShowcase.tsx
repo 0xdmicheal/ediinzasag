@@ -142,7 +142,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
               onClick={() => setStopped((value) => !value)}
               aria-label={stopped ? "Автоматаар солихыг эхлүүлэх" : "Автоматаар солихыг зогсоох"}
               aria-pressed={stopped}
-              className={`grid size-11 place-items-center rounded-full transition-colors ${isPartner ? "hover:bg-brand-foreground/10" : "hover:bg-black/30"}`}
+              className="ez-glass-button grid size-11 place-items-center rounded-full"
             >
               {stopped ? <Play className="size-4" /> : <Pause className="size-4" />}
             </button>
@@ -186,7 +186,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
           <div className="mt-7 flex flex-wrap items-center gap-3">
             <Link
               to={slide.cta.to}
-              className={`inline-flex h-12 items-center gap-2 rounded-full px-6 text-[15px] font-medium transition-transform hover:-translate-y-0.5 ${isPartner ? "bg-brand-foreground text-brand" : "bg-brand text-brand-foreground"}`}
+              className={`inline-flex h-12 items-center gap-2 rounded-full px-6 text-[15px] font-medium ez-glass-light ${isPartner ? "text-brand" : "text-[#131518]"}`}
             >
               {slide.cta.label}
               <ArrowRight className="size-4" />
@@ -196,7 +196,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
                 href={slide.secondary.href}
                 target="_blank"
                 rel="noreferrer"
-                className={`inline-flex h-12 items-center gap-1.5 rounded-full border px-5 text-[15px] font-medium backdrop-blur-sm transition-colors ${isPartner ? "border-brand-foreground/30 hover:bg-brand-foreground/10" : "border-photo-foreground/35 bg-black/15 hover:bg-black/35"}`}
+                className="ez-glass-button inline-flex h-12 items-center gap-1.5 rounded-full px-5 text-[15px] font-medium"
               >
                 {slide.secondary.label}
                 <ArrowUpRight className="size-4" />
@@ -211,7 +211,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
             type="button"
             aria-label="Өмнөх"
             onClick={() => go(index - 1)}
-            className={`grid size-12 place-items-center rounded-full border backdrop-blur-sm transition-colors ${isPartner ? "border-brand-foreground/30 text-brand-foreground hover:bg-brand-foreground/10" : "border-photo-foreground/35 bg-black/15 text-photo-foreground hover:bg-black/35"}`}
+            className={`ez-glass-button grid size-12 place-items-center rounded-full ${isPartner ? "text-brand-foreground" : "text-photo-foreground"}`}
           >
             <ChevronLeft className="size-5" />
           </button>
@@ -219,7 +219,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
             type="button"
             aria-label="Дараах"
             onClick={() => go(index + 1)}
-            className={`grid size-12 place-items-center rounded-full border backdrop-blur-sm transition-colors ${isPartner ? "border-brand-foreground/30 text-brand-foreground hover:bg-brand-foreground/10" : "border-photo-foreground/35 bg-black/15 text-photo-foreground hover:bg-black/35"}`}
+            className={`ez-glass-button grid size-12 place-items-center rounded-full ${isPartner ? "text-brand-foreground" : "text-photo-foreground"}`}
           >
             <ChevronRight className="size-5" />
           </button>

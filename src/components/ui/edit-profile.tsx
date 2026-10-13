@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
-import { Eye, EyeOff, VenetianMask, X } from "lucide-react"
+import { CircleAlert, CircleCheck, Eye, EyeOff, X } from "lucide-react"
 import { AnimatePresence, motion, MotionConfig } from "motion/react"
 
 import { BirthDateField, birthDateError, GenderField, RegionField } from "@/reader/ProfileFields"
@@ -69,7 +69,6 @@ function Dialog({
   const [name, setName] = useState(values.name)
   const [email, setEmail] = useState(values.email)
   const [password, setPassword] = useState("")
-  const [anonymous, setAnonymous] = useState(values.anonymous)
   const [avatar, setAvatar] = useState(values.avatar)
   const [birthDate, setBirthDate] = useState(values.birthDate)
   const [gender, setGender] = useState<Gender | "">(values.gender)
@@ -91,7 +90,6 @@ function Dialog({
     name.trim() !== values.name ||
     email.trim().toLowerCase() !== values.email.toLowerCase() ||
     password !== "" ||
-    anonymous !== values.anonymous ||
     avatar !== values.avatar ||
     birthDate !== values.birthDate ||
     gender !== values.gender ||
@@ -108,7 +106,7 @@ function Dialog({
     setError("")
     setNote("")
     try {
-      const message = await onSave({ name: name.trim(), email: email.trim(), password, anonymous, avatar, birthDate, gender, region })
+      const message = await onSave({ name: name.trim(), email: email.trim(), password, anonymous: values.anonymous, avatar, birthDate, gender, region })
       setPassword("")
       if (message) setNote(message)
       else onClose()
@@ -232,35 +230,6 @@ function Dialog({
                 </p>
               </div>
 
-              <button
-                type="button"
-                role="switch"
-                aria-checked={anonymous}
-                onClick={() => setAnonymous(!anonymous)}
-                className="border-input bg-background flex w-full items-center gap-3 rounded-lg border-2 px-4 py-3 text-left transition-colors hover:border-foreground/30"
-              >
-                <VenetianMask className="text-muted-foreground size-5 shrink-0" />
-                <span className="min-w-0 flex-1">
-                  <span className="text-foreground block text-[14px] font-semibold">Сэтгэгдэлд нэрээ нуух</span>
-                  <span className="text-muted-foreground block text-[12px] leading-snug">Шинэ сэтгэгдэл Зочин нэрээр гарна</span>
-                </span>
-                <span className={`relative h-6 w-10 shrink-0 rounded-full transition-colors duration-200 ${anonymous ? "bg-foreground" : "bg-foreground/20"}`}>
-                  <span
-                    className={`bg-background absolute top-0.5 left-0.5 size-5 rounded-full shadow-sm transition-transform duration-200 ${anonymous ? "translate-x-4" : ""}`}
-                  />
-                </span>
-              </button>
-
-              {error ? (
-                <p role="alert" className="rounded-md bg-[color-mix(in_oklch,var(--down)_12%,transparent)] px-3 py-2 text-[13px] text-[var(--down)]">
-                  {error}
-                </p>
-              ) : null}
-              {note ? (
-                <p role="status" className="rounded-md bg-[color-mix(in_oklch,var(--up)_12%,transparent)] px-3 py-2 text-[13px] text-[var(--up)]">
-                  {note}
-                </p>
-              ) : null}
             </div>
 
             <div className="border-border hidden border-l border-dashed md:block" />
@@ -272,7 +241,26 @@ function Dialog({
             </div>
           </div>
 
-          <div className="bg-muted grid shrink-0 grid-cols-2 gap-3 px-5 py-4 sm:flex sm:justify-end md:px-8">
+          {/* Messages live here, outside the scrolling body, so a confirmation never pushes the form into a scroll. */}
+          <div className="bg-muted flex shrink-0 flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center md:px-8">
+            {/* One quiet line beside the buttons: a tick for success, a warning for errors. */}
+            <p
+              role={error ? "alert" : "status"}
+              className={`flex min-h-5 min-w-0 flex-1 items-start gap-2 text-[13px] leading-snug ${error ? "text-[var(--down)]" : "text-foreground/80"}`}
+            >
+              {error ? (
+                <>
+                  <CircleAlert className="mt-px size-4 shrink-0" />
+                  {error}
+                </>
+              ) : note ? (
+                <>
+                  <CircleCheck className="mt-px size-4 shrink-0 text-[var(--up)]" />
+                  {note}
+                </>
+              ) : null}
+            </p>
+            <div className="grid shrink-0 grid-cols-2 gap-3 sm:flex">
             <button
               type="button"
               onClick={onClose}
@@ -287,6 +275,7 @@ function Dialog({
             >
               {busy ? "Хадгалж байна…" : "Хадгалах"}
             </button>
+          </div>
           </div>
         </motion.form>
       </div>

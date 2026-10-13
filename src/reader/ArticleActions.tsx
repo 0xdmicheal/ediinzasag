@@ -193,7 +193,7 @@ function Reaction({
         className={`group flex w-14 flex-col items-center gap-1 rounded-xl py-1 text-[11px] font-medium transition-colors ${active ? activeTone : "text-muted-foreground hover:text-foreground"}`}
       >
         <span
-          className={`relative grid size-11 place-items-center rounded-full border transition-[background-color,border-color,color,transform] duration-300 active:scale-90 ${active ? activeSurface : "bg-card group-hover:border-foreground/30"}`}
+          className={`relative grid size-11 place-items-center rounded-full border transition-[background-color,border-color,color,transform] duration-300 active:scale-90 ${active ? activeSurface : "ez-glass-pill"}`}
         >
           {burst}
           <span key={`icon-${pulse}`} className={`grid place-items-center ${iconClass}`}>
@@ -212,7 +212,7 @@ function Reaction({
       aria-label={ariaLabel}
       title={title}
       onClick={click}
-      className={`ez-hit relative inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-300 active:scale-95 ${active ? `${activeSurface} ${activeTone === "text-foreground" ? "" : activeTone}` : "border-foreground/20 hover:bg-foreground/5"}`}
+      className={`ez-hit relative inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-[13px] font-medium transition-[background-color,border-color,color,transform] duration-300 active:scale-95 ${active ? `${activeSurface} ${activeTone === "text-foreground" ? "" : activeTone}` : "ez-glass-pill"}`}
     >
       <span className="relative grid place-items-center">
         {burst}

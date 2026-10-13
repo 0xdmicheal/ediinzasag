@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react"
+import { useMemo, useRef, useState, type CSSProperties } from "react"
 import { Link } from "react-router-dom"
 import { ArrowRight, ArrowUpRight, Play } from "lucide-react"
 import { FaTelegram, FaYoutube } from "react-icons/fa6"
@@ -17,10 +17,8 @@ const hosts = [
 ] as const
 
 const filters = [
-  { id: "all", label: "Бүгд", match: () => true },
-  { id: "recent", label: "Сүүлийн бичлэг", match: (e: Episode) => e.n == null && e.date >= "2026" },
   { id: "series", label: "Дугаар", match: (e: Episode) => e.n != null },
-  { id: "archive", label: "Өмнөх", match: (e: Episode) => e.n == null && e.date < "2026" },
+  { id: "all", label: "Бүгд", match: () => true },
 ] as const
 
 type FilterId = (typeof filters)[number]["id"]
@@ -49,7 +47,7 @@ export function TalkPage() {
   // null until the reader picks one, so the player follows the newest video when live uploads arrive.
   const [href, setHref] = useState<string | null>(null)
   const [picked, setPicked] = useState(false)
-  const [filter, setFilter] = useState<FilterId>("all")
+  const [filter, setFilter] = useState<FilterId>("series")
   const player = useRef<HTMLDivElement>(null)
 
   const series = useMemo(() => episodes.filter((episode) => episode.n != null).sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [episodes])
@@ -73,41 +71,42 @@ export function TalkPage() {
 
   return (
     <div className="pb-20">
-      {/* Header */}
-      <header className={`${wide} flex flex-wrap items-end justify-between gap-x-10 gap-y-6 pt-8 pb-6`}>
-        <div className="max-w-xl">
-          <p className="text-muted-foreground flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase">
-            <FaYoutube className="size-3.5 text-[#ff0033]" aria-hidden />
-            YouTube · @ediinzasag
-          </p>
-          <h1 className="font-news mt-2 text-5xl leading-none sm:text-6xl">EZ Talk</h1>
-          <p className="text-muted-foreground mt-3 leading-relaxed">
+      {/* Header: title on top, then one line where the intro, the numbers and the button share a centre line. */}
+      <header className={`${wide} pt-8 pb-6`}>
+        <p className="text-muted-foreground flex items-center gap-2 text-[11px] tracking-[0.2em] uppercase">
+          <FaYoutube className="size-3.5 text-[#ff0033]" aria-hidden />
+          YouTube · @ediinzasag
+        </p>
+        <h1 className="font-news mt-2 text-5xl leading-none sm:text-6xl">EZ Talk</h1>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-x-10 gap-y-4 border-t pt-4">
+          <p className="text-muted-foreground max-w-xl leading-relaxed">
             Эдийн засагч Nio, зах зээлийн шинжээч Ulemj. Сэдэв бүрийг тоогоор нь, ойлгомжтой ярина.
           </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-6 sm:gap-10">
-          <dl className="flex gap-6 sm:gap-10">
-            {[
-              [String(episodes.length), "бичлэг"],
-              [String(series.length), "дугаар"],
-              [`${totalHours}+`, "цаг"],
-              [firstYear, "оноос"],
-            ].map(([value, label]) => (
-              <div key={label}>
-                <dd className="font-news text-3xl leading-none sm:text-4xl">{value}</dd>
-                <dt className="text-muted-foreground mt-1 text-[11px] tracking-[0.14em] uppercase">{label}</dt>
-              </div>
-            ))}
-          </dl>
-          <a
-            href={channels.youtube}
-            target="_blank"
-            rel="noreferrer"
-            className="bg-brand text-brand-foreground inline-flex h-10 items-center gap-2 rounded-full px-4 text-[13px] font-medium transition-transform hover:-translate-y-0.5"
-          >
-            Суваг дагах
-            <ArrowUpRight className="size-4" />
-          </a>
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+            <dl className="flex flex-wrap items-center gap-x-6 gap-y-2">
+              {[
+                [String(episodes.length), "бичлэг"],
+                [String(series.length), "дугаар"],
+                [`${totalHours}+`, "цаг"],
+                [firstYear, "оноос"],
+              ].map(([value, label]) => (
+                <div key={label} className="flex items-baseline gap-1.5">
+                  <dd className="font-news text-2xl leading-none tabular-nums">{value}</dd>
+                  <dt className="text-muted-foreground text-[11px] tracking-[0.14em] uppercase">{label}</dt>
+                </div>
+              ))}
+            </dl>
+            <a
+              href={channels.youtube}
+              target="_blank"
+              rel="noreferrer"
+              className="group bg-foreground text-background inline-flex h-10 items-center gap-2 rounded-full px-4 text-[13px] font-medium transition-[background-color,color,transform] duration-200 hover:bg-[#ff0033] hover:text-white active:scale-95"
+            >
+              <FaYoutube className="size-4" aria-hidden />
+              Суваг дагах
+              <ArrowUpRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
+          </div>
         </div>
       </header>
 
@@ -186,31 +185,33 @@ export function TalkPage() {
         {/* Series timeline */}
         <section>
           <SectionHeader title="Цуврал" />
-          <div className="-mx-4 overflow-x-auto px-4 pb-2 [mask-image:linear-gradient(to_right,black_88%,transparent)] [scrollbar-width:none] sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 [&::-webkit-scrollbar]:hidden">
-            <ol className="flex min-w-max">
-              {series.map((episode, index) => {
-                const current = episode.href === active.href
-                return (
-                  <li key={episode.href} className="relative w-40 shrink-0 pr-4">
-                    {index < series.length - 1 ? (
-                      <span aria-hidden className="bg-border absolute top-6 left-12 right-0 h-px" />
-                    ) : null}
-                    <button type="button" onClick={() => play(episode)} className="group block text-left">
-                      <span
-                        className={`font-news relative grid size-12 place-items-center rounded-full border text-xl transition-colors duration-300 ${current ? "bg-brand border-brand text-brand-foreground" : "bg-card group-hover:border-brand group-hover:text-brand-strong"}`}
-                      >
-                        {episode.n}
-                      </span>
-                      <span className="text-muted-foreground mt-3 block text-[11px] tabular-nums">{episode.date}</span>
-                      <span className="mt-1 line-clamp-2 block text-[13px] leading-snug font-medium">
-                        <span className="ez-underline">{episode.title}</span>
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ol>
-          </div>
+          {/* Every episode in view: rows wrap on smaller screens; from lg they sit on one line joined by a rule. */}
+          <ol
+            className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-4 lg:[grid-template-columns:repeat(var(--count),minmax(0,1fr))]"
+            style={{ "--count": series.length } as CSSProperties}
+          >
+            {series.map((episode, index) => {
+              const current = episode.href === active.href
+              return (
+                <li key={episode.href} className="relative min-w-0">
+                  {index < series.length - 1 ? (
+                    <span aria-hidden className="bg-border absolute top-6 left-14 -right-4 hidden h-px lg:block" />
+                  ) : null}
+                  <button type="button" onClick={() => play(episode)} aria-current={current || undefined} className="group block w-full text-left">
+                    <span
+                      className={`font-news relative grid size-12 place-items-center rounded-full border text-xl transition-colors duration-300 ${current ? "bg-brand border-brand text-brand-foreground" : "bg-card group-hover:border-brand group-hover:text-brand-strong"}`}
+                    >
+                      {episode.n}
+                    </span>
+                    <span className="text-muted-foreground mt-3 block text-[11px] tabular-nums">{episode.date}</span>
+                    <span className="mt-1 line-clamp-2 block text-[13px] leading-snug font-medium">
+                      <span className="ez-underline">{episode.title}</span>
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
         </section>
 
         {/* Library */}

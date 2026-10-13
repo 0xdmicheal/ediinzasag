@@ -1,8 +1,7 @@
 import { useMemo } from "react"
 import { Link, useParams } from "react-router-dom"
 
-import { ArticleLayout, EndActions, excerpt, proseClass, type TocItem } from "@/components/site/article"
-import { SubstackShelf } from "@/components/site/SubstackShelf"
+import { ArticleLayout, EndActions, excerpt, NextCard, proseClass, type TocItem } from "@/components/site/article"
 import { articleAd } from "@/content/ads"
 import { formatStoryDate } from "@/content/stories"
 import { substackPosts } from "@/content/substack.posts"
@@ -86,10 +85,20 @@ export function LetterPage() {
       after={
         more.length > 0 ? (
           <section id="more" className="scroll-mt-24">
-            <h2 className="font-news text-2xl">Бусад захидал</h2>
-            <div className="mt-6">
-              <SubstackShelf posts={more} layout="list" />
-            </div>
+            <h2 className="font-news text-2xl">Бусад нийтлэл</h2>
+            <ul className="mt-6 grid gap-4 sm:grid-cols-3">
+              {more.map((item) => (
+                <li key={item.slug}>
+                  <NextCard
+                    to={`/letter/${item.slug}`}
+                    image={item.image}
+                    alt=""
+                    meta={[/^\d{4}-\d{2}-\d{2}$/.test(item.date) ? formatStoryDate(item.date) : item.date, item.author].filter(Boolean).join(" · ")}
+                    title={item.title}
+                  />
+                </li>
+              ))}
+            </ul>
           </section>
         ) : null
       }

@@ -279,10 +279,10 @@ export function ArticleLayout({
   return (
     <article ref={articleRef}>
       {progressEnd ? <ReadingProgress article={articleRef} endId={progressEnd} /> : null}
-      <header className="relative isolate overflow-hidden">
+      <header className="relative isolate overflow-hidden bg-[rgb(244_245_247/0.5)] dark:bg-white/[0.035]">
         <div
           aria-hidden
-          className="absolute inset-x-0 top-0 -z-10 h-40 bg-[radial-gradient(var(--color-gray-300)_1px,transparent_1px)] [background-size:14px_14px] opacity-60 [mask-image:linear-gradient(to_bottom,black,transparent)] dark:bg-[radial-gradient(var(--color-gray-700)_1px,transparent_1px)]"
+          className="absolute inset-0 -z-10 bg-[radial-gradient(var(--color-gray-400)_1.2px,transparent_1.4px)] [background-size:14px_14px] [mask-image:linear-gradient(to_bottom,black_40%,transparent)] dark:bg-[radial-gradient(var(--color-gray-600)_1.2px,transparent_1.4px)]"
         />
         <div className="mx-auto max-w-[1200px] px-4 pt-8 pb-10 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-2">
@@ -329,7 +329,7 @@ export function ArticleLayout({
           className={`mx-auto grid max-w-[1200px] lg:border-x ${rail ? "lg:grid-cols-[5rem_minmax(0,1fr)_20rem]" : "lg:grid-cols-[minmax(0,1fr)_20rem]"}`}
         >
           {rail ? (
-            <div className="hidden border-r lg:block">
+            <div className="bg-muted/50 hidden border-r lg:block">
               <div className="sticky top-20 flex flex-col items-center gap-3 py-8" role="group" aria-label="Нийтлэлийн үйлдэл">
                 {rail("vertical")}
               </div>
@@ -420,3 +420,22 @@ export function TakeBox({ text }: { text: string }) {
 /** Typography for article bodies (plain paragraphs and rendered letter HTML). */
 export const proseClass =
   "text-[1.0625rem] leading-[1.75] text-foreground/90 [&_a]:text-brand-strong [&_a]:underline [&_a]:underline-offset-2 [&_blockquote]:border-l-2 [&_blockquote]:border-foreground/20 [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground [&_h2:first-child]:mt-0 [&_h2]:font-news [&_h2]:mt-12 [&_h2]:mb-4 [&_h2]:scroll-mt-24 [&_h2]:text-2xl [&_h2]:text-foreground [&_h3]:font-news [&_h3]:mt-10 [&_h3]:mb-3 [&_h3]:scroll-mt-24 [&_h3]:text-xl [&_h3]:text-foreground [&_img]:my-8 [&_img]:w-full [&_img]:rounded-lg [&_figure]:my-8 [&_figure_img]:my-0 [&_figcaption]:mt-2 [&_figcaption]:text-center [&_figcaption]:text-[13px] [&_figcaption]:text-muted-foreground [&_li]:ml-5 [&_li]:mt-2 [&_ol]:my-5 [&_ol]:list-decimal [&_p]:mt-5 [&_p]:scroll-mt-24 [&_p:first-child]:mt-0 [&_strong]:text-foreground [&_ul]:my-5 [&_ul]:list-disc"
+
+/** "Дараа нь" / "Бусад нийтлэл" under an article: image on top, meta line, two-line title, as one card. */
+export function NextCard({ to, image, alt, meta, title }: { to: string; image: string; alt: string; meta: string; title: string }) {
+  return (
+    <Link to={to} className="group ez-lift bg-card flex h-full flex-col overflow-hidden rounded-lg border">
+      <span className="bg-muted block overflow-hidden">
+        {image ? (
+          <img src={image} alt={alt} loading="lazy" className="aspect-[16/10] w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]" />
+        ) : (
+          <span className="block aspect-[16/10] w-full" />
+        )}
+      </span>
+      <span className="flex flex-1 flex-col p-4">
+        <span className="text-muted-foreground block text-[12px]">{meta}</span>
+        <span className="font-news mt-1 line-clamp-2 block text-[17px] leading-snug group-hover:underline">{title}</span>
+      </span>
+    </Link>
+  )
+}

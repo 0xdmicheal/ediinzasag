@@ -1,5 +1,5 @@
 import { slugify } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsItem, NewsRun, ReaderRecord, Role, RunDetails, Status, Tag } from "@/admin/types"
+import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsItem, NewsRun, ReaderRecord, Role, RunDetails, Status, Subscriber, Tag } from "@/admin/types"
 import { devLinkPreview, plainPreview, type LinkPreview } from "@/admin/link-preview"
 import { supabaseClient } from "@/lib/supabase"
 
@@ -216,6 +216,12 @@ export function createSupabaseBackend(): Backend {
     async addMember(name, email, role) {
       const { error } = await client.from("team_invites").upsert({ email: email.trim().toLowerCase(), name: name.trim(), role })
       if (error) fail(error)
+    },
+
+    async listSubscribers() {
+      const { data, error } = await client.from("newsletter_signups").select("email, source, created_at").order("created_at", { ascending: false })
+      if (error) fail(error)
+      return (data as { email: string; source: string; created_at: string }[]).map((row): Subscriber => ({ email: row.email, source: row.source, createdAt: row.created_at }))
     },
 
     async listReaders() {

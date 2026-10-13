@@ -539,6 +539,119 @@
   }
 }
 
+/*
+ * Guest mode on the profile picture (AccountPage). On: a dark veil wipes down
+ * over the photo from the top, the mask swings in from above and settles with
+ * a bounce, a blue ring spins once around the picture and sparks fly. Off: the
+ * mask is tossed up and away, the veil drains out through the bottom and the
+ * ring spins back. Reduced motion shows only the end state.
+ */
+@keyframes ez-veil-in {
+  from {
+    clip-path: circle(0% at 50% -10%);
+  }
+  to {
+    clip-path: circle(75% at 50% 50%);
+  }
+}
+@keyframes ez-veil-out {
+  0% {
+    clip-path: circle(75% at 50% 50%);
+  }
+  35% {
+    clip-path: circle(75% at 50% 50%);
+  }
+  100% {
+    clip-path: circle(0% at 50% 115%);
+  }
+}
+@keyframes ez-mask-drop {
+  0% {
+    transform: translateY(-150%) rotate(-40deg) scale(0.4);
+    opacity: 0;
+  }
+  50% {
+    transform: translateY(10%) rotate(14deg) scale(1.15);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(-4%) rotate(-6deg) scale(0.95);
+  }
+  85% {
+    transform: translateY(1%) rotate(2deg) scale(1.02);
+  }
+  100% {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes ez-mask-toss {
+  0% {
+    transform: none;
+    opacity: 1;
+  }
+  25% {
+    transform: translateY(8%) scale(1.1) rotate(-6deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-170%) rotate(50deg) scale(0.35);
+    opacity: 0;
+  }
+}
+@keyframes ez-mask-ring {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) scale(0.92);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--ez-ring-turn, 360deg)) scale(1.14);
+  }
+}
+.ez-veil-in {
+  animation: ez-veil-in 620ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.ez-veil-out {
+  animation: ez-veil-out 760ms cubic-bezier(0.65, 0, 0.35, 1) both;
+}
+.ez-mask-drop {
+  animation: ez-mask-drop 900ms cubic-bezier(0.2, 0.8, 0.3, 1) 180ms both;
+}
+.ez-mask-toss {
+  animation: ez-mask-toss 520ms cubic-bezier(0.5, 0, 0.75, 0) both;
+}
+.ez-mask-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 9999px;
+  pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0deg, var(--brand) 90deg, transparent 200deg, var(--brand) 290deg, transparent 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), black calc(100% - 2px));
+  animation: ez-mask-ring 900ms cubic-bezier(0.3, 0.6, 0.3, 1) both;
+}
+.ez-mask-ring.is-out {
+  --ez-ring-turn: -360deg;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ez-veil-in,
+  .ez-mask-drop {
+    animation: none;
+  }
+  .ez-veil-out,
+  .ez-mask-toss {
+    animation: none;
+    opacity: 0;
+  }
+  .ez-mask-ring {
+    display: none;
+  }
+}
+
 /* Founder badge: a slow holographic shimmer. */
 @keyframes ez-holo {
   to {
@@ -705,6 +818,42 @@ html[data-ez-theme-vt="active"]::view-transition-new(root) {
   box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.06);
 }
 
+/*
+ * Glass buttons on the home hero's photos and partner slides: a frosted pane
+ * with a bright top edge, the same in both themes because the photo under it
+ * is always dark. Reduced transparency turns it solid (see below).
+ */
+.ez-glass-button {
+  background-color: rgb(255 255 255 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.28);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.45),
+    inset 0 -1px 0 rgb(255 255 255 / 0.06),
+    0 6px 20px rgb(0 0 0 / 0.18);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+.ez-glass-button:hover {
+  background-color: rgb(255 255 255 / 0.22);
+  border-color: rgb(255 255 255 / 0.42);
+}
+.ez-glass-button:active {
+  transform: scale(0.97);
+}
+
+/*
+ * The same glass for buttons elsewhere on the landing page.
+ *   .ez-glass-pill   on the page ground: frosted white in light, smoked in dark.
+ *   .ez-glass-light  white glass, the call to action everywhere (dark text; blue on partner slides).
+ */
+.ez-glass-pill,
+.ez-glass-light,
+
+
 /* The phone sheet stays glass. A focus outline on that panel reads as a bright edge when the theme flips. */
 @media (pointer: coarse), (max-width: 1023px) {
   [data-slot="sheet-content"] {
@@ -759,6 +908,16 @@ html[data-ez-theme-vt="active"]::view-transition-new(root) {
   }
   .ez-glass {
     background-color: var(--background) !important;
+  }
+  .ez-glass-pill,
+  .ez-glass-light {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .ez-glass-button {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background-color: rgb(0 0 0 / 0.55) !important;
   }
   .ez-ambient {
     display: none;

@@ -34,12 +34,12 @@ export function SubstackShelf({
 
   if (layout === "list") {
     return (
-      <div className="divide-y border-y">
+      <div className="flex flex-col gap-3">
         {posts.map((post) => (
           <Link
             key={post.slug}
             to={`/letter/${post.slug}`}
-            className="grid gap-4 py-5 md:grid-cols-[14rem_1fr] md:items-center"
+            className="group ez-lift bg-card grid gap-4 rounded-lg border p-3 md:grid-cols-[14rem_1fr] md:items-center md:p-4"
           >
             <LetterImage src={post.image} className="h-36 w-full rounded-md" />
             <div className="min-w-0">
@@ -64,7 +64,7 @@ export function SubstackShelf({
         <Link
           key={post.slug}
           to={`/letter/${post.slug}`}
-          className="flex h-[22rem] flex-col overflow-hidden rounded-lg border bg-card"
+          className="group ez-lift bg-card flex h-[22rem] flex-col overflow-hidden rounded-lg border"
         >
           <LetterImage src={post.image} className="h-36 w-full shrink-0" />
           <div className="flex min-h-0 flex-1 flex-col p-4">

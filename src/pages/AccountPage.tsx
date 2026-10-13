@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type CSSProperties } from "react"
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { cn } from "cn"
 import {
@@ -53,6 +53,54 @@ const achievementColors: Record<AchievementIcon, [string, string]> = {
   trophy: ["#fde047", "#ca8a04"],
 }
 
+/** Sparks when the mask lands: brand blues with a little white. */
+const MASK_SPARKS = ["#298dff", "#5ca9ff", "#ffffff", "#1759c4", "#9cc9ff", "#298dff", "#ffffff", "#5ca9ff"]
+
+/**
+ * Guest mode under the reader's e-mail, always in place so the header never
+ * changes height: the label and its switch sit faint when off and at full
+ * strength when on. Saved the moment it is flipped (new comments show «Зочин»),
+ * and rolled back if saving fails.
+ */
+function GuestSwitch({ on, onChange }: { on: boolean; onChange: (next: boolean) => Promise<void> }) {
+  const [shown, setShown] = useState(on)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  async function flip() {
+    const next = !shown
+    setShown(next)
+    setBusy(true)
+    setFailed(false)
+    try {
+      await onChange(next)
+    } catch {
+      setShown(!next)
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={shown}
+      aria-busy={busy}
+      title={failed ? "Хадгалж чадсангүй. Дахин оролдоно уу." : shown ? "Шинэ сэтгэгдэл «Зочин» нэрээр гарна" : "Сэтгэгдэлд нэрээ нуух"}
+      onClick={flip}
+      className={`ez-hit mt-1 inline-flex h-7 items-center gap-2 rounded-full text-[12.5px] font-medium transition-opacity duration-200 ${shown ? "opacity-100" : "opacity-40 hover:opacity-70"} ${failed ? "text-[var(--down)]" : ""}`}
+    >
+      <VenetianMask className="size-4" />
+      Зочин горим
+      <span className={`relative h-5 w-8 shrink-0 rounded-full transition-colors duration-200 ${shown ? "bg-foreground" : "bg-foreground/30"}`}>
+        <span className={`bg-background absolute top-0.5 left-0.5 size-4 rounded-full shadow-sm transition-transform duration-200 ${shown ? "translate-x-3" : ""}`} />
+      </span>
+    </button>
+  )
+}
+
 /** The signed-in reader's profile: points, achievements, saved and read stories, settings. */
 export function AccountPage() {
   const { auth, reader, refresh, reads, saved } = useReader()
@@ -62,6 +110,9 @@ export function AccountPage() {
   const [params] = useSearchParams()
   const resetting = params.get("reset") === "1"
   const [tab, setTab] = useState<Tab>("saved")
+  const [guestPreview, setGuestPreview] = useState<boolean | null>(null)
+  /** The last guest-mode flip, which picks and replays the picture's animation. */
+  const [flip, setFlip] = useState<{ dir: "in" | "out"; n: number } | null>(null)
   // A password-reset link, or "солих" under the comment box, opens the edit dialog straight away.
   const [editing, setEditing] = useState(resetting || Boolean((location.state as { edit?: boolean } | null)?.edit))
 
@@ -70,6 +121,7 @@ export function AccountPage() {
   }
   if (!reader) return <Navigate to="/login" replace state={{ from: location.pathname }} />
 
+  const masked = guestPreview ?? reader.anonymous
   const progress = readerProgress(reads, saved, items)
   const avatarSeed = reader.name || reader.email || reader.phone
   const contact = [reader.email, reader.phone && formatPhone(reader.phone)].filter(Boolean).join(" · ")
@@ -116,14 +168,41 @@ export function AccountPage() {
           Guest mode badge and chip: shown whenever guest mode is saved (also behind
           the open dialog, so the header keeps its height and the page never jumps).
         */}
-        <span className="relative shrink-0">
-          <ReaderAvatar name={avatarSeed} avatar={reader.avatar} size="lg" />
-          {reader.anonymous ? (
+        {/*
+          Guest mode masks the picture (keyframes in index.css): on, a veil wipes down,
+          the mask swings in, a ring spins and sparks fly; off, the mask is tossed away
+          and the veil drains out. Nothing animates on page load, only after a flip.
+        */}
+        <span className="relative shrink-0" title={masked ? "Зочин горим: сэтгэгдэл нэргүй гарна" : undefined}>
+          <span className={`block rounded-full transition-[filter,transform] duration-700 ${masked ? "scale-[0.97] grayscale" : ""}`}>
+            <ReaderAvatar name={avatarSeed} avatar={reader.avatar} size="lg" />
+          </span>
+          {masked || flip?.dir === "out" ? (
             <span
-              title="Зочин горим: сэтгэгдэл нэргүй гарна"
-              className="animate-in fade-in bg-foreground text-background ring-card absolute -right-1 -bottom-1 grid size-7 place-items-center rounded-full ring-[3px] duration-300"
+              key={`veil-${flip?.n ?? 0}`}
+              aria-hidden
+              className={`text-background absolute inset-0 grid place-items-center overflow-hidden rounded-full bg-[radial-gradient(circle_at_50%_35%,color-mix(in_oklab,var(--foreground)_70%,transparent),color-mix(in_oklab,var(--foreground)_92%,transparent))] ${flip ? (flip.dir === "in" ? "ez-veil-in" : "ez-veil-out") : ""}`}
             >
-              <VenetianMask className="size-4" />
+              <VenetianMask className={`size-8 ${flip ? (flip.dir === "in" ? "ez-mask-drop" : "ez-mask-toss") : ""}`} />
+            </span>
+          ) : null}
+          {flip ? <span key={`ring-${flip.n}`} aria-hidden className={`ez-mask-ring ${flip.dir === "out" ? "is-out" : ""}`} /> : null}
+          {flip?.dir === "in" ? (
+            <span key={`sparks-${flip.n}`} aria-hidden className="text-brand pointer-events-none absolute inset-0">
+              {MASK_SPARKS.map((color, index, all) => (
+                <span
+                  key={index}
+                  className="ez-spark"
+                  style={
+                    {
+                      background: color,
+                      "--ez-angle": `${(360 / all.length) * index + 20}deg`,
+                      "--ez-distance": `${-44 - (index % 2) * 8}px`,
+                      animationDelay: `${420 + (index % 3) * 30}ms`,
+                    } as CSSProperties
+                  }
+                />
+              ))}
             </span>
           ) : null}
         </span>
@@ -143,16 +222,21 @@ export function AccountPage() {
               {reader.phone ? <span className="truncate">{formatPhone(reader.phone)}</span> : null}
             </p>
           ) : null}
-          {reader.anonymous ? (
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="animate-in fade-in bg-foreground/[0.07] text-muted-foreground hover:text-foreground ez-hit mt-1 inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium transition-colors duration-300"
-            >
-              <VenetianMask className="size-3.5" />
-              Зочин горим
-            </button>
-          ) : null}
+          <GuestSwitch
+            key={String(reader.anonymous)}
+            on={reader.anonymous}
+            onChange={async (next) => {
+              // The picture follows the switch at once, not after the save round-trip.
+              setGuestPreview(next)
+              setFlip((last) => ({ dir: next ? "in" : "out", n: (last?.n ?? 0) + 1 }))
+              try {
+                await auth!.setAnonymous(next)
+                await refresh()
+              } finally {
+                setGuestPreview(null)
+              }
+            }}
+          />
         </div>
         <div className="grid w-full grid-cols-[1fr_auto] gap-2 sm:flex sm:w-auto">
           <button type="button" onClick={() => setEditing(true)} className={buttonClass.primary}>
@@ -165,6 +249,7 @@ export function AccountPage() {
           </button>
         </div>
       </header>
+
 
       <div className="bg-card rounded-xl border p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">

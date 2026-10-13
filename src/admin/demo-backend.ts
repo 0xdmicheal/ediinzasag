@@ -1,7 +1,7 @@
 import { demoBriefings, demoInsights, demoNewsItems } from "@/admin/demo-samples"
 import { devLinkPreview, plainPreview } from "@/admin/link-preview"
 import { allowedTransitions, canClaim, canDelete, canEdit, canManageTags, canManageTeam, isEditor, slugify, TAKE_MIN_WORDS, wordCount } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, Backend, Member, NewsItem, NewsRun, ReaderRecord, Role, Status, Tag } from "@/admin/types"
+import type { Activity, Article, ArticleDraft, Backend, Member, NewsItem, NewsRun, ReaderRecord, Role, Status, Subscriber, Tag } from "@/admin/types"
 
 /*
  * Demo backend: everything lives in this browser's localStorage, so you can
@@ -306,6 +306,17 @@ export function createDemoBackend(): Backend {
       if (store.members.some((item) => item.email === email)) throw new Error("Энэ и-мэйл бүртгэлтэй")
       store.members.push({ id: `m-${Date.now()}`, name, email, role })
       save(store)
+    },
+
+    async listSubscribers() {
+      if (!canManageTeam(requireMember(load()))) throw new Error("Зөвхөн админ харна")
+      // Demo sign-ups (src/content/newsletter.ts) live in this browser.
+      try {
+        const rows = JSON.parse(localStorage.getItem("ez-newsletter-demo-v1") ?? "[]") as Subscriber[]
+        return rows.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      } catch {
+        return []
+      }
     },
 
     async listReaders() {
