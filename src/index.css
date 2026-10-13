@@ -851,8 +851,55 @@ html[data-ez-theme-vt="active"]::view-transition-new(root) {
  *   .ez-glass-light  white glass, the call to action everywhere (dark text; blue on partner slides).
  */
 .ez-glass-pill,
-.ez-glass-light,
+.ez-glass-light {
+  border: 1px solid transparent;
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  backdrop-filter: blur(16px) saturate(160%);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+.ez-glass-pill:active,
+.ez-glass-light:active {
+  transform: scale(0.97);
+}
 
+.ez-glass-pill {
+  background-color: rgb(255 255 255 / 0.5);
+  border-color: rgb(0 0 0 / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    0 4px 14px rgb(0 0 0 / 0.06);
+}
+.ez-glass-pill:hover {
+  background-color: rgb(255 255 255 / 0.85);
+  border-color: rgb(0 0 0 / 0.18);
+}
+.dark .ez-glass-pill {
+  background-color: rgb(255 255 255 / 0.06);
+  border-color: rgb(255 255 255 / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 4px 14px rgb(0 0 0 / 0.3);
+}
+.dark .ez-glass-pill:hover {
+  background-color: rgb(255 255 255 / 0.12);
+  border-color: rgb(255 255 255 / 0.22);
+}
+
+.ez-glass-light {
+  background-color: rgb(255 255 255 / 0.82);
+  border-color: rgb(0 0 0 / 0.1);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.9),
+    0 6px 20px rgb(0 0 0 / 0.15);
+}
+.ez-glass-light:hover,
+.group:hover .ez-glass-light {
+  background-color: rgb(255 255 255 / 0.97);
+}
 
 /* The phone sheet stays glass. A focus outline on that panel reads as a bright edge when the theme flips. */
 @media (pointer: coarse), (max-width: 1023px) {
