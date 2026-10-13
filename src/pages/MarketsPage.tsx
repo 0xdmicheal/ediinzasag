@@ -149,7 +149,7 @@ export function MarketsPage() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Pulse: the six numbers, on the fixed-dark studio surface           */
+/* Pulse: the six numbers, light or dark with the theme               */
 /* ------------------------------------------------------------------ */
 
 interface PulseTile {
@@ -270,11 +270,13 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
   const clock = ubClock(now)
 
   return (
-    <section aria-labelledby="markets-title" className="bg-studio text-photo-foreground">
+    <section aria-labelledby="markets-title" className="bg-muted/60 text-foreground relative isolate overflow-hidden border-b">
+      {/* The article hero's dot grid (article.tsx), following the theme, fading toward the cards. */}
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(var(--color-gray-300)_1.2px,transparent_1.4px)] [background-size:14px_14px] [mask-image:linear-gradient(to_bottom,black_35%,transparent)] dark:bg-[radial-gradient(var(--color-gray-700)_1.2px,transparent_1.4px)]" />
       <div className={`${narrow} pt-7 pb-6 sm:pt-9 sm:pb-7`}>
         <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
           <div>
-            <p className="text-photo-foreground/55 text-[11px] font-medium tracking-[0.18em] uppercase">Зах зээл</p>
+            <p className="text-muted-foreground text-[11px] font-medium tracking-[0.18em] uppercase">Зах зээл</p>
             <h1 id="markets-title" className="font-news mt-2 text-[1.75rem] leading-none sm:text-4xl">
               Өнөөдөр юу хөдөлсөн бэ
             </h1>
@@ -283,8 +285,8 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
           <div className="flex items-end gap-4">
             <time dateTime={new Date(now).toISOString()} className="text-right">
               <span className="block text-[13px] font-medium">{clock.date}</span>
-              <span className="text-photo-foreground/55 mt-0.5 flex items-center justify-end gap-1.5 text-[11.5px]">
-                {updated ? <span className="inline-block size-1.5 animate-pulse rounded-full bg-[var(--up-on-studio)]" aria-hidden /> : null}
+              <span className="text-muted-foreground mt-0.5 flex items-center justify-end gap-1.5 text-[11.5px]">
+                {updated ? <span className="inline-block size-1.5 animate-pulse rounded-full bg-[var(--up)]" aria-hidden /> : null}
                 {updated ? freshness(updated, now) : sessionShort}
               </span>
             </time>
@@ -298,28 +300,28 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
           {tiles.map((tile) => {
             const flat = tile.pct === null || Math.abs(tile.pct) < 0.005
             const trend = tile.spark.length > 1 ? tile.spark[tile.spark.length - 1] - tile.spark[0] : (tile.pct ?? 0)
-            const lineTone = trend > 0 ? "text-[var(--up-on-studio)]" : trend < 0 ? "text-[var(--down-on-studio)]" : "text-photo-foreground/40"
+            const lineTone = trend > 0 ? "text-[var(--up)]" : trend < 0 ? "text-[var(--down)]" : "text-muted-foreground/40"
             return (
               <button
                 key={tile.id}
                 type="button"
                 onClick={() => onOpen(tile.id, tile.room)}
-                className="group border-photo-foreground/10 bg-photo-foreground/[0.03] hover:bg-photo-foreground/[0.07] grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors"
+                className="group bg-card hover:border-foreground/25 grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-0.5 rounded-lg border px-3 py-2.5 text-left transition-colors"
               >
-                <span className="text-photo-foreground/60 truncate text-[11.5px]">{tile.label}</span>
+                <span className="text-muted-foreground truncate text-[11.5px]">{tile.label}</span>
                 {tile.pct === null ? (
                   <span />
                 ) : (
-                  <span className={cn("text-right font-mono text-[11.5px] font-semibold tabular-nums", flat ? "text-photo-foreground/60" : tile.pct > 0 ? "text-[var(--up-on-studio)]" : "text-[var(--down-on-studio)]")}>
+                  <span className={cn("text-right font-mono text-[11.5px] font-semibold tabular-nums", flat ? "text-muted-foreground" : tile.pct > 0 ? "text-[var(--up)]" : "text-[var(--down)]")}>
                     {flat ? "0.00%" : `${tile.pct > 0 ? "▲" : "▼"} ${signedPct(tile.pct).replace(/^[+-]/, "")}`}
                   </span>
                 )}
                 <span className="flex min-w-0 items-baseline gap-1">
                   <span className="truncate text-[17px] font-semibold tracking-tight tabular-nums sm:text-[19px]">{tile.value}</span>
-                  {tile.unit ? <span className="text-photo-foreground/50 shrink-0 text-[10.5px]">{tile.unit}</span> : null}
+                  {tile.unit ? <span className="text-muted-foreground shrink-0 text-[10.5px]">{tile.unit}</span> : null}
                 </span>
                 <Sparkline points={tile.spark} tone={lineTone} className="row-span-2 h-7 w-14 sm:w-16" />
-                <span className="text-photo-foreground/45 truncate text-[10.5px]">{tile.stale ?? tile.note}</span>
+                <span className="text-muted-foreground truncate text-[10.5px]">{tile.stale ?? tile.note}</span>
               </button>
             )
           })}

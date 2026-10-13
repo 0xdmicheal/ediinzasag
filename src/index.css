@@ -153,9 +153,6 @@
     --cat-4: #eda100;
     /* On the inverted ink surface (black in light mode). */
     --up-on-ink: #2fae74;
-    /* On the fixed-dark studio surface, in both themes. */
-    --up-on-studio: #2fae74;
-    --down-on-studio: #f0643f;
     --down-on-ink: #f0643f;
     --sidebar: #ffffff;
     --sidebar-foreground: #131518;
@@ -638,16 +635,14 @@
 }
 
 /*
- * Whole-site field. In light, AmbientBackground paints four soft washes that
- * drift, follow the pointer, and move with scroll, then a paper scrim. In dark
- * the canvas is a flat #121212. A still grain tile sits on both. Reduced transparency
- * hides the field (see below).
+ * Whole-site ground: flat paper with a grain tile that scrolls with the page
+ * (AmbientBackground). Reduced transparency and Increase Contrast hide it (see below).
  */
-.ez-ambient-canvas {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
+.ez-ambient {
+  background-color: #e0e0e0;
+}
+.dark .ez-ambient {
+  background-color: #121212;
 }
 
 /* Still grain. Opacity matches the old faint light speckle and the stronger dark one. */
