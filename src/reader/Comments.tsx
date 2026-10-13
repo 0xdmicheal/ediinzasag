@@ -315,7 +315,12 @@ function CommentItem({
       <div className="min-w-0 flex-1">
         <p className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
           <span className={comment.anonymous ? "text-muted-foreground font-semibold italic" : "font-semibold"}>{shownName}</span>
-          {!comment.anonymous && comment.authorBadge ? <BadgeMark id={comment.authorBadge} size={16} /> : null}
+          {/* The row lines up on text baselines; the badge has none, so it centres on the name instead of riding up. */}
+          {!comment.anonymous && comment.authorBadge ? (
+            <span className="inline-flex self-center">
+              <BadgeMark id={comment.authorBadge} size={16} />
+            </span>
+          ) : null}
           {own ? <span className="bg-foreground/[0.07] text-muted-foreground rounded px-1.5 text-[11px]">Та</span> : null}
           <time dateTime={comment.createdAt} className="text-muted-foreground text-[12px]">
             {when(comment.createdAt)}
