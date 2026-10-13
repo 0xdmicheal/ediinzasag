@@ -73,8 +73,8 @@ export function LoginShowcase() {
               <Trophy className="size-4" />
             </span>
             <span>
-              <span className="block text-[13px] font-semibold text-white">Анхны тойм</span>
-              <span className="block text-[11px] text-white/60">Амжилт нээгдлээ · +50 оноо</span>
+              <span className="block text-[13px] font-semibold text-white">Анхны алхам</span>
+              <span className="block text-[11px] text-white/60">Гавьяа нээгдлээ · +20 оноо</span>
             </span>
           </div>
         </Floating>

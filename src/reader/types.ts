@@ -115,8 +115,10 @@ export interface ReaderAuth {
   getFire(slug: string): Promise<{ count: number; mine: boolean }>
   setFire(slug: string, on: boolean): Promise<void>
 
-  /** Ids of the badges the reader bought (the founder badge is not listed; it comes with memberNo). */
-  listBadges(): Promise<string[]>
+  /** Badges the reader bought, with the points paid and when (the founder badge is not listed; it comes with memberNo). */
+  listBadges(): Promise<OwnedBadge[]>
+  /** Points an admin granted this reader by hand (public.reader_point_grants), newest first. */
+  listGrants(): Promise<PointGrant[]>
   /** Spends points on a badge; the database checks the balance. */
   buyBadge(id: string): Promise<void>
   /** Wears an owned badge next to the name; "" takes it off. */
@@ -131,4 +133,18 @@ export interface ReaderAuth {
   /** Ids of this story's comments the signed-in reader liked. */
   listMyLikes(slug: string): Promise<string[]>
   like(commentId: string, liked: boolean): Promise<void>
+}
+
+/** One bought badge: what was paid, and when (empty in demo accounts made before dates were kept). */
+export interface OwnedBadge {
+  id: string
+  cost: number
+  at: string
+}
+
+/** Points added by an admin, outside the reading rules. */
+export interface PointGrant {
+  points: number
+  note: string
+  at: string
 }

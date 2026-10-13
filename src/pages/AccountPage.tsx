@@ -1,27 +1,14 @@
 import { useState, type CSSProperties } from "react"
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom"
-import { cn } from "cn"
-import {
-  BookMarked,
-  BookOpen,
-  Compass,
-  Flame,
-  Globe,
-  Library,
-  LibraryBig,
-  LogOut,
-  Pencil,
-  Trophy,
-  VenetianMask,
-  type LucideIcon,
-} from "lucide-react"
+import { LogOut, Pencil, VenetianMask } from "lucide-react"
 
 import { buttonClass } from "@/admin/ui"
 import { ContinuousTabs } from "@/components/ui/continuous-tabs"
 import { EditProfile, type ProfileValues } from "@/components/ui/edit-profile"
-import { POINTS_PER_ACHIEVEMENT, POINTS_PER_READ, readerProgress, type AchievementIcon } from "@/reader/achievements"
+import { readerProgress } from "@/reader/achievements"
 import { BadgeMark } from "@/reader/badges"
-import { BadgeShop } from "@/reader/BadgeShop"
+import { BadgeShop, useOwnedBadges } from "@/reader/BadgeShop"
+import { MeritsSection, PointsLedger } from "@/reader/ProgressPanels"
 import { LibraryList } from "@/reader/LibraryList"
 import { useLibraryItems } from "@/reader/library-items"
 import { formatPhone } from "@/reader/phone"
@@ -29,29 +16,6 @@ import { ReaderAvatar } from "@/reader/ReaderAvatar"
 import { useReader } from "@/reader/session"
 
 type Tab = "saved" | "read"
-
-const icons: Record<AchievementIcon, LucideIcon> = {
-  book: BookOpen,
-  books: Library,
-  library: LibraryBig,
-  globe: Globe,
-  compass: Compass,
-  bookmark: BookMarked,
-  flame: Flame,
-  trophy: Trophy,
-}
-
-/** Each achievement's own colours (light → deep). */
-const achievementColors: Record<AchievementIcon, [string, string]> = {
-  book: ["#38bdf8", "#2563eb"],
-  books: ["#a78bfa", "#7c3aed"],
-  library: ["#f472b6", "#be185d"],
-  globe: ["#2dd4bf", "#0f766e"],
-  compass: ["#fbbf24", "#d97706"],
-  bookmark: ["#fb923c", "#ea580c"],
-  flame: ["#f87171", "#dc2626"],
-  trophy: ["#fde047", "#ca8a04"],
-}
 
 /** Sparks when the mask lands: brand blues with a little white. */
 const MASK_SPARKS = ["#298dff", "#5ca9ff", "#ffffff", "#1759c4", "#9cc9ff", "#298dff", "#ffffff", "#5ca9ff"]
@@ -111,6 +75,7 @@ export function AccountPage() {
   const resetting = params.get("reset") === "1"
   const [tab, setTab] = useState<Tab>("saved")
   const [guestPreview, setGuestPreview] = useState<boolean | null>(null)
+  const { owned, setOwned, grants } = useOwnedBadges()
   /** The last guest-mode flip, which picks and replays the picture's animation. */
   const [flip, setFlip] = useState<{ dir: "in" | "out"; n: number } | null>(null)
   // A password-reset link, or "солих" under the comment box, opens the edit dialog straight away.
@@ -122,7 +87,9 @@ export function AccountPage() {
   if (!reader) return <Navigate to="/login" replace state={{ from: location.pathname }} />
 
   const masked = guestPreview ?? reader.anonymous
-  const progress = readerProgress(reads, saved, items)
+  const progress = readerProgress(reads, saved, items, grants.reduce((sum, grant) => sum + grant.points, 0))
+  const spent = (owned ?? []).reduce((sum, item) => sum + item.cost, 0)
+  const balance = Math.max(0, progress.points - spent)
   const avatarSeed = reader.name || reader.email || reader.phone
   const contact = [reader.email, reader.phone && formatPhone(reader.phone)].filter(Boolean).join(" · ")
 
@@ -251,90 +218,11 @@ export function AccountPage() {
       </header>
 
 
-      <div className="bg-card rounded-xl border p-5">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-muted-foreground text-[12px] font-medium">Оноо</p>
-            <p className="font-news text-4xl leading-none tabular-nums">{progress.points}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-[14px] font-semibold">{progress.level}</p>
-            <p className="text-muted-foreground text-[12px]">
-              {progress.next ? `${progress.next.label} хүртэл ${progress.next.remaining} оноо` : "Хамгийн дээд түвшин"}
-            </p>
-          </div>
-        </div>
-        <div
-          role="progressbar"
-          aria-label="Дараагийн түвшин"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={Math.round((progress.next?.share ?? 1) * 100)}
-          className="bg-muted mt-4 h-2.5 overflow-hidden rounded-full border"
-        >
-          <div className="bg-primary h-full rounded-full" style={{ width: `${(progress.next?.share ?? 1) * 100}%` }} />
-        </div>
-        <p className="text-muted-foreground mt-3 text-[12px]">
-          Тойм, нийтлэл бүрийг эцэс хүртэл уншихад +{POINTS_PER_READ}, амжилт бүрт +{POINTS_PER_ACHIEVEMENT} оноо.
-        </p>
-      </div>
+      <PointsLedger progress={progress} owned={owned} grants={grants} />
 
-      <section aria-labelledby="achievements-heading">
-        <div className="flex items-baseline justify-between">
-          <h2 id="achievements-heading" className="font-news text-2xl">
-            Амжилт
-          </h2>
-          <span className="text-muted-foreground text-[13px]">
-            {progress.unlocked} / {progress.achievements.length}
-          </span>
-        </div>
-        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {progress.achievements.map((item) => {
-            const Icon = icons[item.icon]
-            const [light, deep] = achievementColors[item.icon]
-            return (
-              <li
-                key={item.id}
-                className="bg-card flex flex-col gap-2 rounded-xl border p-4"
-                aria-label={`${item.title}: ${item.unlocked ? "нээгдсэн" : `${item.progress}/${item.goal}`}`}
-              >
-                <span
-                  className={cn("grid size-11 place-items-center rounded-2xl", !item.unlocked && "bg-muted text-muted-foreground/70")}
-                  style={
-                    item.unlocked
-                      ? {
-                          backgroundImage: `linear-gradient(145deg, ${light}, ${deep})`,
-                          boxShadow: `0 8px 20px -8px ${deep}, inset 0 1px 0 rgb(255 255 255 / 0.35)`,
-                          color: "white",
-                        }
-                      : undefined
-                  }
-                >
-                  <Icon className="size-5 drop-shadow-[0_1px_1px_rgb(0_0_0/0.25)]" strokeWidth={2.25} />
-                </span>
-                <span className={cn("text-[14px] font-semibold", !item.unlocked && "text-muted-foreground")}>{item.title}</span>
-                <span className="text-muted-foreground text-[12px] leading-snug">{item.description}</span>
-                {item.unlocked ? (
-                  <span className="mt-auto text-[12px] font-semibold" style={{ color: deep }}>
-                    Нээгдсэн
-                  </span>
-                ) : (
-                  <span className="mt-auto flex items-center gap-2">
-                    <span className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
-                      <span className="block h-full rounded-full" style={{ width: `${(item.progress / item.goal) * 100}%`, backgroundImage: `linear-gradient(90deg, ${light}, ${deep})` }} />
-                    </span>
-                    <span className="text-muted-foreground font-mono text-[11px]">
-                      {item.progress}/{item.goal}
-                    </span>
-                  </span>
-                )}
-              </li>
-            )
-          })}
-        </ul>
-      </section>
+      <MeritsSection progress={progress} />
 
-      <BadgeShop points={progress.points} />
+      <BadgeShop balance={balance} owned={owned} onBought={(badge) => setOwned((current) => [badge, ...(current ?? [])])} />
 
       <section className="mt-2 flex flex-col gap-5">
         <ContinuousTabs

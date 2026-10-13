@@ -213,10 +213,16 @@ export function createSupabaseReader(): ReaderAuth {
       if (error) fail(error)
     },
 
+    async listGrants() {
+      const { data, error } = await client.from("reader_point_grants").select("points, note, granted_at").order("granted_at", { ascending: false })
+      // Before the table exists the profile simply shows no grants.
+      if (error) return []
+      return (data as { points: number; note: string; granted_at: string }[]).map((row) => ({ points: row.points, note: row.note, at: row.granted_at }))
+    },
     async listBadges() {
-      const { data, error } = await client.from("reader_badges").select("badge_id")
+      const { data, error } = await client.from("reader_badges").select("badge_id, cost, acquired_at").order("acquired_at", { ascending: false })
       if (error) fail(error)
-      return (data as { badge_id: string }[]).map((row) => row.badge_id)
+      return (data as { badge_id: string; cost: number; acquired_at: string }[]).map((row) => ({ id: row.badge_id, cost: row.cost, at: row.acquired_at }))
     },
     async buyBadge(id) {
       const { error } = await client.rpc("buy_badge", { bid: id })

@@ -1,21 +1,34 @@
 import { useRef, useState, type CSSProperties } from "react"
 import { Link } from "react-router-dom"
-import { ChartCandlestick, Coins, Crown, Gem, Landmark, Pickaxe, Sparkles, TrendingDown, TrendingUp, type LucideIcon } from "lucide-react"
+import { ChartCandlestick, Coins, Crown, Fuel, Gem, Landmark, Mountain, Pickaxe, Rocket, Route, Sparkles, TrainFront, TrendingDown, TrendingUp, Wheat, Wind, type LucideIcon } from "lucide-react"
 import { Popover } from "radix-ui"
 
 import { useReader } from "@/reader/session"
 
 /*
- * Reader badges. Each one is its own design: a different shape, colours and
- * icon. Most are bought with points (the database checks the balance, see
- * buy_badge() in supabase/schema.sql); "Анхдагч" is free and only for the
- * first 3,000 readers, numbered, so every founder badge is one of a kind.
- * Keep ids and costs in step with public.badge_catalog.
+ * Reader badges. Each one is its own design: a shape, colours and an icon, set
+ * in a metal rim whose finish shows how rare it is. They are bought with points
+ * (the database checks the balance, see buy_badge() in supabase/schema.sql);
+ * "Анхдагч" is free and only for the first 3,000 readers, numbered, so every
+ * founder badge is one of a kind. Keep ids and costs in step with
+ * public.badge_catalog.
  */
 
 export const FOUNDER_LIMIT = 3000
 
 type Shape = "circle" | "hexagon" | "shield" | "diamond" | "octagon" | "burst" | "squircle"
+
+export type Rarity = "common" | "rare" | "epic" | "legendary"
+
+export const rarityLabel: Record<Rarity, string> = { common: "Энгийн", rare: "Ховор", epic: "Эрхэм", legendary: "Домог" }
+
+/** Rim metal per rarity: brushed steel, gold, violet gold, and a holographic sweep for legends. */
+const rim: Record<Rarity, string> = {
+  common: "conic-gradient(from 200deg, #f1f5f9, #94a3b8, #e2e8f0, #64748b, #f1f5f9)",
+  rare: "conic-gradient(from 200deg, #fff7cc, #d4a017, #fde68a, #92650a, #fff7cc)",
+  epic: "conic-gradient(from 200deg, #f5d0fe, #a855f7, #fde68a, #6b21a8, #f5d0fe)",
+  legendary: "conic-gradient(from 0deg, #f9a8d4, #a78bfa, #38bdf8, #6ee7b7, #fde68a, #f9a8d4)",
+}
 
 export interface BadgeDef {
   id: string
@@ -25,28 +38,28 @@ export interface BadgeDef {
   cost: number | null
   icon: LucideIcon
   shape: Shape
-  /** Gradient stops, light to dark. */
+  rarity: Rarity
+  /** Face gradient stops, light to dark. */
   colors: [string, string, string]
 }
 
 export const badges: BadgeDef[] = [
-  {
-    id: "founder",
-    name: "Анхдагч",
-    description: "Сайтын анхны уншигчдын тэмдэг",
-    cost: null,
-    icon: Sparkles,
-    shape: "burst",
-    colors: ["#f9a8d4", "#a78bfa", "#38bdf8"],
-  },
-  { id: "tugrik", name: "Төгрөг", description: "Анхны тэмдэг", cost: 50, icon: Coins, shape: "circle", colors: ["#6ee7b7", "#10b981", "#047857"] },
-  { id: "copper", name: "Зэс", description: "Оюу толгойн гялбаа", cost: 150, icon: Pickaxe, shape: "hexagon", colors: ["#fdba74", "#ea580c", "#9a3412"] },
-  { id: "candle", name: "Ногоон лаа", description: "Өсөлтийн өдөр", cost: 250, icon: ChartCandlestick, shape: "squircle", colors: ["#bef264", "#65a30d", "#3f6212"] },
-  { id: "bull", name: "Бух", description: "Зах зээл өсөхөд", cost: 400, icon: TrendingUp, shape: "shield", colors: ["#86efac", "#16a34a", "#14532d"] },
-  { id: "bear", name: "Баавгай", description: "Зах зээл унахад", cost: 400, icon: TrendingDown, shape: "shield", colors: ["#fda4af", "#e11d48", "#881337"] },
-  { id: "gold", name: "Алт", description: "Нөөцийн хаан", cost: 700, icon: Gem, shape: "diamond", colors: ["#fef08a", "#f59e0b", "#b45309"] },
-  { id: "eurobond", name: "Евробонд", description: "Гадаад зах зээлд", cost: 1000, icon: Landmark, shape: "octagon", colors: ["#93c5fd", "#2563eb", "#1e3a8a"] },
-  { id: "economist", name: "Эдийн засагч", description: "Хамгийн дээд тэмдэг", cost: 1500, icon: Crown, shape: "burst", colors: ["#f0abfc", "#c026d3", "#581c87"] },
+  { id: "founder", name: "Анхдагч", description: "Сайтын анхны уншигчдын тэмдэг", cost: null, icon: Sparkles, shape: "burst", rarity: "legendary", colors: ["#f9a8d4", "#a78bfa", "#38bdf8"] },
+  { id: "tugrik", name: "Төгрөг", description: "Анхны тэмдэг", cost: 200, icon: Coins, shape: "circle", rarity: "common", colors: ["#6ee7b7", "#10b981", "#047857"] },
+  { id: "copper", name: "Зэс", description: "Оюу толгойн гялбаа", cost: 500, icon: Pickaxe, shape: "hexagon", rarity: "common", colors: ["#fdba74", "#ea580c", "#9a3412"] },
+  { id: "candle", name: "Ногоон лаа", description: "Өсөлтийн өдөр", cost: 900, icon: ChartCandlestick, shape: "squircle", rarity: "common", colors: ["#bef264", "#65a30d", "#3f6212"] },
+  { id: "wheat", name: "Улаан буудай", description: "Атар газрын ургац", cost: 700, icon: Wheat, shape: "circle", rarity: "common", colors: ["#fde68a", "#ca8a04", "#713f12"] },
+  { id: "coal", name: "Нүүрс", description: "Тавантолгойн хар алт", cost: 1200, icon: Mountain, shape: "octagon", rarity: "rare", colors: ["#cbd5e1", "#475569", "#0f172a"] },
+  { id: "bull", name: "Бух", description: "Зах зээл өсөхөд", cost: 1800, icon: TrendingUp, shape: "shield", rarity: "rare", colors: ["#86efac", "#16a34a", "#14532d"] },
+  { id: "bear", name: "Баавгай", description: "Зах зээл унахад", cost: 1800, icon: TrendingDown, shape: "shield", rarity: "rare", colors: ["#fda4af", "#e11d48", "#881337"] },
+  { id: "railway", name: "Төмөр зам", description: "Хилийн боомт хүртэл", cost: 2000, icon: TrainFront, shape: "shield", rarity: "rare", colors: ["#fca5a5", "#b91c1c", "#450a0a"] },
+  { id: "oil", name: "Нефть", description: "Brent-ийн долгион", cost: 2500, icon: Fuel, shape: "squircle", rarity: "rare", colors: ["#fcd34d", "#b45309", "#1c1917"] },
+  { id: "gold", name: "Алт", description: "Нөөцийн хаан", cost: 3500, icon: Gem, shape: "diamond", rarity: "epic", colors: ["#fef08a", "#f59e0b", "#b45309"] },
+  { id: "silkroad", name: "Торгоны зам", description: "Худалдааны их зам", cost: 5000, icon: Route, shape: "hexagon", rarity: "epic", colors: ["#5eead4", "#0d9488", "#134e4a"] },
+  { id: "windfarm", name: "Салхин парк", description: "Говийн ногоон эрчим хүч", cost: 4500, icon: Wind, shape: "octagon", rarity: "epic", colors: ["#a5f3fc", "#0891b2", "#164e63"] },
+  { id: "eurobond", name: "Евробонд", description: "Гадаад зах зээлд", cost: 6500, icon: Landmark, shape: "octagon", rarity: "epic", colors: ["#93c5fd", "#2563eb", "#1e3a8a"] },
+  { id: "unicorn", name: "Юникорн", description: "Тэрбумын стартап", cost: 8000, icon: Rocket, shape: "circle", rarity: "legendary", colors: ["#fda4af", "#8b5cf6", "#1e1b4b"] },
+  { id: "economist", name: "Эдийн засагч", description: "Хамгийн дээд тэмдэг", cost: 12000, icon: Crown, shape: "burst", rarity: "legendary", colors: ["#f0abfc", "#c026d3", "#581c87"] },
 ]
 
 export const badgeById = new Map(badges.map((badge) => [badge.id, badge]))
@@ -63,57 +76,54 @@ const clip: Record<Shape, string> = {
 }
 
 /** Icon scale per shape, so it sits inside the narrower shapes. */
-const iconScale: Record<Shape, number> = { circle: 0.46, squircle: 0.48, hexagon: 0.44, octagon: 0.46, diamond: 0.36, shield: 0.42, burst: 0.38 }
+const iconScale: Record<Shape, number> = { circle: 0.42, squircle: 0.44, hexagon: 0.4, octagon: 0.42, diamond: 0.32, shield: 0.38, burst: 0.34 }
 
 /** Not owned yet: still in colour (it is a shop), just softer. */
-const lockedFilter = "saturate(0.55) opacity(0.6)"
+const lockedFilter = "saturate(0.45) opacity(0.55)"
 
-/** The badge itself: shaped gradient, an inner bevel, a shine and the icon. Not-yet-owned badges are softened. */
+/**
+ * The badge: a metal rim (finish by rarity), a dark groove, the coloured face
+ * with a soft dome light, an engraved inner ring, the icon, and on owned
+ * badges a light that sweeps across now and then (ez-badge-shine).
+ */
 export function BadgeArt({ id, size = 56, locked = false }: { id: string; size?: number; locked?: boolean }) {
   const badge = badgeById.get(id)
   if (!badge) return null
   const [light, mid, dark] = badge.colors
   const Icon = badge.icon
-  const founder = badge.id === "founder"
-  const outer: CSSProperties = {
-    width: size,
-    height: size,
-    clipPath: clip[badge.shape],
-    background: founder
-      ? `conic-gradient(from 210deg, ${light}, ${mid}, ${dark}, #fde68a, ${light})`
-      : `linear-gradient(145deg, ${light}, ${mid} 55%, ${dark})`,
-    filter: locked ? lockedFilter : undefined,
-  }
+  const shape = clip[badge.shape]
+  const layer = (scale: number, background: string, extra?: CSSProperties): CSSProperties => ({
+    width: size * scale,
+    height: size * scale,
+    clipPath: shape,
+    background,
+    ...extra,
+  })
+  const legendary = badge.rarity === "legendary"
   return (
-    <span className="relative inline-grid shrink-0 place-items-center" style={{ width: size, height: size }} aria-hidden>
-      <span className={`absolute ${founder && !locked ? "ez-holo" : ""}`} style={outer} />
-      {/* Inner bevel: the same shape, slightly smaller, darker. */}
-      <span
-        className="absolute"
-        style={{
-          width: size * 0.78,
-          height: size * 0.78,
-          clipPath: clip[badge.shape],
-          background: `radial-gradient(circle at 35% 30%, ${mid}, ${dark})`,
-          filter: locked ? lockedFilter : undefined,
-        }}
-      />
-      {/* Shine. */}
-      <span
-        className="absolute"
-        style={{
-          width: size,
-          height: size,
-          clipPath: clip[badge.shape],
-          background: "linear-gradient(160deg, rgb(255 255 255 / 0.45), transparent 42%)",
-        }}
-      />
-      {/* Every layer is absolutely stacked in the same box, the icon on top, centred. */}
+    <span className="relative inline-grid shrink-0 place-items-center" style={{ width: size, height: size, filter: locked ? lockedFilter : undefined }} aria-hidden>
+      {/* Rim */}
+      <span className={`absolute ${legendary && !locked ? "ez-holo" : ""}`} style={layer(1, rim[badge.rarity])} />
+      {/* Groove between rim and face */}
+      <span className="absolute" style={layer(0.86, `linear-gradient(160deg, ${dark}, #000)`)} />
+      {/* Face with a dome light */}
+      <span className="absolute" style={layer(0.8, `radial-gradient(circle at 32% 26%, ${light}, ${mid} 48%, ${dark} 100%)`)} />
+      {/* Engraved inner ring */}
+      <span className="absolute" style={layer(0.66, `radial-gradient(circle at 60% 70%, ${mid}, ${dark})`, { opacity: 0.55 })} />
+      <span className="absolute" style={layer(0.62, `radial-gradient(circle at 34% 28%, ${light}, ${mid} 55%, ${dark})`)} />
+      {/* Gloss on the upper half */}
+      <span className="absolute" style={layer(1, "linear-gradient(165deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0.08) 38%, transparent 52%)")} />
+      {/* Sweep of light, owned badges only */}
+      {locked ? null : (
+        <span className="absolute overflow-hidden" style={{ width: size, height: size, clipPath: shape }}>
+          <span className="ez-badge-shine absolute inset-y-0 -left-1/2 w-1/2" />
+        </span>
+      )}
       <span className="absolute inset-0 grid place-items-center">
         <Icon
-          className="text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.35)]"
-          style={{ width: size * iconScale[badge.shape], height: size * iconScale[badge.shape], opacity: locked ? 0.85 : 1 }}
-          strokeWidth={2.25}
+          className="text-white drop-shadow-[0_1px_2px_rgb(0_0_0/0.45)]"
+          style={{ width: size * iconScale[badge.shape], height: size * iconScale[badge.shape] }}
+          strokeWidth={2.4}
         />
       </span>
     </span>

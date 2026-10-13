@@ -774,8 +774,10 @@ create table if not exists public.badge_catalog (
 );
 
 insert into public.badge_catalog (id, cost) values
-  ('founder', null), ('tugrik', 50), ('copper', 150), ('candle', 250), ('bull', 400),
-  ('bear', 400), ('gold', 700), ('eurobond', 1000), ('economist', 1500)
+  ('founder', null), ('tugrik', 200), ('copper', 500), ('wheat', 700), ('candle', 900),
+  ('coal', 1200), ('bull', 1800), ('bear', 1800), ('railway', 2000), ('oil', 2500),
+  ('gold', 3500), ('windfarm', 4500), ('silkroad', 5000), ('eurobond', 6500),
+  ('unicorn', 8000), ('economist', 12000)
 on conflict (id) do update set cost = excluded.cost;
 
 alter table public.badge_catalog enable row level security;
@@ -796,23 +798,53 @@ create policy "reader sees own badges" on public.reader_badges for select to aut
 -- No insert/update/delete for readers: badges are only bought through buy_badge().
 revoke insert, update, delete on public.reader_badges from anon, authenticated;
 
--- Points earned, mirroring achievements.ts. Streak days use Ulaanbaatar time.
+-- Points an admin grants by hand (prizes, corrections). Readers see their own;
+-- only SQL or the service role writes them. reader_points() adds them in.
+create table if not exists public.reader_point_grants (
+  id bigint generated always as identity primary key,
+  reader_id uuid not null references public.readers (id) on delete cascade,
+  points integer not null check (points between -1000000 and 1000000),
+  note text not null default '',
+  granted_at timestamptz not null default now()
+);
+alter table public.reader_point_grants enable row level security;
+drop policy if exists "reader sees own grants" on public.reader_point_grants;
+create policy "reader sees own grants" on public.reader_point_grants for select to authenticated using (reader_id = auth.uid());
+revoke insert, update, delete on public.reader_point_grants from anon, authenticated;
+
+-- Points earned, mirroring src/reader/achievements.ts: 5 per finished story or
+-- letter, plus each merit by its metal (bronze 20, silver 60, gold 150, legend
+-- 400). Days, hours and weekends are Ulaanbaatar time. 8 = number of topics.
 create or replace function public.reader_points(rid uuid) returns integer
 language sql stable security definer set search_path = public as $$
   with r as (
-    select desk, topic, (read_at at time zone 'Asia/Ulaanbaatar')::date as d from public.reader_reads where reader_id = rid
+    select slug, desk, topic, (read_at at time zone 'Asia/Ulaanbaatar') as t from public.reader_reads where reader_id = rid
   ),
-  counts as (select count(*) as n, count(distinct desk) as desks, count(distinct topic) as topics from r),
+  c as (
+    select
+      count(*) as n,
+      count(*) filter (where desk = 'mongolia') as mon,
+      count(*) filter (where desk = 'world') as wor,
+      count(distinct topic) as topics,
+      count(*) filter (where slug like 'letter-%') as letters,
+      count(*) filter (where extract(hour from t) < 5) as night,
+      count(*) filter (where extract(hour from t) >= 5 and extract(hour from t) < 8) as dawn,
+      count(distinct t::date) filter (where extract(isodow from t) in (6, 7)) as weekends
+    from r
+  ),
   saves as (select count(*) as n from public.reader_saves where reader_id = rid),
-  days as (select distinct d from r),
+  days as (select distinct t::date as d from r),
   runs as (select d - (row_number() over (order by d))::int as run from days),
-  best as (select coalesce(max(c), 0) as b from (select count(*) as c from runs group by run) x)
-  select (counts.n * 10 + 50 * (
-      (counts.n >= 1)::int + (counts.n >= 10)::int + (counts.n >= 50)::int +
-      (counts.desks >= 2)::int + (counts.topics >= 5)::int + (saves.n >= 5)::int +
-      (best.b >= 3)::int + (best.b >= 7)::int
-    ))::int
-  from counts, saves, best
+  best as (select coalesce(max(len), 0) as b from (select count(*) as len from runs group by run) x)
+  select (
+    c.n * 5
+    + 20 * ((c.n >= 1)::int + (c.n >= 25)::int + (best.b >= 7)::int + (saves.n >= 25)::int + (c.weekends >= 10)::int)
+    + 60 * ((c.n >= 100)::int + (best.b >= 30)::int + (least(c.mon, c.wor) >= 20)::int + (c.letters >= 10)::int + (c.night >= 10)::int + (c.dawn >= 10)::int)
+    + 150 * ((c.n >= 300)::int + (best.b >= 100)::int + (c.topics >= 8)::int)
+    + 400 * ((c.n >= 1000)::int + (best.b >= 365)::int)
+    + coalesce((select sum(points) from public.reader_point_grants where reader_id = rid), 0)
+  )::int
+  from c, saves, best
 $$;
 
 create or replace function public.buy_badge(bid text) returns void

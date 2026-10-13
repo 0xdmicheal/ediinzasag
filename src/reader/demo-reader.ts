@@ -1,4 +1,5 @@
 import { COMMENT_MAX, type LibraryEntry, type Reader, type ReaderAuth, type StoryComment } from "@/reader/types"
+import { badgeById } from "@/reader/badges"
 
 /*
  * Demo reader accounts: kept in this browser's localStorage so sign-up,
@@ -19,6 +20,8 @@ interface Account extends Omit<Reader, "moderator" | "anonymous" | "phone" | "av
   badge?: string
   /** Bought badge ids. */
   badges?: string[]
+  /** What each bought badge cost and when, by id (older demo accounts lack it). */
+  badgeLog?: Record<string, { cost: number; at: string }>
   anonymous?: boolean
   phone?: string
   avatar?: string
@@ -246,14 +249,28 @@ export function createDemoReader(): ReaderAuth {
       write(FIRES, on ? [...rest, key] : rest)
     },
 
+    async listGrants() {
+      return []
+    },
     async listBadges() {
-      return requireAccount().badges ?? []
+      const account = requireAccount()
+      return (account.badges ?? []).map((id) => ({
+        id,
+        cost: account.badgeLog?.[id]?.cost ?? badgeById.get(id)?.cost ?? 0,
+        at: account.badgeLog?.[id]?.at ?? "",
+      }))
     },
     async buyBadge(id) {
       // Demo trusts the profile page's balance check; Supabase checks it in the database.
       const account = requireAccount()
       if ((account.badges ?? []).includes(id)) throw new Error("Энэ тэмдэг танд аль хэдийн бий")
-      write(KEY, accounts().map((item) => (item.id === account.id ? { ...item, badges: [...(item.badges ?? []), id] } : item)))
+      const entry = { cost: badgeById.get(id)?.cost ?? 0, at: new Date().toISOString() }
+      write(
+        KEY,
+        accounts().map((item) =>
+          item.id === account.id ? { ...item, badges: [...(item.badges ?? []), id], badgeLog: { ...item.badgeLog, [id]: entry } } : item,
+        ),
+      )
     },
     async wearBadge(id) {
       const account = requireAccount()
