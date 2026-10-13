@@ -163,10 +163,10 @@ export function IndexRanking({
             id={row.id}
             className="hover:bg-muted/50 target:bg-muted grid scroll-mt-28 grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 px-4 py-3 transition-colors sm:grid-cols-[minmax(0,15rem)_minmax(0,1fr)_7.5rem] sm:px-5"
           >
-            <span className="min-w-0">
-              <span className="flex items-center gap-2">
-                <span className="font-semibold">{row.label}</span>
-                <span className="text-muted-foreground bg-foreground/[0.06] rounded-sm px-1.5 text-[11px] leading-5">
+            <span className="col-start-1 row-start-1 min-w-0 sm:col-auto sm:row-auto">
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate font-semibold">{row.label}</span>
+                <span className="text-muted-foreground bg-foreground/[0.06] hidden shrink-0 rounded-sm px-1.5 text-[11px] leading-5 sm:inline">
                   {region(row.id)}
                 </span>
               </span>
@@ -181,7 +181,7 @@ export function IndexRanking({
               />
             </span>
 
-            <span className="row-start-1 flex flex-col items-end gap-1 sm:row-start-auto">
+            <span className="col-start-2 row-start-1 flex flex-col items-end gap-1 sm:col-auto sm:row-auto">
               <span className="text-sm font-semibold tabular-nums">
                 {row.price} <span className="text-muted-foreground text-[11px] font-normal">оноо</span>
               </span>
