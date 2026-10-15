@@ -122,7 +122,7 @@
     --accent: #f6fcff;
     --accent-foreground: #131518;
     --destructive: #c2380f;
-    --border: #e3e6ea;
+    --border: #c9cdd2;
     --input: #d5d9df;
     --ring: #298dff;
     --ink: #16181c;
@@ -160,7 +160,7 @@
     --sidebar-primary-foreground: #131518;
     --sidebar-accent: #f6fcff;
     --sidebar-accent-foreground: #131518;
-    --sidebar-border: #e3e6ea;
+    --sidebar-border: #c9cdd2;
     --sidebar-ring: #298dff;
 }
 

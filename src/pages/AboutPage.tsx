@@ -474,8 +474,7 @@ function Services() {
 
 export function AboutPage() {
   return (
-    // Borders from the text colour: the theme's --border is lighter than the light page and disappears.
-    <div className="[--border:color-mix(in_oklch,var(--foreground)_13%,transparent)]">
+    <div>
       <Hero />
       <Placements />
       <Audience />
