@@ -8,6 +8,8 @@ export const channels = {
   telegram: "https://t.me/+bgMX4V_b5XEyNjM9",
   x: "https://x.com/ezediinzasag",
   linktree: "https://linktr.ee/ediinzasag",
+  /** Google Form for ad and partnership requests. */
+  partnerForm: "https://forms.gle/ubAppok7udmUHNJSA",
 } as const
 
 export function openSubstackSubscribe(email = "") {

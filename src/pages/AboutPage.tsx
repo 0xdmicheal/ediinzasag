@@ -201,7 +201,7 @@ function Hero() {
           </motion.p>
           <motion.div variants={rise} className="mt-6 flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <a
-              href={channels.telegram}
+              href={channels.partnerForm}
               target="_blank"
               rel="noreferrer"
               className="group bg-foreground text-background hover:bg-foreground/90 inline-flex items-center justify-center gap-2 px-7 py-3 text-sm font-semibold transition active:scale-[0.97]"
@@ -498,17 +498,25 @@ export function AboutPage() {
                   </li>
                 ))}
               </ul>
-              <p className="text-ink-foreground/75 mt-4 max-w-md text-sm leading-relaxed">Үнэ нь байршил, хугацаа, ажлын хэмжээнээс хамаарна. Telegram дээр тохирно.</p>
+              <p className="text-ink-foreground/75 mt-4 max-w-md text-sm leading-relaxed">
+                Үнэ нь байршил, хугацаа, ажлын хэмжээнээс хамаарна. Хамтран ажиллах маягтыг бөглөвөл бид эргэж холбогдоно.
+              </p>
             </div>
-            <a
-              href={channels.telegram}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-ink-foreground text-ink hover:bg-ink-foreground/90 mt-8 inline-flex w-fit items-center gap-2 px-6 py-2.5 text-sm font-semibold transition active:scale-[0.97]"
-            >
-              Зар байршуулах
-              <ArrowUpRight className="size-4" />
-            </a>
+            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+              <a
+                href={channels.partnerForm}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-ink-foreground text-ink hover:bg-ink-foreground/90 inline-flex w-fit items-center gap-2 px-6 py-2.5 text-sm font-semibold transition active:scale-[0.97]"
+              >
+                Хүсэлт илгээх
+                <ArrowUpRight className="size-4" />
+              </a>
+              <a href={channels.telegram} target="_blank" rel="noreferrer" className="text-ink-foreground/75 hover:text-ink-foreground inline-flex items-center gap-2 text-sm underline-offset-4 hover:underline">
+                <FaTelegram />
+                Telegram-аар
+              </a>
+            </div>
           </section>
 
           <section id="contact" className="bg-card relative flex scroll-mt-24 flex-col justify-between border p-6 sm:p-8">
@@ -517,18 +525,29 @@ export function AboutPage() {
               <Eyebrow>Холбоо барих</Eyebrow>
               <h2 className="font-news mt-4 text-4xl leading-tight">Шууд шугам Telegram.</h2>
               <p className="text-muted-foreground mt-4 max-w-md text-sm leading-relaxed">
-                Зар, үйлчилгээ, асуулт, засвар, дугаарын санал. Имэйл хаяг нийтлээгүй. Эхлээд Telegram, бусад сувгаар бас хүрдэг.
+                Асуулт, засвар, дугаарын санал Telegram-аар. Зар, хамтын ажиллагааны саналыг маягтаар илгээнэ үү. Имэйл хаяг нийтлээгүй.
               </p>
             </div>
-            <a
-              href={channels.telegram}
-              target="_blank"
-              rel="noreferrer"
-              className="bg-foreground text-background hover:bg-foreground/90 mt-8 inline-flex w-fit items-center gap-2 px-6 py-2.5 text-sm font-semibold transition active:scale-[0.97]"
-            >
-              <FaTelegram />
-              Telegram нээх
-            </a>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a
+                href={channels.telegram}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-foreground text-background hover:bg-foreground/90 inline-flex w-fit items-center gap-2 px-6 py-2.5 text-sm font-semibold transition active:scale-[0.97]"
+              >
+                <FaTelegram />
+                Telegram нээх
+              </a>
+              <a
+                href={channels.partnerForm}
+                target="_blank"
+                rel="noreferrer"
+                className="hover:bg-foreground/[0.05] inline-flex w-fit items-center gap-2 border px-6 py-2.5 text-sm font-semibold transition active:scale-[0.97]"
+              >
+                Хамтран ажиллах маягт
+                <ArrowUpRight className="size-4" />
+              </a>
+            </div>
           </section>
         </div>
 
