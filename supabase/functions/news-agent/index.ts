@@ -28,7 +28,7 @@
 import { rankByRules, score, sourceCard } from "./rules.ts"
 import { EXEMPLARS, STYLE_CARD, STYLE_PAIRS } from "../_shared/style-card.ts"
 import { lintStyle } from "../_shared/style-lint.ts"
-import { termsFor } from "../_shared/termbase.ts"
+import { termLine, termsFor } from "../_shared/termbase.ts"
 import { flashBackups, geminiAsk } from "../_shared/gemini.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
@@ -597,19 +597,18 @@ interface Briefing {
 
 export function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[]) {
   const terms = termsFor(`${item.title} ${item.summary} ${text}`)
-  const termbase = terms.length
-    ? `Termbase (use these Mongolian forms):\n${terms.map((term) => `- ${term.en} → ${term.mn}${term.note ? ` (${term.note})` : ""}`).join("\n")}`
-    : ""
+  const termbase = terms.length ? `Termbase (use these renderings; gloss as the policy says):\n${terms.map(termLine).join("\n")}` : ""
   return ask<Briefing>(
     `${NEWSROOM}\n\nYou write briefings in Mongolian (Cyrillic) for ediinzasag.mn from foreign and Mongolian reporting. ` +
       `A human editor checks every fact, adds the newsroom's own analysis and decides whether to publish; your draft must make that easy and must never overstate. ` +
       `It must read as written by a Mongolian journalist, never as a translation or as generic AI prose.\n\n${STYLE_CARD}\n\n${STYLE_PAIRS}\n\n${EXEMPLARS}`,
     `Write a Mongolian briefing from this ${item.source} story.\n\n` +
-      `Structure (body_html, 250-450 words, <h2> headings in this order):\n` +
-      `- <h2>Юу болов</h2>: lead with the key figure, its unit and who reported it, wire style («${item.source}-ийн мэдээлснээр…» or the institution first). Then the context in one or two paragraphs.\n` +
-      `- <h2>Яагаад чухал вэ</h2>: open with the question a Mongolian reader would ask, answer it in one sentence, then walk the mechanism in plain steps («…вэ гэвэл энгийнээр ингэж ойлгоно»). Each number gets a yardstick. Say plainly where the evidence is one-sided.\n` +
-      `- <h2>Монголд ямар хамаатай вэ</h2>: a bridge sentence («Нэгэнт … ярьсных энийг Монголтой холбож харах хэрэгтэй.»), then careful, hedged reasoning about the tögrög, prices, exports or household costs. No new facts. End on one calm, complete sentence.\n` +
-      `Do not write an opinion or conclusion section; the editor adds "EZ-ийн дүгнэлт" themselves.\n\n` +
+      `Structure (body_html, 300-600 words when the source supports it, shorter when it does not; <h2> headings in this order):\n` +
+      `- <h2>Юу болов</h2>: the lede, the news in one or two sentences: what happened, who, when, how big, with the source named because the claim is reported («${item.source}-ийн мэдээлснээр…» or the institution first). Then the supporting facts in descending importance, each sourced.\n` +
+      `- <h2>Яагаад чухал вэ</h2>: one nut paragraph on why it matters and who pays or gains. If there is a mechanism, give its first step directly, then the next, each following from the last; never announce the explanation. Each number gets a comparison base. Then one paragraph with the strongest opposing case from the source, opened plainly («Гэхдээ …», «Нөгөө талаас …»).\n` +
+      `- <h2>Юуг ажиглах вэ</h2>: two or three checkable things: a named number or event that would show this reading is wrong, with its date if the source gives one.\n` +
+      `- <h2>Монголд ямар хамаатай вэ</h2>: what it means for the tögrög, prices, exports or household costs, using only facts the source supports and labelling our own reading with «бид». If no link is established, say so plainly in one sentence. End on one calm, complete sentence.\n` +
+      `Do not write an opinion or conclusion section; the editor adds "EZ-ийн дүгнэлт" themselves. If a section has no support in the source, keep it to one sentence saying so and list the gap in verify_notes.\n\n` +
       `Fields:\n` +
       `- tags: 1-4 slugs chosen only from this list: ${tags.map((tag) => `${tag.slug} (${tag.label})`).join(", ")}.\n` +
       `- desk: "mongolia" only if the story is mainly about Mongolia, otherwise "world".\n` +
@@ -627,7 +626,7 @@ export function write(item: FeedItem, text: string, why: string, tags: { slug: s
 /**
  * After the model: apply the style book's mechanical fixes (dashes, иен, ОПЕК,
  * month digits, «quotes»…), then list what is left for the editor, plus any
- * number in the draft that the source text does not contain (style book L08).
+ * number in the draft that the source text does not contain (a light form of the guide's W03).
  */
 export function polish(briefing: Briefing, sourceText: string) {
   let draft = { title: briefing.title, dek: briefing.dek, body: briefing.body_html, take: "" }
@@ -642,7 +641,7 @@ export function polish(briefing: Briefing, sourceText: string) {
   // Years (1900–2099) are dates, not figures to trace.
   const isYear = (n: string) => /^(19|20)\d\d$/.test(n)
   const unsourced = [...new Set(numbers)].filter((n) => Number(n.replace(",", ".")) > 31 && !isYear(n) && !source.includes(n) && !source.includes(n.replace(".", ",")))
-  if (unsourced.length) notes.push(`Эх сурвалжид олдоогүй тоо: ${unsourced.slice(0, 8).join(", ")}. Тооцоолсон бол «ойролцоогоор» гэж тэмдэглэнэ, эс бөгөөс хасна.`)
+  if (unsourced.length) notes.push(`Эх сурвалжид олдоогүй тоо: ${unsourced.slice(0, 8).join(", ")}. Өөрсдөө тооцоолсон бол «бидний тооцоолсноор» гэж тэмдэглэнэ, эс бөгөөс хасна.`)
   return {
     ...briefing,
     title: draft.title,

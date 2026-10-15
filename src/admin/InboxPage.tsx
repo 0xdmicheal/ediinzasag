@@ -4,6 +4,7 @@ import { ArrowRight, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, Un
 import { cn } from "cn"
 
 import { RunDetailsView } from "@/admin/AgentRunDetails"
+import { categoriesOf, NEWS_CATEGORIES } from "@/admin/news-categories"
 import { isEditor } from "@/admin/rules"
 
 import { useTeam } from "@/admin/session"
@@ -33,6 +34,8 @@ const deskTabs: { key: DeskFilter; label: string }[] = [
 ]
 
 const PAGE = 60
+
+const categoryLabel = new Map(NEWS_CATEGORIES.map((category) => [category.key, category.label]))
 
 function ago(iso: string | null) {
   if (!iso) return ""
@@ -79,12 +82,12 @@ export function InboxPage() {
   const [error, setError] = useState("")
   const [status, setStatus] = useState<StatusFilter>("new")
   const [desk, setDesk] = useState<DeskFilter>("all")
+  const [category, setCategory] = useState("all")
   const [byScore, setByScore] = useState(true)
   const [query, setQuery] = useState("")
   const [limit, setLimit] = useState(PAGE)
   /** Ids with a request in flight. */
   const [busy, setBusy] = useState<Set<string>>(new Set())
-  const [tagLabels, setTagLabels] = useState<Map<string, string>>(new Map())
   /** Stories acted on since the filters last changed: they stay in view, so "Карт нээх" / "Буцаах" are right there. */
   const [touched, setTouched] = useState<Set<string>>(new Set())
 
@@ -94,21 +97,32 @@ export function InboxPage() {
       .then(setItems)
       .catch((failure) => setError(failure instanceof Error ? failure.message : "Ачаалж чадсангүй"))
     backend.listNewsRuns().then(setRuns, () => setRuns([]))
-    backend
-      .listTags()
-      .then((tags) => setTagLabels(new Map(tags.map((tag) => [tag.slug, tag.label]))))
-      .catch(() => {})
   }, [backend])
+
+  /** Topic categories per story, worked out once per load. */
+  const categories = useMemo(() => new Map((items ?? []).map((item) => [item.id, categoriesOf(item)])), [items])
 
   const counts = useMemo(() => {
     const result: Record<StatusFilter, number> = { new: 0, filed: 0, dismissed: 0, all: 0 }
     for (const item of items ?? []) {
-      if (desk !== "all" && item.desk !== desk) continue
+      if ((desk !== "all" && item.desk !== desk) || (category !== "all" && !categories.get(item.id)?.includes(category))) continue
       result[item.status] += 1
       result.all += 1
     }
     return result
-  }, [items, desk])
+  }, [items, desk, category, categories])
+
+  /** Stories per category under the current status and region, for the topic chips. */
+  const categoryCounts = useMemo(() => {
+    const result = new Map<string, number>()
+    let all = 0
+    for (const item of items ?? []) {
+      if ((status !== "all" && item.status !== status) || (desk !== "all" && item.desk !== desk)) continue
+      all += 1
+      for (const key of categories.get(item.id) ?? []) result.set(key, (result.get(key) ?? 0) + 1)
+    }
+    return { all, byKey: result }
+  }, [items, status, desk, categories])
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -116,11 +130,12 @@ export function InboxPage() {
       (item) =>
         (status === "all" || item.status === status || touched.has(item.id)) &&
         (desk === "all" || item.desk === desk) &&
+        (category === "all" || Boolean(categories.get(item.id)?.includes(category))) &&
         (!needle || item.title.toLowerCase().includes(needle) || item.source.toLowerCase().includes(needle) || item.summary.toLowerCase().includes(needle)),
     )
     const time = (item: NewsItem) => Date.parse(item.publishedAt ?? item.seenAt)
     return list.sort((a, b) => (byScore ? b.priority - a.priority : 0) || time(b) - time(a))
-  }, [items, status, desk, query, byScore, touched])
+  }, [items, status, desk, category, categories, query, byScore, touched])
 
   async function runAgent() {
     setRunning(true)
@@ -234,6 +249,29 @@ export function InboxPage() {
         />
       </div>
 
+      {items ? (
+        <div role="tablist" aria-label="Сэдэв" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {[{ key: "all", label: "Бүх сэдэв", count: categoryCounts.all }, ...NEWS_CATEGORIES.map((entry) => ({ key: entry.key, label: entry.label, count: categoryCounts.byKey.get(entry.key) ?? 0 }))]
+            .filter((entry) => entry.key === "all" || entry.count > 0 || entry.key === category)
+            .map((entry) => (
+              <button
+                key={entry.key}
+                type="button"
+                role="tab"
+                aria-selected={category === entry.key}
+                onClick={() => refilter(() => setCategory(entry.key))}
+                className={cn(
+                  "h-8 shrink-0 rounded-full border px-3 text-[13px] font-medium whitespace-nowrap transition-colors",
+                  category === entry.key ? "bg-foreground text-background border-foreground" : "text-muted-foreground hover:text-foreground bg-card",
+                )}
+              >
+                {entry.label}
+                <span className="ml-1.5 font-mono text-[11px] opacity-70">{entry.count}</span>
+              </button>
+            ))}
+        </div>
+      ) : null}
+
       <label className="relative block">
         <span className="sr-only">Хайх</span>
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" />
@@ -307,10 +345,15 @@ export function InboxPage() {
                         </button>
                       </>
                     )}
-                    {item.tags.map((tag) => (
-                      <span key={tag} className="bg-foreground/[0.05] text-muted-foreground rounded-full px-2 py-0.5 text-[11px]">
-                        {tagLabels.get(tag) ?? tag}
-                      </span>
+                    {(categories.get(item.id) ?? []).map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => refilter(() => setCategory(key))}
+                        className="bg-foreground/[0.05] text-muted-foreground hover:text-foreground rounded-full px-2 py-0.5 text-[11px]"
+                      >
+                        {categoryLabel.get(key)}
+                      </button>
                     ))}
                   </div>
                 </div>

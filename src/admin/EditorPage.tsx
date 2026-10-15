@@ -735,11 +735,11 @@ export function EditorPage() {
                 </ul>
               </section>
 
-              {/* House style: EZ Mongolian Writing Style Book. Errors block publishing. */}
+              {/* House style: EZ Article Bot Writing Guide (Mode W). Advice only; it never blocks publishing. */}
               {styleHits.length ? (
                 <section aria-label="Хэв маяг">
                   <p className="text-[13px] font-semibold">Хэв маяг</p>
-                  <p className="text-muted-foreground mt-0.5 text-[12px]">EZ-ийн бичгийн дүрэм. Улаан нь нийтлэхийг хаана, бусад нь зөвлөмж.</p>
+                  <p className="text-muted-foreground mt-0.5 text-[12px]">EZ-ийн бичгийн дүрэм. Улаан нь алдаа, бусад нь зөвлөмж. Нийтлэхэд саад болохгүй.</p>
                   <ul className="mt-3 flex flex-col gap-2.5">
                     {styleHits.map((hit) => (
                       <li key={hit.rule} className={cn("rounded-lg border p-2.5 text-[12.5px]", hit.severity === "error" ? "border-[var(--down)]/40 bg-[color-mix(in_oklch,var(--down)_6%,transparent)]" : "bg-muted/40")}>

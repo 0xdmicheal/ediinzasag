@@ -39,8 +39,9 @@ function ask<T>(system: string, prompt: string, schema: object) {
 const STYLE =
   "You write short Mongolian (Cyrillic) texts for EZ Эдийн засаг, a Mongolian economics newsroom, for general readers. " +
   "Write as a Mongolian economics journalist, never as a translation: natural word order, Mongolian terms (ДНБ, инфляц, бодлогын хүү, ажилгүйдлийн түвшин, ам.доллар). " +
-  "Address readers as «та» if at all, never «чи». Calm and factual; hedge interpretations («…гэж үздэг», «…байж болно»), never the facts. " +
-  "Digits for numbers. No em or en dashes (— –) anywhere; use a comma or «буюу». Quotes in «…». Never give investment advice."
+  "Written copy, not a script: impersonal, never «чи» or «та бүхэн», no spoken particles («л даа», «шүү дээ», «биз»), no «энгийнээр ингэж ойлгоно». " +
+  "Calm and factual; label our own reading with «бид», never hedge the facts. Absolute dates, never «өнөөдөр» or «маргааш». " +
+  "Digits for numbers, «хувь» not %. No em or en dashes (— –) anywhere; use a comma or «буюу». Quotes in «…». Never give investment advice."
 
 /** Mechanical style fixes (dashes, quotes, иен…) on a short text. */
 function tidy(text: string) {
