@@ -765,6 +765,25 @@ async function saveInbox(db: SupabaseClient, items: FeedItem[], filed: Set<strin
   await db.from("news_items").delete().lt("seen_at", new Date(Date.now() - 14 * 86_400_000).toISOString())
 }
 
+/**
+ * "Устгах" in the inbox: deletes the card a story became and parks the story in «Хаасан»,
+ * which also keeps the morning run from filing it again. Editors may delete until it is
+ * published; admins always.
+ */
+async function deleteCard(db: SupabaseClient, id: number, role: string) {
+  const { data: row, error } = await db.from("news_items").select("id, article_id").eq("id", id).maybeSingle()
+  if (error) throw error
+  if (!row) throw new Error("Мэдээ олдсонгүй")
+  if (row.article_id) {
+    const { data: article } = await db.from("articles").select("status").eq("id", row.article_id).maybeSingle()
+    if (article?.status === "published" && role !== "admin") throw new Error("Нийтлэгдсэн картыг админ л устгана")
+    const { error: removeError } = await db.from("articles").delete().eq("id", row.article_id)
+    if (removeError) throw removeError
+  }
+  await db.from("news_items").update({ status: "dismissed", article_id: null }).eq("id", id)
+  return { deleted: true }
+}
+
 /** "Карт болгох" in the inbox: one stored story becomes an article card. */
 async function fileFromInbox(db: SupabaseClient, id: number) {
   const { data: row, error } = await db.from("news_items").select("*").eq("id", id).maybeSingle()
@@ -830,7 +849,10 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
       .not("source_url", "is", null)
       .gte("created_at", new Date(Date.now() - 7 * 86_400_000).toISOString())
     const knownUrls = new Set((known ?? []).map((row: { source_url: string }) => row.source_url))
-    const items = fresh.filter((item) => !knownUrls.has(item.link))
+    // Stories someone closed or whose card was deleted stay out of the picks.
+    const { data: closed } = await db.from("news_items").select("link").eq("status", "dismissed")
+    const closedUrls = new Set((closed ?? []).map((row: { link: string }) => row.link))
+    const items = fresh.filter((item) => !knownUrls.has(item.link) && !closedUrls.has(item.link))
     details.new = items.length
     await saveInbox(db, fresh, knownUrls)
     if (items.length === 0) {
@@ -900,15 +922,18 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
     auth: { persistSession: false },
   })
 
-  // { action: "file", id } turns one inbox story into a card; anything else is a full run.
+  // { action: "file", id } turns one inbox story into a card, { action: "delete", id } removes
+  // that card again; anything else is a full run.
   const body = await request.json().catch(() => ({})) as { action?: string; id?: number }
   const filing = body.action === "file"
+  const deleting = body.action === "delete"
 
   // The daily cron sends the shared secret. People must be signed in: any team member
   // may file an inbox story, only editors and admins start a run.
   const cronSecret = Deno.env.get("NEWS_CRON_SECRET")
   let trigger: "cron" | "manual" = "manual"
-  if (!filing && cronSecret && request.headers.get("x-cron-secret") === cronSecret) {
+  let role = ""
+  if (!filing && !deleting && cronSecret && request.headers.get("x-cron-secret") === cronSecret) {
     trigger = "cron"
   } else {
     const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
@@ -916,7 +941,18 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
     if (!data.user) return json({ error: "Нэвтэрнэ үү" }, 401)
     const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
     if (!profile?.role) return json({ error: "Редакцын гишүүд л ашиглана" }, 403)
-    if (!filing && profile.role !== "editor" && profile.role !== "admin") return json({ error: "Редактор, админ л ажиллуулна" }, 403)
+    role = profile.role
+    if (!filing && role !== "editor" && role !== "admin") return json({ error: deleting ? "Редактор, админ л устгана" : "Редактор, админ л ажиллуулна" }, 403)
+  }
+
+  if (deleting) {
+    if (!Number.isInteger(body.id)) return json({ error: "id хэрэгтэй" }, 400)
+    try {
+      return json(await deleteCard(db, body.id!, role))
+    } catch (error) {
+      console.error(error)
+      return json({ error: error instanceof Error ? error.message : "Карт устгаж чадсангүй" }, 500)
+    }
   }
 
   if (PROVIDER === "claude" && !Deno.env.get("ANTHROPIC_API_KEY")) return json({ error: "ANTHROPIC_API_KEY тохируулаагүй байна (ADMIN.md)" }, 500)

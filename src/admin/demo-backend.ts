@@ -1,6 +1,6 @@
 import { demoBriefings, demoInsights, demoNewsItems } from "@/admin/demo-samples"
 import { devLinkPreview, plainPreview } from "@/admin/link-preview"
-import { allowedTransitions, canClaim, canDelete, canEdit, canManageTags, canManageTeam, isEditor, slugify, TAKE_MIN_WORDS, wordCount } from "@/admin/rules"
+import { allowedTransitions, canClaim, canDelete, canDeleteCard, canEdit, canManageTags, canManageTeam, isEditor, slugify, TAKE_MIN_WORDS, wordCount } from "@/admin/rules"
 import type { Activity, Article, ArticleDraft, Backend, Member, NewsItem, NewsRun, ReaderRecord, Role, Status, Subscriber, Tag } from "@/admin/types"
 
 /*
@@ -440,6 +440,17 @@ export function createDemoBackend(): Backend {
       Object.assign(item, { status: "filed", articleId: article.id })
       save(store)
       return article.id
+    },
+    async deleteNewsCard(id) {
+      const store = load()
+      const member = requireMember(store)
+      const item = (store.inbox ??= demoNewsItems()).find((entry) => entry.id === id)
+      if (!item) throw new Error("Мэдээ олдсонгүй")
+      const article = store.articles.find((entry) => entry.id === item.articleId)
+      if (article && !canDeleteCard(member, article)) throw new Error("Устгах эрхгүй")
+      store.articles = store.articles.filter((entry) => entry.id !== item.articleId)
+      Object.assign(item, { status: "dismissed", articleId: null })
+      save(store)
     },
     async setNewsItemDismissed(id, dismissed) {
       const store = load()

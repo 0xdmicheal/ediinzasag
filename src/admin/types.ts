@@ -225,6 +225,8 @@ export interface Backend {
   /** Any team member: turns an inbox story into an unclaimed article card. Resolves with the article id. */
   fileNewsItem(id: string): Promise<string>
   setNewsItemDismissed(id: string, dismissed: boolean): Promise<void>
+  /** Deletes the card an inbox story became; the story goes to «Хаасан» so the agent doesn't file it again. */
+  deleteNewsCard(id: string): Promise<void>
   /** Admin only. */
   insights(): Promise<Insights>
 }

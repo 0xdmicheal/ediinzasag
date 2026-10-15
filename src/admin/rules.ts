@@ -90,6 +90,10 @@ export function allowedTransitions(member: Member, article: Pick<Article, "autho
 export const canDelete = (member: Member, article: Pick<Article, "authorId" | "status">) =>
   member.role === "admin" || (article.authorId === member.id && article.status === "draft")
 
+/** An agent card from the inbox: editors may delete it until it is published; admins always. */
+export const canDeleteCard = (member: Member, article: Pick<Article, "status">) =>
+  member.role === "admin" || (isEditor(member) && article.status !== "published")
+
 export const canManageTags = isEditor
 export const canManageTeam = (member: Member) => member.role === "admin"
 

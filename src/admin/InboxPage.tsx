@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { ArrowRight, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, Undo2, X } from "lucide-react"
+import { ArrowRight, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, Trash2, Undo2, X } from "lucide-react"
 import { cn } from "cn"
 
 import { RunDetailsView } from "@/admin/AgentRunDetails"
+import { useConfirm } from "@/admin/ConfirmDialog"
 import { categoriesOf, NEWS_CATEGORIES } from "@/admin/news-categories"
 import { isEditor } from "@/admin/rules"
 
@@ -15,6 +16,7 @@ import { buttonClass, inputClass, Notice } from "@/admin/ui"
  * "Мэдээний урсгал": every story the news agent read in the last two weeks.
  * The agent files the best few as cards itself each morning; here anyone on
  * the team turns any other story into a card ("Карт болгох") or clears it.
+ * Editors can delete a card again ("Устгах"); the story then moves to «Хаасан».
  */
 
 type StatusFilter = NewsItem["status"] | "all"
@@ -74,6 +76,7 @@ function Tabs<T extends string>({ value, options, onChange, label }: { value: T;
 
 export function InboxPage() {
   const { backend, member } = useTeam()
+  const confirm = useConfirm()
   const [runs, setRuns] = useState<NewsRun[]>([])
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState<{ text: string; problem: string } | null>(null)
@@ -193,6 +196,20 @@ export function InboxPage() {
       await backend.setNewsItemDismissed(item.id, dismissed)
       patch(item.id, { status: dismissed ? "dismissed" : "new" })
     })
+
+  const removeCard = async (item: NewsItem) => {
+    const ok = await confirm({
+      title: "Энэ картыг устгах уу?",
+      message: `“${item.title}” карт самбараас бүр мөсөн устна. Мэдээ нь «Хаасан» руу орж, агент дахин карт болгохгүй.`,
+      confirmLabel: "Устгах",
+      destructive: true,
+    })
+    if (!ok) return
+    await act(item.id, async () => {
+      await backend.deleteNewsCard(item.id)
+      patch(item.id, { status: "dismissed", articleId: null })
+    })
+  }
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6">
@@ -324,10 +341,18 @@ export function InboxPage() {
                   {item.summary ? <p className="text-muted-foreground mt-1 line-clamp-2 text-[13px]">{item.summary}</p> : null}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     {item.status === "filed" && item.articleId ? (
-                      <Link to={`/edit/${item.articleId}`} className={buttonClass.ghost}>
-                        Карт нээх
-                        <ArrowRight className="size-4" />
-                      </Link>
+                      <>
+                        <Link to={`/edit/${item.articleId}`} className={buttonClass.ghost}>
+                          Карт нээх
+                          <ArrowRight className="size-4" />
+                        </Link>
+                        {isEditor(member) ? (
+                          <button type="button" disabled={working} onClick={() => removeCard(item)} className={buttonClass.danger}>
+                            <Trash2 className="size-4" />
+                            {working ? "Устгаж байна…" : "Устгах"}
+                          </button>
+                        ) : null}
+                      </>
                     ) : item.status === "dismissed" ? (
                       <button type="button" disabled={working} onClick={() => dismiss(item, false)} className={buttonClass.ghost}>
                         <Undo2 className="size-4" />

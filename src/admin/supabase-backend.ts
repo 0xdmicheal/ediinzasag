@@ -302,6 +302,13 @@ export function createSupabaseBackend(): Backend {
       }
       return (data as { article_id: string }).article_id
     },
+    async deleteNewsCard(id) {
+      const { error } = await client.functions.invoke("news-agent", { body: { action: "delete", id: Number(id) } })
+      if (error) {
+        const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
+        throw new Error(detail?.error ?? "Карт устгаж чадсангүй")
+      }
+    },
     async setNewsItemDismissed(id, dismissed) {
       const { error } = await client.from("news_items").update({ status: dismissed ? "dismissed" : "new" }).eq("id", Number(id))
       if (error) fail(error)
