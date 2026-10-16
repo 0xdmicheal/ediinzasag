@@ -4,7 +4,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  # Rebuilds the article link previews (scripts/og-pages.mjs) so newly published admin articles get theirs.
+  # Rebuilds the article link previews (scripts/og-pages.mjs) so newly published admin articles get theirs,
+  # and pulls new Substack letters.
   schedule:
     - cron: "*/15 * * * *"
 
@@ -27,6 +28,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      # New Substack letters show up within 15 minutes; if the feed fails, the committed posts are kept.
+      - run: python3 scripts/pull_substack.py || echo "Substack pull failed, keeping committed posts"
       - run: npm run build
         env:
           VITE_BASE: /

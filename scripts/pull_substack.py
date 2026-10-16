@@ -110,6 +110,18 @@ def excerpt(raw):
     return cut.rstrip(".,;:") + "…"
 
 
+def previous_posts():
+    try:
+        with open(OUT, encoding="utf-8") as handle:
+            source = handle.read()
+    except FileNotFoundError:
+        return []
+    marker = "export const substackPosts: SubstackPost[] = "
+    if marker not in source:
+        return []
+    return json.loads(source.split(marker, 1)[1])
+
+
 def main():
     request = urllib.request.Request(FEED, headers={"User-Agent": "ediinzasag-rss"})
     with urllib.request.urlopen(request, timeout=30) as response:
@@ -142,6 +154,12 @@ def main():
                 "html": article_html(encoded.text if encoded is not None else ""),
             }
         )
+    # The feed only carries the latest 20 posts, so keep older ones from the last pull.
+    links = {post["link"] for post in posts}
+    for post in previous_posts():
+        if post["link"] not in links and post["slug"] not in seen:
+            seen.add(post["slug"])
+            posts.append(post)
     posts.sort(key=lambda post: post["date"], reverse=True)
     body = json.dumps(posts, ensure_ascii=False, indent=2)
     source = (
