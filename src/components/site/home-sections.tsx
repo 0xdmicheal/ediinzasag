@@ -394,14 +394,16 @@ export function EpisodeThumb({ episode, quality, className }: { episode: Episode
     id ? `https://i.ytimg.com/vi/${id}/${quality === "max" ? "maxresdefault" : "hqdefault"}.jpg` : "",
   )
   if (!src) return <div className={`bg-photo-foreground/10 ${className}`} />
+  const fallback = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
   return (
     <img
       src={src}
       alt=""
       loading="lazy"
-      onError={() => {
-        const fallback = `https://i.ytimg.com/vi/${id}/hqdefault.jpg`
-        setSrc(src === fallback ? "" : fallback)
+      onError={() => setSrc(src === fallback ? "" : fallback)}
+      // A new video has no maxres thumbnail yet: YouTube sends a 120px gray placeholder with the 404, and Chrome shows it instead of firing onError.
+      onLoad={(event) => {
+        if (event.currentTarget.naturalWidth <= 120 && src !== fallback) setSrc(fallback)
       }}
       className={`object-cover ${className}`}
     />

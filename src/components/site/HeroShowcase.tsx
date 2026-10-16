@@ -315,6 +315,10 @@ function SlideVisual({
               if (slide.imageFallback && src !== slide.imageFallback) setSrc(slide.imageFallback)
               else setFailed(true)
             }}
+            // A new video has no maxres thumbnail yet: YouTube sends a 120px gray placeholder with the 404, and Chrome shows it instead of firing onError.
+            onLoad={(event) => {
+              if (event.currentTarget.naturalWidth <= 120 && slide.imageFallback && src !== slide.imageFallback) setSrc(slide.imageFallback)
+            }}
             className={`h-full w-full object-cover ${active ? "ez-hero-zoom" : ""}`}
             style={active ? { animationPlayState: playState } : undefined}
           />
