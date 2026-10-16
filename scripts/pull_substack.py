@@ -3,6 +3,7 @@
 import html
 import json
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -10,6 +11,8 @@ from html.parser import HTMLParser
 from xml.etree import ElementTree as ET
 
 FEED = "https://niots.substack.com/feed"
+# Edge Function supabase/functions/substack-feed: the same feed, fetched from Supabase.
+RELAY = "https://dpaeackqpdqcfvumjoha.supabase.co/functions/v1/substack-feed"
 OUT = "src/content/substack.posts.ts"
 NS = {
     "dc": "http://purl.org/dc/elements/1.1/",
@@ -110,6 +113,19 @@ def excerpt(raw):
     return cut.rstrip(".,;:") + "…"
 
 
+def fetch_feed():
+    # Substack answers 403 to GitHub Actions IPs, so the Pages build goes through the relay.
+    error = None
+    for url in (FEED, RELAY):
+        request = urllib.request.Request(url, headers={"User-Agent": "ediinzasag-rss"})
+        try:
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.read()
+        except urllib.error.URLError as failure:
+            error = failure
+    raise error
+
+
 def previous_posts():
     try:
         with open(OUT, encoding="utf-8") as handle:
@@ -123,10 +139,7 @@ def previous_posts():
 
 
 def main():
-    request = urllib.request.Request(FEED, headers={"User-Agent": "ediinzasag-rss"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        payload = response.read()
-    root = ET.fromstring(payload)
+    root = ET.fromstring(fetch_feed())
     posts = []
     seen = set()
     for item in root.findall("./channel/item"):
