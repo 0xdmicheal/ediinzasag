@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "r
 import { Bookmark, Flame } from "lucide-react"
 
 import type { ArticleDraft, Tag } from "@/admin/types"
-import { ArticleLayout, EndActions, proseClass, TakeBox, type TocItem } from "@/components/site/article"
+import { ArticleLayout, BOX_LABEL, EndActions, proseClass, TakeBox, type TocItem } from "@/components/site/article"
 import { articleAd } from "@/content/ads"
 import { deskLabel, formatStoryDate } from "@/content/stories"
 import { countWords, prepareArticle } from "@/lib/article-html"
@@ -63,10 +63,12 @@ function DraftArticle({ draft, tags, authorName, date }: PreviewPayload) {
   const labels = new Map(tags.map((tag) => [tag.slug, tag.label]))
   const prepared = prepareArticle(draft.body || "")
   const minutes = Math.max(1, Math.round(countWords(draft.body || "") / 200))
+  // Same rule as StoryPage: the source list shows only when the body has no inline links.
+  const sourceList = draft.sources.length > 0 && !/<a\s[^>]*href=/i.test(draft.body || "")
   const toc: TocItem[] = [
     ...prepared.toc,
-    ...(draft.take.trim() ? [{ id: "take", label: "EZ-ийн дүгнэлт" }] : []),
-    { id: "sources", label: "Эх сурвалж" },
+    ...(draft.take.trim() ? [{ id: "take", label: BOX_LABEL }] : []),
+    ...(sourceList ? [{ id: "sources", label: "Эх сурвалж" }] : []),
     { id: "comments", label: "Сэтгэгдэл" },
   ]
 
@@ -84,7 +86,7 @@ function DraftArticle({ draft, tags, authorName, date }: PreviewPayload) {
         title={draft.title || "Гарчиг"}
         dek={draft.dek}
         image={draft.coverUrl ? { src: draft.coverUrl, alt: draft.coverAlt, caption: draft.coverAlt, credit: draft.coverCredit } : undefined}
-        author={{ name: authorName || "EZ тойм", role: "Эдийн засаг редакц" }}
+        author={{ name: authorName || "EZ редакц", role: "Эдийн засаг редакц" }}
         toc={toc}
         ad={articleAd}
         rail={(layout) => <PreviewActions layout={layout} />}
@@ -105,9 +107,9 @@ function DraftArticle({ draft, tags, authorName, date }: PreviewPayload) {
           <PreviewActions layout="horizontal" />
         </EndActions>
 
-        <section id="sources" className="bg-muted/60 mt-12 scroll-mt-24 rounded-lg border p-5">
-          <h2 className="text-ds-label font-semibold">Эх сурвалж</h2>
-          {draft.sources.length > 0 ? (
+        {sourceList ? (
+          <section id="sources" className="bg-muted/60 mt-12 scroll-mt-24 rounded-lg border p-5">
+            <h2 className="text-ds-label font-semibold">Эх сурвалж</h2>
             <ul className="mt-3 space-y-2 text-[14px]">
               {draft.sources.map((source, index) => (
                 <li key={index}>
@@ -121,13 +123,8 @@ function DraftArticle({ draft, tags, authorName, date }: PreviewPayload) {
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="text-muted-foreground mt-3 text-[14px]">Эх сурвалж нэмээгүй байна.</p>
-          )}
-          <p className="text-muted-foreground mt-3 text-[12px]">
-            Энэ хуудас нийтийн мэдэгдэл, тоймыг нэгтгэсэн. Ишлэл, гэрээний нарийн тоог зохиогоогүй.
-          </p>
-        </section>
+          </section>
+        ) : null}
 
         <section id="comments" className="mt-12 scroll-mt-24">
           <h2 className="font-news text-2xl">Сэтгэгдэл</h2>

@@ -1,5 +1,5 @@
 import type { Article, ArticleDraft, Member, Origin, Role, Status } from "@/admin/types"
-import { countHeadings, countWords } from "@/lib/article-html"
+import { countWords } from "@/lib/article-html"
 
 /*
  * Workflow rules for the admin UI. They mirror the database trigger in
@@ -56,9 +56,6 @@ export function formatWhen(iso: string) {
 export const isUnclaimed = (article: Pick<Article, "origin" | "authorId">) => article.origin === "bot" && !article.authorId
 
 export const canClaim = (article: Pick<Article, "origin" | "authorId" | "status">) => isUnclaimed(article) && article.status !== "published"
-
-/** Minimum words in the EZ take before an agent briefing can go out. */
-export const TAKE_MIN_WORDS = 40
 
 export function canEdit(member: Member, article: Pick<Article, "authorId" | "status">) {
   if (isEditor(member)) return true
@@ -118,26 +115,25 @@ export function readMinutes(body: string) {
 export function readiness(draft: ArticleDraft, origin: Origin = "human"): Check[] {
   const words = wordCount(draft.body)
   const titleLength = draft.title.trim().length
-  const takeWords = wordCount(draft.take)
-  // Agent briefings also need a person's own analysis and a cleared photo (guard_article enforces both).
+  // Agent briefings need a cleared photo (guard_article enforces it). The editor's approval is the human gate.
   const agentChecks: Check[] =
-    origin === "bot"
-      ? [
-          { id: "take", label: `EZ-ийн дүгнэлт ${TAKE_MIN_WORDS}+ үг (${takeWords})`, ok: takeWords >= TAKE_MIN_WORDS, required: true },
-          { id: "rights", label: "Нүүр зургийн эрхийг шалгасан", ok: !draft.coverUrl || draft.coverRightsOk, required: true },
-        ]
-      : []
+    origin === "bot" ? [{ id: "rights", label: "Нүүр зургийн эрхийг шалгасан", ok: !draft.coverUrl || draft.coverRightsOk, required: true }] : []
   return [
     ...agentChecks,
     { id: "title", label: "Гарчиг бичсэн", ok: titleLength > 0, required: true },
     { id: "dek", label: "Товч тайлбар бичсэн", ok: draft.dek.trim().length >= 30, required: true },
-    { id: "body", label: `Үндсэн текст 120+ үг (${words})`, ok: words >= 120, required: true },
-    { id: "sources", label: "Эх сурвалж", ok: draft.sources.some((s) => s.label.trim()), required: false },
+    // The shortest format (Мэдээ) is 200 to 350 words; Мэдээ ба тайлбар 500 to 900.
+    { id: "body", label: `Үндсэн текст 200+ үг (${words})`, ok: words >= 200, required: true },
+    {
+      id: "sources",
+      label: "Эх сурвалж текст дотор холбоосоор",
+      ok: /<a\s[^>]*href=/i.test(draft.body) || draft.sources.some((s) => s.label.trim()),
+      required: false,
+    },
     { id: "tags", label: `1–5 шошго (${draft.tags.length})`, ok: draft.tags.length >= 1 && draft.tags.length <= 5, required: true },
     { id: "cover", label: "Нүүр зураг", ok: Boolean(draft.coverUrl), required: true },
     { id: "cover-alt", label: "Нүүр зургийн тайлбар, эх сурвалж", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: false },
-    { id: "headings", label: "2+ дэд гарчиг", ok: countHeadings(draft.body) >= 2, required: false },
-    // House style (EZ Article Bot Writing Guide) is advice only: findings and fixes live in the editor's style panel.
+    // House style (EZ Writing System v2.1) is advice only: findings and fixes live in the editor's style panel.
   ]
 }
 

@@ -144,7 +144,7 @@ export interface ArticleDraft {
   /** False until a person confirms we may use an agent-imported cover. */
   coverRightsOk: boolean
   sources: ArticleSource[]
-  /** "EZ-ийн дүгнэлт": the newsroom's own analysis. Required (40+ words) before an agent briefing is published. */
+  /** The «Цаасан дээр бодвол» box (was "EZ-ийн дүгнэлт"): optional, text then an arithmetic line. */
   take: string
 }
 

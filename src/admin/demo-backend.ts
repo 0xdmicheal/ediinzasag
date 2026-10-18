@@ -1,6 +1,6 @@
 import { demoBriefings, demoInsights, demoNewsItems } from "@/admin/demo-samples"
 import { devLinkPreview, plainPreview } from "@/admin/link-preview"
-import { allowedTransitions, canClaim, canDelete, canDeleteCard, canEdit, canManageTags, canManageTeam, isEditor, slugify, TAKE_MIN_WORDS, wordCount } from "@/admin/rules"
+import { allowedTransitions, canClaim, canDelete, canDeleteCard, canEdit, canManageTags, canManageTeam, isEditor, slugify } from "@/admin/rules"
 import type { Activity, Article, ArticleDraft, Backend, Member, NewsItem, NewsRun, ReaderRecord, Role, Status, Subscriber, Tag } from "@/admin/types"
 
 /*
@@ -221,7 +221,6 @@ export function createDemoBackend(): Backend {
       if (!article) throw new Error("Нийтлэл олдсонгүй")
       if (!allowedTransitions(member, article).includes(status)) throw new Error("Энэ алхмыг хийх эрхгүй")
       if (article.origin === "bot" && status === "published") {
-        if (wordCount(article.take) < TAKE_MIN_WORDS) throw new Error(`EZ-ийн дүгнэлт (${TAKE_MIN_WORDS}+ үг) бичсэний дараа нийтэлнэ`)
         if (article.coverUrl && !article.coverRightsOk) throw new Error("Нүүр зургийн эрхийг шалгаж баталгаажуулна уу")
       }
       article.status = status

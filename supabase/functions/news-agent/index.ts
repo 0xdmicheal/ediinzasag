@@ -333,10 +333,13 @@ const RANK_SCHEMA = {
 const BRIEFING_SCHEMA = {
   type: "object",
   properties: {
-    title: { type: "string", description: "Mongolian headline, calm and factual, one object and one number when the story has one; no exclamation marks" },
-    dek: { type: "string", description: "Mongolian one-sentence summary, 40-200 characters" },
+    format: { type: "string", enum: ["medee", "medee_tailbar"], description: "Мэдээ (200-350 words, no subheads) or Мэдээ ба тайлбар (500-900 words, 0-2 subheads)" },
+    mongolia_level: { type: "string", enum: ["direct", "channel", "none"], description: "The Mongolia relevance test, set before writing; when in doubt, none" },
+    mongolia_reason: { type: "string", description: "One line: why this level (for direct or channel, the channel and the figure)" },
+    title: { type: "string", description: "Mongolian headline, at most 14 words, a past or present verb, a number when the news is a number; states the news, not the topic; no exclamation marks" },
+    dek: { type: "string", description: "One Mongolian sentence of 15-30 words with the second most important fact; never the headline's figure" },
     slug: { type: "string", description: "Short latin slug, lowercase words joined by hyphens" },
-    body_html: { type: "string", description: "Mongolian article body as HTML using only <h2>, <p>, <ul>, <li>, <strong>, <em>, <blockquote>" },
+    body_html: { type: "string", description: "Mongolian article body as HTML using only <h2>, <p>, <ul>, <li>, <strong>, <em>, <blockquote> and <a href> for the one inline source link" },
     desk: { type: "string", enum: ["world", "mongolia"] },
     tags: { type: "array", items: { type: "string" } },
     cover_alt: { type: "string", description: "Mongolian description of the cover photo's likely subject, under 120 characters" },
@@ -356,7 +359,7 @@ const BRIEFING_SCHEMA = {
       },
     },
   },
-  required: ["title", "dek", "slug", "body_html", "desk", "tags", "cover_alt", "verify_notes", "claims"],
+  required: ["format", "mongolia_level", "mongolia_reason", "title", "dek", "slug", "body_html", "desk", "tags", "cover_alt", "verify_notes", "claims"],
   additionalProperties: false,
 }
 
@@ -394,7 +397,7 @@ const TIME_BUDGET_MS = Math.max(30, Number(Deno.env.get("NEWS_TIME_BUDGET_S") ??
 async function ask<T>(system: string, prompt: string, schema: object, effort: "low" | "medium" | "high"): Promise<T | null> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return PROVIDER === "gemini" ? await askGemini<T>(system, prompt, schema) : await askClaude<T>(system, prompt, schema, effort)
+      return PROVIDER === "gemini" ? await askGemini<T>(system, prompt, schema, effort) : await askClaude<T>(system, prompt, schema, effort)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       const retryable = /429|503|overloaded|unavailable|хязгаар|RESOURCE_EXHAUSTED|JSON/i.test(message)
@@ -407,9 +410,9 @@ async function ask<T>(system: string, prompt: string, schema: object, effort: "l
 /** Gemini's response schema is an OpenAPI subset: no additionalProperties. */
 
 /** Gemini with patience (see _shared/gemini.ts): GEMINI_MODEL first, then backups when it's busy. */
-function askGemini<T>(system: string, prompt: string, schema: object): Promise<T | null> {
+function askGemini<T>(system: string, prompt: string, schema: object, thinking: "low" | "medium" | "high"): Promise<T | null> {
   const backups = () => (GEMINI_FALLBACK === "none" ? Promise.resolve([]) : GEMINI_FALLBACK === "auto" ? flashBackups(GEMINI_MODEL) : Promise.resolve([GEMINI_FALLBACK]))
-  return geminiAsk<T>({ system, prompt, schema, models: [GEMINI_MODEL], backups, served: geminiServed })
+  return geminiAsk<T>({ system, prompt, schema, models: [GEMINI_MODEL], backups, served: geminiServed, thinking })
 }
 
 function parseModelJson<T>(text: string): T {
@@ -584,6 +587,9 @@ export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
 }
 
 interface Briefing {
+  format: "medee" | "medee_tailbar"
+  mongolia_level: "direct" | "channel" | "none"
+  mongolia_reason: string
   title: string
   dek: string
   slug: string
@@ -599,25 +605,36 @@ export function write(item: FeedItem, text: string, why: string, tags: { slug: s
   const terms = termsFor(`${item.title} ${item.summary} ${text}`)
   const termbase = terms.length ? `Termbase (use these renderings; gloss as the policy says):\n${terms.map(termLine).join("\n")}` : ""
   return ask<Briefing>(
-    `${NEWSROOM}\n\nYou write briefings in Mongolian (Cyrillic) for ediinzasag.mn from foreign and Mongolian reporting. ` +
-      `A human editor checks every fact, adds the newsroom's own analysis and decides whether to publish; your draft must make that easy and must never overstate. ` +
+    `${NEWSROOM}\n\nYou are a senior writer at ediinzasag.mn. You write in Mongolian (Cyrillic) for educated general readers, to the standard of the Financial Times, Reuters and Bloomberg: precise, calm, specific. ` +
+      `A human editor checks every fact and decides whether to publish. ` +
       `It must read as written by a Mongolian journalist, never as a translation or as generic AI prose.\n\n${STYLE_CARD}\n\n${STYLE_PAIRS}\n\n${EXEMPLARS}`,
-    `Write a Mongolian briefing from this ${item.source} story.\n\n` +
-      `Structure (body_html, 300-600 words when the source supports it, shorter when it does not; <h2> headings in this order):\n` +
-      `- <h2>Юу болов</h2>: the lede, the news in one or two sentences: what happened, who, when, how big, with the source named because the claim is reported («${item.source}-ийн мэдээлснээр…» or the institution first). Then the supporting facts in descending importance, each sourced.\n` +
-      `- <h2>Яагаад чухал вэ</h2>: one nut paragraph on why it matters and who pays or gains. If there is a mechanism, give its first step directly, then the next, each following from the last; never announce the explanation. Each number gets a comparison base. Then one paragraph with the strongest opposing case from the source, opened plainly («Гэхдээ …», «Нөгөө талаас …»).\n` +
-      `- <h2>Юуг ажиглах вэ</h2>: two or three checkable things: a named number or event that would show this reading is wrong, with its date if the source gives one.\n` +
-      `- <h2>Монголд ямар хамаатай вэ</h2>: what it means for the tögrög, prices, exports or household costs, using only facts the source supports and labelling our own reading with «бид». If no link is established, say so plainly in one sentence. End on one calm, complete sentence.\n` +
-      `Do not write an opinion or conclusion section; the editor adds "EZ-ийн дүгнэлт" themselves. If a section has no support in the source, keep it to one sentence saying so and list the gap in verify_notes.\n\n` +
+    // Gemini 3 drops constraints placed early in a long prompt (guide v2.1, 15.2): data first, then the task, then the rules.
+    `Source story from ${item.source}.\n` +
+      `Headline: ${item.title}\nPublished: ${item.published ? new Date(item.published).toISOString() : "unknown"}\nURL: ${item.link}\n` +
+      `Feed summary: ${item.summary}\n\nSource text:\n${text || "(Only the feed summary is available. Write a short Мэдээ and say in verify_notes that the full text must be read.)"}\n\n` +
+      (termbase ? `${termbase}\n\n` : "") +
+      `Why it was picked: ${why}\n\n` +
+      `Based on the source above, write one ediinzasag.mn article in Mongolian. The source text is the only source of facts; it overrides anything you remember, including dates, office holders and prices. Combine, compare and explain its facts freely.\n` +
+      `1. Choose the format the source can carry: "medee" (Мэдээ, 200-350 words, no subheads) for a clean fact with little to explain; "medee_tailbar" (Мэдээ ба тайлбар, 500-900 words, 0-2 subheads) when it supports the fact plus why it happened and what it means. Meet the word range; never pad. If the source cannot support 500 words, write a Мэдээ.\n` +
+      `2. Set mongolia_level before writing: "direct" if the subject is Mongolian; "channel" only if the source itself gives a named channel and a measured, material Mongolian exposure; otherwise "none". When in doubt, "none". Direct: Mongolia runs through the piece, no separate section. Channel: one paragraph with the figure, no subhead. None: nothing about Mongolia at all.\n` +
+      `3. Lede: the news in one or two sentences with who, what, how much and an absolute date. By paragraph two to four, state why it matters, with a figure.\n` +
+      `4. Body (body_html): <p> paragraphs of three to five sentences, each with a number, name, date or document. Explain the mechanism plainly. Give every figure its base and period; compare like with like. Subheads (<h2>) only in medee_tailbar, each stating its section's point, each section two or more paragraphs and 100 words.\n` +
+      `5. In medee_tailbar, include the strongest opposing reading named in the source. If the source names none, leave it out and say so in verify_notes.\n` +
+      `6. End with a forward-looking fact from the source: the next date, decision, signpost or forecast.\n` +
+      `7. Link the source once, inline, on its name or on the words that carry the fact: <a href="${item.link}">…</a>.\n` +
+      `8. If you compute anything (a share, a difference, a per-day figure), label it once with «Тооцооллоор» and write the arithmetic in verify_notes so the editor can check it.\n\n` +
       `Fields:\n` +
       `- tags: 1-4 slugs chosen only from this list: ${tags.map((tag) => `${tag.slug} (${tag.label})`).join(", ")}.\n` +
       `- desk: "mongolia" only if the story is mainly about Mongolia, otherwise "world".\n` +
       `- claims: every figure, date and quote you used, traced to the source text. If a figure is not in the source text, do not use it.\n` +
-      `- verify_notes: 2-5 concrete things the editor should check (figures against the original, names and titles, a Mongolian primary source to add: Монголбанк, ҮСХ 1212.mn, Гаалийн Ерөнхий Газар, АМГТГ).\n\n` +
-      (termbase ? `${termbase}\n\n` : "") +
-      `Why it was picked: ${why}\n` +
-      `Headline: ${item.title}\nPublished: ${item.published ? new Date(item.published).toISOString() : "unknown"}\nURL: ${item.link}\n` +
-      `Feed summary: ${item.summary}\n\nSource text:\n${text || "(Only the feed summary is available. Keep the briefing short and say in verify_notes that the full text must be read.)"}`,
+      `- verify_notes: 2-5 concrete things for the editor: figures to check against the original, names and titles, the primary (T1) document to find and link (the release, filing or table: Монголбанк, ҮСХ 1212.mn, Гаалийн ерөнхий газар, the company's own report), and any point you dropped because the source lacked it. This is the only place to mention what you could not verify; it never appears on the site.\n\n` +
+      `Constraints, applied last and strictly:\n` +
+      `- Numbers inside full sentences, at most three per sentence. «хувь» in prose; % only in the headline. «нэгж хувь» for rate changes. No + or − signs in prose. No em or en dashes. Quotes in «». No exclamation marks.\n` +
+      `- No source list, no «Эх сурвалж» heading, no bare URLs, no disclaimer («зөвлөгөө биш»), no AI or tool label, no «EZ-ийн дүгнэлт» or summary block.\n` +
+      `- Never write label headings: «Юу болов», «Яагаад чухал вэ», «Монголд ямар хамаатай вэ», «Юуг ажиглах вэ», «Дүгнэлт».\n` +
+      `- Never mention in the article that a source lacked data; leave the point out.\n` +
+      `- Vary paragraph openers; the same content word at most three times per 300 words; the same reporting verb at most twice.\n` +
+      `- Never use the banned phrases and patterns A to P in the style card.`,
     BRIEFING_SCHEMA,
     "high",
   )
@@ -641,7 +658,7 @@ export function polish(briefing: Briefing, sourceText: string) {
   // Years (1900–2099) are dates, not figures to trace.
   const isYear = (n: string) => /^(19|20)\d\d$/.test(n)
   const unsourced = [...new Set(numbers)].filter((n) => Number(n.replace(",", ".")) > 31 && !isYear(n) && !source.includes(n) && !source.includes(n.replace(".", ",")))
-  if (unsourced.length) notes.push(`Эх сурвалжид олдоогүй тоо: ${unsourced.slice(0, 8).join(", ")}. Өөрсдөө тооцоолсон бол «бидний тооцоолсноор» гэж тэмдэглэнэ, эс бөгөөс хасна.`)
+  if (unsourced.length) notes.push(`Эх сурвалжид олдоогүй тоо: ${unsourced.slice(0, 8).join(", ")}. Өөрсдөө тооцоолсон бол «Тооцооллоор» гэж нэг удаа тэмдэглэж, тооцоог шалгана, эс бөгөөс хасна.`)
   return {
     ...briefing,
     title: draft.title,
@@ -657,7 +674,15 @@ export function polish(briefing: Briefing, sourceText: string) {
 /* Storage and database                                                */
 /* ------------------------------------------------------------------ */
 
-const ALLOWED_HTML = /<(?!\/?(?:h2|h3|p|ul|ol|li|strong|em|b|i|blockquote|br)\b)[^>]*>/gi
+const ALLOWED_HTML = /<(?!\/?(?:h2|h3|p|ul|ol|li|strong|em|b|i|blockquote|br|a)\b)[^>]*>/gi
+
+/** Sources are inline links (guide v2.1, Part 10): keep an http(s) href and nothing else on <a>. */
+function cleanBody(html: string) {
+  return html
+    .replace(ALLOWED_HTML, "")
+    .replace(/<a\b[^>]*?\bhref="(https?:\/\/[^"]+)"[^>]*>/gi, '<a href="$1">')
+    .replace(/<a\b(?![^>]*href="https?:)[^>]*>([\s\S]*?)<\/a>/gi, "$1")
+}
 
 function slugify(text: string) {
   return text
@@ -706,7 +731,7 @@ async function fileStory(
   const drafted = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
   const briefing = drafted ? polish(drafted, `${item.title} ${item.summary} ${page.text}`) : null
   if (!briefing && PROVIDER !== "rules" && !cardIfNoDraft) return null
-  const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published })
+  const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published, link: item.link })
   const tagSlugs = new Set(tags.map((tag) => tag.slug))
   const slug = `${slugify(briefing?.slug || item.title) || "medee"}-${Date.now().toString(36).slice(-4)}`
   const coverUrl = await copyImage(db, page.image || item.image, slug)
@@ -716,7 +741,7 @@ async function fileStory(
       slug,
       title: (card?.title || briefing!.title).slice(0, 120),
       dek: card?.dek || briefing!.dek,
-      body: (card?.body || briefing!.body_html).replace(ALLOWED_HTML, ""),
+      body: cleanBody(card?.body || briefing!.body_html),
       desk: card ? pick.desk || "world" : briefing!.desk === "mongolia" ? "mongolia" : "world",
       tags: (card ? pick.tags ?? [] : briefing!.tags).filter((tag) => tagSlugs.has(tag)).slice(0, 5),
       cover_url: coverUrl,
@@ -727,8 +752,9 @@ async function fileStory(
       bot_notes: [
         `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 · ${why}`,
         ...(card
-          ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ. EZ-ийн дүгнэлтийг редактор нэмнэ.", "Нүүр зургийн эрхийг шалгана."]
+          ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ (EZ Writing System v2.1): эх сурвалжийг нэр дээр нь холбоосоор, жагсаалтгүй.", "Нүүр зургийн эрхийг шалгана."]
           : [
+              `Формат: ${briefing!.format === "medee" ? "Мэдээ" : "Мэдээ ба тайлбар"} · Монгол: ${{ direct: "шууд", channel: "суваг", none: "хамааралгүй" }[briefing!.mongolia_level] ?? briefing!.mongolia_level}${briefing!.mongolia_reason ? ` (${briefing!.mongolia_reason})` : ""}`,
               ...briefing!.verify_notes.map((note) => note.trim()).filter(Boolean),
               ...briefing!.styleNotes,
               ...(briefing!.claims ?? []).map((claim) => `Баримт: ${claim.claim}${claim.figure ? ` (${claim.figure})` : ""} · ${claim.source}`),

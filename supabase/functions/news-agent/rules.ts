@@ -138,10 +138,15 @@ function clip(text: string, max: number) {
   return `${clean.slice(0, max - 1).replace(/\s+\S*$/, "")}…`
 }
 
-/** A review card: the source's own words, plus empty sections for the editor. */
-export function sourceCard(input: { title: string; source: string; summary: string; excerpt: string; published: number | null }) {
+/**
+ * A review card: the source's own words and the steps of the EZ Writing System
+ * v2.1, for the editor to replace with the article. No label headings: the
+ * guide retired them, and a subhead must state its section's point.
+ */
+export function sourceCard(input: { title: string; source: string; summary: string; excerpt: string; published: number | null; link?: string }) {
   const when = input.published ? new Date(input.published).toISOString().slice(0, 10).replace(/-/g, ".") : "огноо тодорхойгүй"
   const quoted = clip(input.excerpt || input.summary, 700)
+  const source = input.link ? `<a href="${escapeHtml(input.link)}">${escapeHtml(input.source)}</a>` : `<strong>${escapeHtml(input.source)}</strong>`
   const quote = quoted
     ? `<blockquote>${escapeHtml(quoted)}</blockquote><p>Дээрх хэсэг ${escapeHtml(input.source)}-ийн өөрийн үг. Орчуулж, тоог эхтэй тулгаад эндээс дахин бичнэ.</p>`
     : `<p>Эх сурвалж дээрээс ишлэл ирсэнгүй. Холбоосыг нээгээд эхээс нь бичнэ.</p>`
@@ -149,15 +154,10 @@ export function sourceCard(input: { title: string; source: string; summary: stri
     title: clip(input.title, 120),
     dek: clip(input.summary || `${input.source}, ${when}`, 200),
     body: [
-      `<h2>Эх сурвалж</h2>`,
-      `<p><strong>${escapeHtml(input.source)}</strong>, ${when}.</p>`,
-      `<h2>Юу болов</h2>`,
-      `<p>${escapeHtml(input.title)}</p>`,
+      `<p>${source}, ${when}: ${escapeHtml(input.title)}</p>`,
       quote,
-      `<h2>Яагаад чухал вэ</h2>`,
-      `<p>Редактор бичнэ.</p>`,
-      `<h2>Монголд ямар хамаатай вэ</h2>`,
-      `<p>Редактор бичнэ. Эхэд байхгүй тоо бүү нэм.</p>`,
+      `<p>Редактор бичнэ. Эхний догол мөр мэдээг хэн, юу, хэр хэмжээ, хэзээ гэдгээр нь хэлнэ; хоёроос дөрөв дэх догол мөрөнд яагаад чухлыг тоотой нь. Анхны баримт бичгийг (тайлан, хүснэгт, мэдэгдэл) олж, эх сурвалжийг нэр дээр нь холбоосоор оруулна.</p>`,
+      `<p>Монголтой зөвхөн суваг нь нэрлэгдэж, тоогоор хэмжигдэж, материаллаг бол холбоно. Эхэд байхгүй тоо бүү нэм. Төгсгөл дараагийн огноо, шийдвэр эсвэл төсөөллөөр дуусна.</p>`,
     ].join(""),
   }
 }

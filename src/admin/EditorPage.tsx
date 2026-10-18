@@ -41,7 +41,6 @@ import {
   readiness,
   slugify,
   statusMeta,
-  TAKE_MIN_WORDS,
   timeAgo,
   transitionLabel,
   isScheduled,
@@ -52,6 +51,7 @@ import { useTeam } from "@/admin/session"
 import { TagInput } from "@/admin/TagInput"
 import { Avatar, buttonClass, Field, inputClass, Notice, StatusPill } from "@/admin/ui"
 import type { Activity, Article, ArticleDraft, Status, Tag } from "@/admin/types"
+import { BOX_LABEL } from "@/components/site/article"
 import { bodyToHtml } from "@/lib/article-html"
 import { publicUrl } from "@/lib/public-url"
 
@@ -550,7 +550,7 @@ export function EditorPage() {
                     <p className="text-muted-foreground mt-0.5 text-[13px] leading-relaxed">
                       {unclaimed
                         ? "Түүхий орчуулга. Хэн нэг нь авч, баримтыг шалгаж, өөрийн дүгнэлтийг нэмсний дараа нийтлэгдэнэ."
-                        : `${article.authorName || "Гишүүн"} засварлаж байна. Нийтлэхээс өмнө EZ-ийн дүгнэлт, зургийн эрх шаардлагатай.`}
+                        : `${article.authorName || "Гишүүн"} засварлаж байна. Нийтлэхээс өмнө редактор баталж, зургийн эрхийг шалгана.`}
                     </p>
                   </div>
                 </div>
@@ -629,26 +629,19 @@ export function EditorPage() {
             onLinkPreview={(url) => backend.linkPreview(url)}
           />
 
-          {/* EZ take: required on agent briefings, optional elsewhere. */}
-          {isAgent || takeOpen || draft.take ? (
+          {/* «Цаасан дээр бодвол» (guide v2.1, Part 11): optional, and better left out than forced. */}
+          {takeOpen || draft.take ? (
             <section aria-labelledby="take-label" className="border-brand/30 bg-brand-soft/40 mt-12 rounded-xl border p-4 sm:p-5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <label id="take-label" htmlFor="article-take" className="text-brand-strong font-mono text-[11px] font-semibold uppercase">
-                  EZ-ийн дүгнэлт{isAgent ? "" : " · заавал биш"}
+                  {BOX_LABEL} · заавал биш
                 </label>
-                <span
-                  className={cn(
-                    "font-mono text-[11px]",
-                    isAgent && takeWords < TAKE_MIN_WORDS ? "text-[var(--down)]" : "text-muted-foreground",
-                  )}
-                >
-                  {takeWords}
-                  {isAgent ? ` / ${TAKE_MIN_WORDS}+` : ""} үг
-                </span>
+                <span className="text-muted-foreground font-mono text-[11px]">{takeWords} үг</span>
               </div>
               <p className="text-muted-foreground mt-1 text-[12px] leading-relaxed">
-                Энэ мэдээ Монголд юу гэсэн үг вэ? Редакцын өөрийн тайлбар, тоо баримтын харьцуулалт, уншигч юуг анхаарах ёстой. Нийтлэлийн төгсгөлд тусад нь
-                харагдана. Хоосон мөрөөр догол мөр тусгаарлана.
+                Уншигчийн найздаа давтан хэлэх нэг гэнэтийн харьцуулалт: хэмжээ, хурд, хэн төлөх, Монгол хаана байгааг харуулна. Хоёроос дөрвөн өгүүлбэр, дараа
+                нь тооцооны мөр (жишээ нь «114,000 ÷ 92 ≈ 1,240»), тэр нь жижиг үсгээр харагдана. Тоо нь нийтлэлд байгаа эсвэл эх сурвалжтай байна; мэдээг давтсан
+                бол хасна.
               </p>
               <textarea
                 id="article-take"
@@ -656,13 +649,13 @@ export function EditorPage() {
                 value={draft.take}
                 onChange={(event) => update("take", event.target.value)}
                 rows={5}
-                placeholder="Жишээ: Зэсийн үнэ өсөх нь Оюу толгойн экспортын орлогыг нэмэх ч…"
+                placeholder={"Гуравдугаар улиралд Оюу толгой өдөрт дунджаар 1,240 орчим тонн зэс гаргажээ.\n114,000 тонн ÷ 92 хоног ≈ 1,240 тонн"}
                 className="field-sizing-content mt-3 min-h-28 w-full resize-none bg-transparent text-[1.0625rem] leading-[1.7] outline-none placeholder:text-muted-foreground/80"
               />
             </section>
           ) : editable ? (
             <button type="button" onClick={() => setTakeOpen(true)} className={cn(buttonClass.ghost, "mt-12")}>
-              + EZ-ийн дүгнэлт нэмэх
+              + {BOX_LABEL} нэмэх
             </button>
           ) : null}
         </main>

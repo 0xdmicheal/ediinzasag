@@ -27,15 +27,22 @@ export class GeminiBusy extends Error {
   }
 }
 
-/** One call to one model. 429 / 500 / 503 throw GeminiBusy so the caller can wait or switch. */
-export async function callGemini<T>(model: string, system: string, prompt: string, schema: object): Promise<T | null> {
+export type ThinkingLevel = "minimal" | "low" | "medium" | "high"
+
+/**
+ * One call to one model. 429 / 500 / 503 throw GeminiBusy so the caller can wait or switch.
+ * Gemini 3 ignores temperature (later models reject it), so consistency comes from the
+ * prompt and schema and effort from `thinking`; older backups keep a low temperature.
+ */
+export async function callGemini<T>(model: string, system: string, prompt: string, schema: object, thinking?: ThinkingLevel): Promise<T | null> {
+  const tuning = version(model) >= 3 ? (thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}) : { temperature: 0.3 }
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": KEY() },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", responseSchema: toGeminiSchema(schema), temperature: 0.3 },
+      generationConfig: { responseMimeType: "application/json", responseSchema: toGeminiSchema(schema), ...tuning },
     }),
     signal: AbortSignal.timeout(90_000),
   })
@@ -110,8 +117,10 @@ export async function geminiAsk<T>(options: {
   /** More models to try once the first is busy (looked up only if needed). */
   backups?: () => Promise<string[]>
   served?: Set<string>
+  /** Gemini 3 thinking level for this stage (guide v2.1, 15.3). */
+  thinking?: ThinkingLevel
 }): Promise<T | null> {
-  const { system, prompt, schema, served } = options
+  const { system, prompt, schema, served, thinking } = options
   let models = options.models.filter(Boolean)
   if (!models.length && options.backups) models = await options.backups()
   if (!models.length) throw new Error("Gemini: ашиглах загвар олдсонгүй")
@@ -121,7 +130,7 @@ export async function geminiAsk<T>(options: {
     const model = models[index]
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const answer = await callGemini<T>(model, system, prompt, schema)
+        const answer = await callGemini<T>(model, system, prompt, schema, thinking)
         served?.add(model)
         return answer
       } catch (error) {

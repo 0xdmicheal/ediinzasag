@@ -1,6 +1,6 @@
 import { Link, useParams } from "react-router-dom"
 
-import { ArticleLayout, EndActions, excerpt, NextCard, proseClass, TakeBox, type TocItem } from "@/components/site/article"
+import { ArticleLayout, BOX_LABEL, EndActions, excerpt, NextCard, proseClass, TakeBox, type TocItem } from "@/components/site/article"
 import { articleAd } from "@/content/ads"
 import { sortByDate, useStories, useTagLabels } from "@/content/live"
 import { storyOutlines } from "@/content/story-outlines"
@@ -62,14 +62,16 @@ export function StoryPage() {
   const rich = story.html ? prepareArticle(story.html) : null
   const blocks = rich ? [] : storyBlocks(story.paragraphs, storyOutlines[story.slug])
   const headings = blocks.filter((block) => block.kind === "heading")
+  // Sources are inline links now (EZ Writing System v2.1); the list stays only for older pieces without them.
+  const sourceList = story.sources.length > 0 && !/<a\s[^>]*href=/i.test(story.html ?? "")
   const toc: TocItem[] = [
     ...(rich
       ? rich.toc
       : headings.length > 0
         ? headings.map((block) => ({ id: block.id, label: block.text }))
         : blocks.map((block) => ({ id: block.id, label: excerpt(block.text) }))),
-    ...(story.take?.trim() ? [{ id: "take", label: "EZ-ийн дүгнэлт" }] : []),
-    { id: "sources", label: "Эх сурвалж" },
+    ...(story.take?.trim() ? [{ id: "take", label: BOX_LABEL }] : []),
+    ...(sourceList ? [{ id: "sources", label: "Эх сурвалж" }] : []),
     { id: "comments", label: "Сэтгэгдэл" },
     ...(related.length > 0 ? [{ id: "related", label: "Дараа нь" }] : []),
   ]
@@ -85,10 +87,10 @@ export function StoryPage() {
       title={story.title}
       dek={story.dek}
       image={{ src: art.src, alt: art.alt, caption: story.author || story.coverCredit ? art.alt : `${art.alt} · Зураглал`, credit: story.coverCredit }}
-      author={{ name: story.author || "EZ тойм", role: "Эдийн засаг редакц" }}
+      author={{ name: story.author || "EZ редакц", role: "Эдийн засаг редакц" }}
       toc={toc}
       ad={articleAd}
-      progressEnd="sources"
+      progressEnd={sourceList ? "sources" : "comments"}
       rail={(layout) => <ArticleActions slug={story.slug} fire={fire} layout={layout} />}
       after={
         related.length > 0 ? (
@@ -139,25 +141,24 @@ export function StoryPage() {
         <ArticleActions slug={story.slug} fire={fire} layout="horizontal" />
       </EndActions>
 
-      <section id="sources" className="bg-muted/60 mt-12 scroll-mt-24 rounded-lg border p-5">
-        <h2 className="text-ds-label font-semibold">Эх сурвалж</h2>
-        <ul className="mt-3 space-y-2 text-[14px]">
-          {story.sources.map((source) => (
-            <li key={source.label}>
-              {source.href ? (
-                <a href={source.href} target="_blank" rel="noreferrer" className="text-brand-strong underline underline-offset-2">
-                  {source.label}
-                </a>
-              ) : (
-                source.label
-              )}
-            </li>
-          ))}
-        </ul>
-        <p className="text-muted-foreground mt-3 text-[12px]">
-          Энэ хуудас нийтийн мэдэгдэл, тоймыг нэгтгэсэн. Ишлэл, гэрээний нарийн тоог зохиогоогүй.
-        </p>
-      </section>
+      {sourceList ? (
+        <section id="sources" className="bg-muted/60 mt-12 scroll-mt-24 rounded-lg border p-5">
+          <h2 className="text-ds-label font-semibold">Эх сурвалж</h2>
+          <ul className="mt-3 space-y-2 text-[14px]">
+            {story.sources.map((source) => (
+              <li key={source.label}>
+                {source.href ? (
+                  <a href={source.href} target="_blank" rel="noreferrer" className="text-brand-strong underline underline-offset-2">
+                    {source.label}
+                  </a>
+                ) : (
+                  source.label
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <Comments slug={story.slug} />
     </ArticleLayout>

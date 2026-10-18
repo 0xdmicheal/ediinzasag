@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react"
+import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react"
 import { Link } from "react-router-dom"
 import { ArrowLeft, ArrowUpRight, Expand } from "lucide-react"
 
@@ -401,17 +401,37 @@ export function EndActions({ children }: { children: ReactNode }) {
   )
 }
 
-/** "EZ-ийн дүгнэлт": the newsroom's own analysis, set apart from the reported text. */
+export const BOX_LABEL = "Цаасан дээр бодвол"
+
+/** A line of arithmetic («114,000 ÷ 92 ≈ 1,240»), shown in small type so any reader can check it. */
+const isArithmetic = (line: string) => /[÷×≈=]/.test(line)
+
+/**
+ * «Цаасан дээр бодвол» (EZ Writing System v2.1, Part 11): one comparison worked
+ * out in front of the reader, two to four sentences, then the arithmetic line.
+ * It lives in the old «EZ-ийн дүгнэлт» field, so earlier takes show here too.
+ */
 export function TakeBox({ text }: { text: string }) {
   const paragraphs = text.split(/\n\s*\n/).map((part) => part.trim()).filter(Boolean)
   if (paragraphs.length === 0) return null
   return (
-    <aside aria-label="EZ-ийн дүгнэлт" className="bg-brand-soft/60 border-brand/30 mt-12 rounded-xl border p-5 sm:p-6">
-      <p className="text-brand-strong font-mono text-[11px] font-semibold uppercase">EZ-ийн дүгнэлт</p>
+    <aside aria-label={BOX_LABEL} className="bg-brand-soft/60 border-brand/30 mt-12 rounded-xl border p-5 sm:p-6">
+      <p className="text-brand-strong font-mono text-[11px] font-semibold uppercase">{BOX_LABEL}</p>
       <div className="mt-3 space-y-3 text-[1.0625rem] leading-[1.7]">
-        {paragraphs.map((paragraph, index) => (
-          <p key={index}>{paragraph}</p>
-        ))}
+        {paragraphs.map((paragraph, index) => {
+          const lines = paragraph.split("\n").map((line) => line.trim()).filter(Boolean)
+          const words = lines.filter((line) => !isArithmetic(line)).join(" ")
+          return (
+            <Fragment key={index}>
+              {words ? <p>{words}</p> : null}
+              {lines.filter(isArithmetic).map((line, part) => (
+                <p key={part} className="text-muted-foreground font-mono text-[13px] leading-relaxed">
+                  {line}
+                </p>
+              ))}
+            </Fragment>
+          )
+        })}
       </div>
     </aside>
   )

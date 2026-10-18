@@ -33,7 +33,7 @@ export interface Story {
   author?: string
   /** Rich-text body (admin stories); when set it is shown instead of paragraphs. */
   html?: string
-  /** "EZ-ийн дүгнэлт", the newsroom's own analysis (admin stories). */
+  /** The «Цаасан дээр бодвол» box (was "EZ-ийн дүгнэлт", admin stories). */
   take?: string
   /** Photo credit for the cover, e.g. "Зураг: Reuters". */
   coverCredit?: string

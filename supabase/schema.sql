@@ -374,11 +374,11 @@ create index if not exists articles_tags_idx on public.articles using gin (tags)
 -- News automation (supabase/functions/news-agent). The agent writes translated
 -- briefings with origin 'bot' and no author, straight into review. A team member
 -- claims one (claim_article) and becomes its author; it can only be published
--- once a person has written the EZ take and cleared the cover image's rights.
+-- by an editor, once the cover image's rights are cleared.
 alter table public.articles add column if not exists origin text not null default 'human' check (origin in ('human', 'bot'));
 alter table public.articles add column if not exists source_url text;
 alter table public.articles add column if not exists bot_notes text not null default '';   -- what the agent wants a person to verify
-alter table public.articles add column if not exists take text not null default '';        -- "EZ-ийн дүгнэлт": the newsroom's own analysis
+alter table public.articles add column if not exists take text not null default '';        -- «Цаасан дээр бодвол» box (was "EZ-ийн дүгнэлт")
 alter table public.articles add column if not exists cover_credit text not null default '';
 alter table public.articles add column if not exists cover_rights_ok boolean not null default true;
 alter table public.articles add column if not exists claimed_by uuid references public.profiles (id);
@@ -502,11 +502,9 @@ begin
     end if;
   end if;
 
-  -- Raw agent output never goes live: a person adds the EZ take and clears the photo first.
+  -- Agent output goes live only through an editor's approval, with the photo cleared.
+  -- The EZ take is no longer required (EZ Writing System v2.1: the box is optional).
   if new.origin = 'bot' and new.status = 'published' and old.status <> 'published' then
-    if public.word_count(new.take) < 40 then
-      raise exception 'EZ-ийн дүгнэлт (40+ үг) бичсэний дараа нийтэлнэ';
-    end if;
     if coalesce(new.cover_url, '') <> '' and not new.cover_rights_ok then
       raise exception 'Нүүр зургийн эрхийг шалгаж баталгаажуулна уу';
     end if;
