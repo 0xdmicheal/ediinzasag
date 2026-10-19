@@ -30,6 +30,7 @@ import { EXEMPLARS, STYLE_CARD, STYLE_PAIRS } from "../_shared/style-card.ts"
 import { lintStyle } from "../_shared/style-lint.ts"
 import { termLine, termsFor } from "../_shared/termbase.ts"
 import { flashBackups, geminiAsk } from "../_shared/gemini.ts"
+import { BEATS, EVENTS, SKELETONS, drawPlan, planBrief, planNote, recentFrom, type Classification, type Recent } from "../_shared/skeletons.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
@@ -333,9 +334,6 @@ const RANK_SCHEMA = {
 const BRIEFING_SCHEMA = {
   type: "object",
   properties: {
-    format: { type: "string", enum: ["medee", "medee_tailbar"], description: "Мэдээ (200-350 words, no subheads) or Мэдээ ба тайлбар (500-900 words, 0-2 subheads)" },
-    mongolia_level: { type: "string", enum: ["direct", "channel", "none"], description: "The Mongolia relevance test, set before writing; when in doubt, none" },
-    mongolia_reason: { type: "string", description: "One line: why this level (for direct or channel, the channel and the figure)" },
     title: { type: "string", description: "Mongolian headline, at most 14 words, a past or present verb, a number when the news is a number; states the news, not the topic; no exclamation marks" },
     dek: { type: "string", description: "One Mongolian sentence of 15-30 words with the second most important fact; never the headline's figure" },
     slug: { type: "string", description: "Short latin slug, lowercase words joined by hyphens" },
@@ -359,7 +357,27 @@ const BRIEFING_SCHEMA = {
       },
     },
   },
-  required: ["format", "mongolia_level", "mongolia_reason", "title", "dek", "slug", "body_html", "desk", "tags", "cover_alt", "verify_notes", "claims"],
+  required: ["title", "dek", "slug", "body_html", "desk", "tags", "cover_alt", "verify_notes", "claims"],
+  additionalProperties: false,
+}
+
+/** The planner's read of the story (guide v2.1, Parts 4, 5 and 7): what the skeleton draw needs. */
+const CLASSIFY_SCHEMA = {
+  type: "object",
+  properties: {
+    beat: { type: "string", enum: Object.keys(BEATS) },
+    event_type: { type: "string", enum: Object.keys(EVENTS) },
+    format: { type: "string", enum: ["medee", "medee_tailbar"], description: "Мэдээ (200-350 words) for a clean fact with little to explain; Мэдээ ба тайлбар (500-900 words) when the source supports the fact plus why and what it means" },
+    mongolia_level: { type: "string", enum: ["direct", "channel", "none"], description: "The Mongolia relevance test; when in doubt, none" },
+    mongolia_reason: { type: "string", description: "One line: why this level (for direct or channel, the channel and the figure)" },
+    fillable: { type: "array", items: { type: "string", enum: SKELETONS.map((s) => s.code) }, description: "Every skeleton whose needs the source text can fill" },
+    has_household_figure: { type: "boolean", description: "The source gives a price, rate or wage a household pays or earns" },
+    has_dated_precedent: { type: "boolean", description: "The source names an earlier dated event this one repeats or beats" },
+    has_named_quote: { type: "boolean", description: "The source quotes a named, on-record speaker" },
+    has_contrast: { type: "boolean", description: "Two sourced facts in it really pull apart" },
+    has_forecast: { type: "boolean", description: "The source gives a named forecast, target or stated condition" },
+  },
+  required: ["beat", "event_type", "format", "mongolia_level", "mongolia_reason", "fillable", "has_household_figure", "has_dated_precedent", "has_named_quote", "has_contrast", "has_forecast"],
   additionalProperties: false,
 }
 
@@ -586,10 +604,7 @@ export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
   return pool.slice(0, count).map((item) => ({ item, why: "Хамгийн сүүлийн мэдээ (агент эрэмбэлж чадсангүй)", priority: 0 }))
 }
 
-interface Briefing {
-  format: "medee" | "medee_tailbar"
-  mongolia_level: "direct" | "channel" | "none"
-  mongolia_reason: string
+interface Draft {
   title: string
   dek: string
   slug: string
@@ -601,10 +616,64 @@ interface Briefing {
   claims?: { claim: string; figure: string; source: string }[]
 }
 
-export function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[]) {
+type Briefing = Draft & {
+  format: "medee" | "medee_tailbar"
+  mongolia_level: "direct" | "channel" | "none"
+  mongolia_reason: string
+  /** The structure line for the editor's notes (planNote). */
+  structure: string
+}
+
+/** Step 1 of a draft: beat, event type, format, Mongolia level and the skeletons the source can fill. */
+function classify(item: FeedItem, text: string) {
+  return ask<Classification & { mongolia_reason: string }>(
+    `${NEWSROOM}\n\nYou are the planning editor at ediinzasag.mn. You do not write the article; you read the source and route it, following the EZ Writing System v2.1.`,
+    `Source story from ${item.source}.\nHeadline: ${item.title}\nFeed summary: ${item.summary}\n\nSource text:\n${(text || "(only the feed summary)").slice(0, 12_000)}\n\n` +
+      `Beats: ${Object.entries(BEATS).map(([key, beat]) => `${key} (${beat.label})`).join(", ")}.\n` +
+      `Event types: ${Object.entries(EVENTS).map(([key, event]) => `${key} (${event.label})`).join(", ")}.\n` +
+      `Skeletons (code, use when, what the source must hold):\n${SKELETONS.map((s) => `${s.code} ${s.name}: ${s.use}; needs ${s.needs}`).join("\n")}\n\n` +
+      `Route this story. Pick one beat and one event type. Pick the format the source can carry; if it cannot support 500 words, medee. ` +
+      `Set mongolia_level: direct if the subject is Mongolian; channel only if the source itself names the channel and gives a measured, material Mongolian exposure (5 percent or more of exports, the budget, reserves or a household cost) from the last 12 months; otherwise none. When in doubt, none. ` +
+      `List in fillable every skeleton whose needs this source text actually holds, not those that would need facts from elsewhere. Answer the yes/no fields from the source text only.`,
+    CLASSIFY_SCHEMA,
+    "low",
+  )
+}
+
+/**
+ * Routes the story, draws its structure (skeleton, lede, ending, headline pattern)
+ * against the last drafts so pieces in a row differ (guide v2.1, Parts 5 and 6),
+ * then writes it to that plan. `recent` comes from recentFrom(), newest first.
+ */
+export async function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[], recent: Recent[] = []): Promise<Briefing | null> {
+  const routed = await classify(item, text).catch((error) => {
+    console.warn("classify skipped:", error instanceof Error ? error.message : error)
+    return null
+  })
+  // No routing: a Мэдээ in the brief-news order, with nothing about Mongolia.
+  const story = routed ?? {
+    beat: "mongolia_macro", event_type: "follow_up", format: "medee", mongolia_level: "none", mongolia_reason: "", fillable: ["S18"],
+    has_household_figure: false, has_dated_precedent: false, has_named_quote: false, has_contrast: false, has_forecast: false,
+  } satisfies Classification & { mongolia_reason: string }
+  const plan = drawPlan(story, recent)
+  const draft = await writeToPlan(item, text, why, tags, story, planBrief(plan, story.mongolia_level))
+  if (!draft) return null
+  return { ...draft, format: plan.format, mongolia_level: story.mongolia_level, mongolia_reason: story.mongolia_reason, structure: planNote(plan, story) }
+}
+
+function writeToPlan(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[], story: Classification, brief: string) {
+  const formatLine =
+    story.format === "medee"
+      ? `Format: Мэдээ, 200-350 words, no subheads. Meet the range; never pad.`
+      : `Format: Мэдээ ба тайлбар, 500-900 words, 0-2 subheads, at least six distinct figures spread through the text. Meet the range; never pad.`
+  const mongoliaLine = {
+    direct: `Mongolia level: direct. Mongolia is the story; the context runs through the piece. No separate Mongolia section.`,
+    channel: `Mongolia level: channel. One paragraph with the sourced exposure figure, no subhead, where it fits the logic, usually after the mechanism.`,
+    none: `Mongolia level: none. Nothing about Mongolia: no paragraph, no closing line, no hint.`,
+  }[story.mongolia_level]
   const terms = termsFor(`${item.title} ${item.summary} ${text}`)
   const termbase = terms.length ? `Termbase (use these renderings; gloss as the policy says):\n${terms.map(termLine).join("\n")}` : ""
-  return ask<Briefing>(
+  return ask<Draft>(
     `${NEWSROOM}\n\nYou are a senior writer at ediinzasag.mn. You write in Mongolian (Cyrillic) for educated general readers, to the standard of the Financial Times, Reuters and Bloomberg: precise, calm, specific. ` +
       `A human editor checks every fact and decides whether to publish. ` +
       `It must read as written by a Mongolian journalist, never as a translation or as generic AI prose.\n\n${STYLE_CARD}\n\n${STYLE_PAIRS}\n\n${EXEMPLARS}`,
@@ -615,12 +684,13 @@ export function write(item: FeedItem, text: string, why: string, tags: { slug: s
       (termbase ? `${termbase}\n\n` : "") +
       `Why it was picked: ${why}\n\n` +
       `Based on the source above, write one ediinzasag.mn article in Mongolian. The source text is the only source of facts; it overrides anything you remember, including dates, office holders and prices. Combine, compare and explain its facts freely.\n` +
-      `1. Choose the format the source can carry: "medee" (Мэдээ, 200-350 words, no subheads) for a clean fact with little to explain; "medee_tailbar" (Мэдээ ба тайлбар, 500-900 words, 0-2 subheads) when it supports the fact plus why it happened and what it means. Meet the word range; never pad. If the source cannot support 500 words, write a Мэдээ.\n` +
-      `2. Set mongolia_level before writing: "direct" if the subject is Mongolian; "channel" only if the source itself gives a named channel and a measured, material Mongolian exposure; otherwise "none". When in doubt, "none". Direct: Mongolia runs through the piece, no separate section. Channel: one paragraph with the figure, no subhead. None: nothing about Mongolia at all.\n` +
-      `3. Lede: the news in one or two sentences with who, what, how much and an absolute date. By paragraph two to four, state why it matters, with a figure.\n` +
+      `The planning editor has set the format, the Mongolia level and the structure. Follow them; do not choose your own.\n${formatLine}\n${mongoliaLine}\n${brief}\n\n` +
+      `1. Lede: the news in one or two sentences with who, what, how much and an absolute date, in the lede type above.\n` +
+      `2. By paragraph two to four, state why it matters as a statement with a figure, never announced.\n` +
+      `3. Then the skeleton's moves, in order. A move the source cannot fill is dropped, never padded or confessed.\n` +
       `4. Body (body_html): <p> paragraphs of three to five sentences, each with a number, name, date or document. Explain the mechanism plainly. Give every figure its base and period; compare like with like. Subheads (<h2>) only in medee_tailbar, each stating its section's point, each section two or more paragraphs and 100 words.\n` +
       `5. In medee_tailbar, include the strongest opposing reading named in the source. If the source names none, leave it out and say so in verify_notes.\n` +
-      `6. End with a forward-looking fact from the source: the next date, decision, signpost or forecast.\n` +
+      `6. End with the ending type above: a forward-looking fact from the source. Never a summary, a moral or a slogan.\n` +
       `7. Link the source once, inline, on its name or on the words that carry the fact: <a href="${item.link}">…</a>.\n` +
       `8. If you compute anything (a share, a difference, a per-day figure), label it once with «Тооцооллоор» and write the arithmetic in verify_notes so the editor can check it.\n\n` +
       `Fields:\n` +
@@ -714,6 +784,17 @@ async function copyImage(db: SupabaseClient, url: string, slug: string) {
 
 type Tags = { slug: string; label: string }[]
 
+/** The structures of the last 20 agent drafts, newest first, read back from their bot notes. */
+async function recentStructures(db: SupabaseClient): Promise<Recent[]> {
+  const { data } = await db
+    .from("articles")
+    .select("bot_notes")
+    .like("bot_notes", "%Бүтэц: S%")
+    .order("created_at", { ascending: false })
+    .limit(20)
+  return recentFrom((data ?? []).map((row: { bot_notes: string }) => row.bot_notes))
+}
+
 /**
  * Files one story as an unclaimed bot article in review: a model draft, or the
  * source card in rules mode. `cardIfNoDraft` (a person asked for this story)
@@ -728,7 +809,7 @@ async function fileStory(
 ): Promise<string | null> {
   const { item, why, priority } = pick
   const page = await readArticle(item.link)
-  const drafted = PROVIDER === "rules" ? null : await write(item, page.text, why, tags)
+  const drafted = PROVIDER === "rules" ? null : await write(item, page.text, why, tags, await recentStructures(db))
   const briefing = drafted ? polish(drafted, `${item.title} ${item.summary} ${page.text}`) : null
   if (!briefing && PROVIDER !== "rules" && !cardIfNoDraft) return null
   const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published, link: item.link })
@@ -755,6 +836,7 @@ async function fileStory(
           ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ (EZ Writing System v2.1): эх сурвалжийг нэр дээр нь холбоосоор, жагсаалтгүй.", "Нүүр зургийн эрхийг шалгана."]
           : [
               `Формат: ${briefing!.format === "medee" ? "Мэдээ" : "Мэдээ ба тайлбар"} · Монгол: ${{ direct: "шууд", channel: "суваг", none: "хамааралгүй" }[briefing!.mongolia_level] ?? briefing!.mongolia_level}${briefing!.mongolia_reason ? ` (${briefing!.mongolia_reason})` : ""}`,
+              briefing!.structure,
               ...briefing!.verify_notes.map((note) => note.trim()).filter(Boolean),
               ...briefing!.styleNotes,
               ...(briefing!.claims ?? []).map((claim) => `Баримт: ${claim.claim}${claim.figure ? ` (${claim.figure})` : ""} · ${claim.source}`),

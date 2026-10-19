@@ -48,7 +48,7 @@ for (const pick of picks) {
     const raw = await agent.write(pick.item, page.text, pick.why, TAGS)
     // The same clean-up the live run applies before filing the card.
     const draft = raw ? agent.polish(raw, `${pick.item.title} ${pick.item.summary} ${page.text}`) : null
-    const notes = draft ? [...draft.styleNotes, ...(draft.claims ?? []).map((c) => `Баримт: ${c.claim}${c.figure ? ` (${c.figure})` : ""} · ${c.source}`)] : []
+    const notes = draft ? [draft.structure, ...draft.styleNotes, ...(draft.claims ?? []).map((c) => `Баримт: ${c.claim}${c.figure ? ` (${c.figure})` : ""} · ${c.source}`)] : []
     cards.push({ pick, page, title: draft?.title ?? "(загвар бичсэнгүй)", dek: draft?.dek ?? "", body: draft?.body_html ?? "", tags: draft?.tags ?? [], notes })
   }
 }
