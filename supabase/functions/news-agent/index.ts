@@ -288,7 +288,8 @@ export async function readFeeds() {
 /** The article page's main image (og:image) and readable paragraphs. */
 export async function readArticle(url: string) {
   try {
-    const html = await fetchText(url, 12_000)
+    // Scripts and styles can hold "<p" in strings; drop them so no page code reaches the card.
+    const html = (await fetchText(url, 12_000)).replace(/<(script|style|noscript|svg)\b[\s\S]*?<\/\1>/gi, " ")
     const meta = metaTags(html)
     const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
       .map((match) => stripTags(match[1]))
@@ -722,7 +723,8 @@ function writeToPlan(item: FeedItem, text: string, why: string, tags: { slug: st
       `- Vary paragraph openers; the same content word at most three times per 300 words; the same reporting verb at most twice.\n` +
       `- Never use the banned phrases and patterns A to P in the style card.`,
     BRIEFING_SCHEMA,
-    "high",
+    // "high" ran past Gemini's 90 s limit on every draft (19 Oct); the plan above carries the structure.
+    "medium",
   )
 }
 
@@ -827,6 +829,7 @@ async function fileStory(
   const { item, why, priority } = pick
   const page = await readArticle(item.link)
   let missed = ""
+  const draftStart = Date.now()
   const drafted =
     PROVIDER === "rules"
       ? null
@@ -865,6 +868,7 @@ async function fileStory(
           : [
               `Формат: ${briefing!.format === "medee" ? "Мэдээ" : "Мэдээ ба тайлбар"} · Монгол: ${{ direct: "шууд", channel: "суваг", none: "хамааралгүй" }[briefing!.mongolia_level] ?? briefing!.mongolia_level}${briefing!.mongolia_reason ? ` (${briefing!.mongolia_reason})` : ""}`,
               briefing!.structure,
+              `Ноорог ${Math.round((Date.now() - draftStart) / 1000)} секундэд бичигдсэн.`,
               ...briefing!.verify_notes.map((note) => note.trim()).filter(Boolean),
               ...briefing!.styleNotes,
               ...(briefing!.claims ?? []).map((claim) => `Баримт: ${claim.claim}${claim.figure ? ` (${claim.figure})` : ""} · ${claim.source}`),
