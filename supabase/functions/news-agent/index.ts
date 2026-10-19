@@ -409,6 +409,22 @@ const geminiServed = new Set<string>()
 
 /** Supabase stops an edge function at ~150 s; after this budget no new draft is started. */
 const TIME_BUDGET_MS = Math.max(30, Number(Deno.env.get("NEWS_TIME_BUDGET_S") ?? "110") || 110) * 1000
+/**
+ * A draft still unfinished this long after the request began is dropped, so the card
+ * (or the run log) is saved before Supabase stops the function and the admin waits on nothing.
+ */
+const DRAFT_DEADLINE_MS = 105_000
+
+class DraftTimeout extends Error {}
+
+/** `task`, or a DraftTimeout once `deadline` (epoch ms) passes; a late answer is ignored. */
+function beforeDeadline<T>(task: Promise<T>, deadline: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new DraftTimeout("Загвар цагтаа бичиж амжсангүй")), Math.max(0, deadline - Date.now()))
+  })
+  return Promise.race([task, timeout]).finally(() => clearTimeout(timer))
+}
 
 
 /** One structured JSON call; returns null when the model declines. Retries brief overloads (free tiers hit these often). */
@@ -798,18 +814,28 @@ async function recentStructures(db: SupabaseClient): Promise<Recent[]> {
 /**
  * Files one story as an unclaimed bot article in review: a model draft, or the
  * source card in rules mode. `cardIfNoDraft` (a person asked for this story)
- * falls back to the card when the model declines, instead of filing nothing.
- * Resolves with the new article's id, or null when nothing was filed.
+ * falls back to the card when the model declines, fails or runs past `deadline`,
+ * instead of filing nothing. Resolves with the new article's id, or null when nothing was filed.
  */
 async function fileStory(
   db: SupabaseClient,
   pick: { item: FeedItem; why: string; priority: number; tags?: string[]; desk?: "mongolia" | "world" },
   tags: Tags,
+  deadline: number,
   cardIfNoDraft = false,
 ): Promise<string | null> {
   const { item, why, priority } = pick
   const page = await readArticle(item.link)
-  const drafted = PROVIDER === "rules" ? null : await write(item, page.text, why, tags, await recentStructures(db))
+  let missed = ""
+  const drafted =
+    PROVIDER === "rules"
+      ? null
+      : await beforeDeadline(recentStructures(db).then((recent) => write(item, page.text, why, tags, recent)), deadline).catch((error) => {
+          if (!cardIfNoDraft) throw error
+          missed = error instanceof Error ? error.message : String(error)
+          console.warn("draft skipped, filing the source card:", missed)
+          return null
+        })
   const briefing = drafted ? polish(drafted, `${item.title} ${item.summary} ${page.text}`) : null
   if (!briefing && PROVIDER !== "rules" && !cardIfNoDraft) return null
   const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published, link: item.link })
@@ -833,7 +859,9 @@ async function fileStory(
       bot_notes: [
         `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 · ${why}`,
         ...(card
-          ? ["Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ (EZ Writing System v2.1): эх сурвалжийг нэр дээр нь холбоосоор, жагсаалтгүй.", "Нүүр зургийн эрхийг шалгана."]
+          ? [
+              ...(PROVIDER === "rules" ? [] : [`Агент ноорог бичээгүй (${missed.slice(0, 160) || "загвар татгалзсан"}). Эх сурвалжийн картаас бичнэ.`]),
+              "Тоо, нэр, огноог эхтэй тулгана.", "Монголоор дахин бичнэ (EZ Writing System v2.1): эх сурвалжийг нэр дээр нь холбоосоор, жагсаалтгүй.", "Нүүр зургийн эрхийг шалгана."]
           : [
               `Формат: ${briefing!.format === "medee" ? "Мэдээ" : "Мэдээ ба тайлбар"} · Монгол: ${{ direct: "шууд", channel: "суваг", none: "хамааралгүй" }[briefing!.mongolia_level] ?? briefing!.mongolia_level}${briefing!.mongolia_reason ? ` (${briefing!.mongolia_reason})` : ""}`,
               briefing!.structure,
@@ -893,7 +921,7 @@ async function deleteCard(db: SupabaseClient, id: number, role: string) {
 }
 
 /** "Карт болгох" in the inbox: one stored story becomes an article card. */
-async function fileFromInbox(db: SupabaseClient, id: number) {
+async function fileFromInbox(db: SupabaseClient, id: number, deadline: number) {
   const { data: row, error } = await db.from("news_items").select("*").eq("id", id).maybeSingle()
   if (error) throw error
   if (!row) throw new Error("Мэдээ олдсонгүй")
@@ -908,7 +936,7 @@ async function fileFromInbox(db: SupabaseClient, id: number) {
     image: row.image,
     mongolia: row.mongolia,
   }
-  const articleId = await fileStory(db, { item, why: row.why, priority: row.priority, tags: row.tags, desk: row.desk }, (tagRows ?? []) as Tags, true)
+  const articleId = await fileStory(db, { item, why: row.why, priority: row.priority, tags: row.tags, desk: row.desk }, (tagRows ?? []) as Tags, deadline, true)
   if (!articleId) {
     // Filed before under the same link (e.g. by the morning run): point the inbox at that article.
     const { data: existing } = await db.from("articles").select("id").eq("source_url", row.link).maybeSingle()
@@ -987,7 +1015,7 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     // Gemini: one at a time, so the free tier's per-minute limit isn't hit in a burst.
     const written = await settleInBatches(picks, PROVIDER === "gemini" ? 1 : picks.length, async (pick) => {
       if (Date.now() - startedAt > TIME_BUDGET_MS) throw new Error("Хугацаа хүрэлцсэнгүй. Мэдээний урсгалаас «Карт болгох»-оор нэмнэ")
-      return Boolean(await fileStory(db, pick, tags))
+      return Boolean(await fileStory(db, pick, tags, startedAt + DRAFT_DEADLINE_MS))
     })
     const created = written.filter((result) => result.status === "fulfilled" && result.value).length
     if (PROVIDER === "gemini" && geminiServed.size) details.provider = `gemini · ${[...geminiServed].join(" + ")}`
@@ -1023,6 +1051,7 @@ async function settleInBatches<T, R>(list: T[], size: number, task: (value: T) =
 
 // NEWS_DRY_RUN: imported by dry-run.ts on a laptop, so no server.
 if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
+  const received = Date.now()
   if (request.method === "OPTIONS") return new Response("ok", { headers: CORS })
   if (request.method !== "POST") return json({ error: "POST only" }, 405)
 
@@ -1071,7 +1100,7 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
   try {
     if (filing) {
       if (!Number.isInteger(body.id)) return json({ error: "id хэрэгтэй" }, 400)
-      return json(await fileFromInbox(db, body.id!))
+      return json(await fileFromInbox(db, body.id!, received + DRAFT_DEADLINE_MS))
     }
     return json(await run(db, trigger))
   } catch (error) {

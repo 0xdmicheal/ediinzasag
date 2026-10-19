@@ -91,6 +91,8 @@ export function InboxPage() {
   const [limit, setLimit] = useState(PAGE)
   /** Ids with a request in flight. */
   const [busy, setBusy] = useState<Set<string>>(new Set())
+  /** The last failure per story, shown under its own buttons rather than at the top of a long list. */
+  const [failed, setFailed] = useState<Map<string, string>>(new Map())
   /** Stories acted on since the filters last changed: they stay in view, so "Карт нээх" / "Буцаах" are right there. */
   const [touched, setTouched] = useState<Set<string>>(new Set())
 
@@ -171,11 +173,15 @@ export function InboxPage() {
 
   async function act(id: string, task: () => Promise<void>) {
     setBusy((set) => new Set(set).add(id))
-    setError("")
+    setFailed((map) => {
+      const next = new Map(map)
+      next.delete(id)
+      return next
+    })
     try {
       await task()
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Алдаа гарлаа")
+      setFailed((map) => new Map(map).set(id, failure instanceof Error ? failure.message : "Алдаа гарлаа"))
     } finally {
       setBusy((set) => {
         const next = new Set(set)
@@ -364,6 +370,7 @@ export function InboxPage() {
                           <FilePlus2 className="size-4" />
                           {working ? "Бэлдэж байна…" : "Карт болгох"}
                         </button>
+                        {working ? <span className="text-muted-foreground text-[12px]">Агент ноорог бичиж байна, 2 минут хүртэл үргэлжилнэ.</span> : null}
                         <button type="button" disabled={working} onClick={() => dismiss(item, true)} className={buttonClass.ghost}>
                           <X className="size-4" />
                           Хаах
@@ -381,6 +388,11 @@ export function InboxPage() {
                       </button>
                     ))}
                   </div>
+                  {failed.has(item.id) ? (
+                    <div className="mt-2">
+                      <Notice tone="error">{failed.get(item.id)}</Notice>
+                    </div>
+                  ) : null}
                 </div>
               </li>
             )
