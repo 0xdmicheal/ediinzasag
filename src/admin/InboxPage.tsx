@@ -336,7 +336,7 @@ export function InboxPage() {
 
       <div className="bg-card flex min-h-[420px] flex-1 gap-4 overflow-hidden rounded-2xl border p-5">
         {/* Folders, with an arrow from the open one to its list. */}
-        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[148px] shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain pt-1 pr-6 pb-1 [scrollbar-width:thin]">
+        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[148px] shrink-0 ez-scroll flex-col gap-2 pt-1 pr-4 pb-1">
           {FOLDERS.map((entry) => (
             <div key={entry.key} className="relative">
               <Folder
@@ -346,7 +346,7 @@ export function InboxPage() {
                 onClick={() => openFolder(entry.key)}
               />
               {entry.key === folder.key ? (
-                <ArrowRight className="text-muted-foreground absolute top-1/2 -right-5 size-4 -translate-y-1/2" aria-hidden />
+                <ArrowRight className="text-muted-foreground absolute top-1/2 -right-4 size-4 -translate-y-1/2" aria-hidden />
               ) : null}
             </div>
           ))}
@@ -370,7 +370,7 @@ export function InboxPage() {
               />
             </label>
           </header>
-          <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+          <div ref={list} className="ez-scroll min-h-0 flex-1">
 
           {!items ? (
             <p className="text-muted-foreground p-8 text-[14px]">Loading…</p>
