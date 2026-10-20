@@ -165,7 +165,17 @@ export function createDemoBackend(): Backend {
       notify()
       return null
     },
+    async twoStep() {
+      return null
+    },
     async verifyTwoStep() {},
+    async sendPasswordReset() {
+      throw new Error("Демо горимд нууц үг байхгүй. Доорх товчнуудаас сонгоно уу.")
+    },
+    async welcomeMember() {
+      return null
+    },
+    async setPassword() {},
     async signOut() {
       localStorage.removeItem(SESSION)
       notify()
@@ -307,6 +317,7 @@ export function createDemoBackend(): Backend {
       if (store.members.some((item) => item.email === email)) throw new Error("Энэ и-мэйл бүртгэлтэй")
       store.members.push({ id: `m-${Date.now()}`, name, email, role })
       save(store)
+      return "joined"
     },
 
     async listSubscribers() {

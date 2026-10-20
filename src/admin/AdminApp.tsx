@@ -13,6 +13,7 @@ import { ReadersPage } from "@/admin/ReadersPage"
 import { AdminSessionProvider } from "@/admin/session"
 import { TagsPage } from "@/admin/TagsPage"
 import { TeamPage } from "@/admin/TeamPage"
+import { WelcomePage } from "@/admin/WelcomePage"
 
 /** The newsroom admin (desktop only), served on its own at admin.ediinzasag.mn (src/admin-main.tsx). */
 export default function AdminApp() {
@@ -22,6 +23,8 @@ export default function AdminApp() {
         <ConfirmProvider>
         <Routes>
           <Route path="login" element={<LoginPage />} />
+          {/* Invite and password-reset links land here (team-invite Edge Function). */}
+          <Route path="welcome" element={<WelcomePage />} />
           <Route element={<AdminGuard />}>
             {/* The editor is full-screen, like Substack: no sidebar while writing. */}
             <Route path="new" element={<EditorPage key="editor" />} />

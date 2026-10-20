@@ -1,6 +1,8 @@
 import { slugify } from "@/admin/rules"
-import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsItem, NewsRun, ReaderRecord, Role, RunDetails, Status, Subscriber, Tag } from "@/admin/types"
+import type { Activity, Article, ArticleDraft, AuthorStats, Backend, Insights, Member, NewsItem, NewsRun, ReaderRecord, Role, RunDetails, Status, Subscriber, Tag, TwoStep } from "@/admin/types"
 import { devLinkPreview, plainPreview, type LinkPreview } from "@/admin/link-preview"
+import { adminUrl } from "@/lib/admin-url"
+import { isPwnedPassword } from "@/lib/pwned-password"
 import { supabaseClient } from "@/lib/supabase"
 
 /* Supabase backend. Permissions are enforced by the database (supabase/schema.sql). */
@@ -101,6 +103,21 @@ export function createSupabaseBackend(): Backend {
     return data?.currentLevel === "aal2" ? profileOf() : null
   }
 
+  /** Which code step this session needs: enter the code, or link an app first. */
+  async function twoStep(): Promise<TwoStep | null> {
+    const { data: factors, error: listError } = await client.auth.mfa.listFactors()
+    if (listError) throw new Error(listError.message)
+    const linked = factors.totp.find((factor) => factor.status === "verified")
+    if (linked) return { factorId: linked.id }
+    // First sign-in since two-step became required: drop half-finished setups, then link an app.
+    for (const factor of factors.all.filter((item) => item.status === "unverified")) {
+      await client.auth.mfa.unenroll({ factorId: factor.id })
+    }
+    const { data: enrolled, error: enrollError } = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "EZ Редакц" })
+    if (enrollError) throw new Error(enrollError.message)
+    return { factorId: enrolled.id, enroll: { qr: enrolled.totp.qr_code, secret: enrolled.totp.secret } }
+  }
+
   return {
     mode: "supabase",
 
@@ -116,21 +133,22 @@ export function createSupabaseBackend(): Backend {
         await client.auth.signOut()
         throw new Error("Энэ бүртгэл багийн гишүүн биш байна")
       }
-      const { data: factors, error: listError } = await client.auth.mfa.listFactors()
-      if (listError) throw new Error(listError.message)
-      const linked = factors.totp.find((factor) => factor.status === "verified")
-      if (linked) return { factorId: linked.id }
-      // First sign-in since two-step became required: drop half-finished setups, then link an app.
-      for (const factor of factors.all.filter((item) => item.status === "unverified")) {
-        await client.auth.mfa.unenroll({ factorId: factor.id })
-      }
-      const { data: enrolled, error: enrollError } = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "EZ Редакц" })
-      if (enrollError) throw new Error(enrollError.message)
-      return { factorId: enrolled.id, enroll: { qr: enrolled.totp.qr_code, secret: enrolled.totp.secret } }
+      return twoStep()
     },
+    twoStep,
     async verifyTwoStep(factorId, code) {
       const { error } = await client.auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\s/g, "") })
       if (error) throw new Error(/invalid|expired/i.test(error.message) ? "Код буруу эсвэл хугацаа нь дууссан байна" : error.message)
+    },
+    async sendPasswordReset(email) {
+      const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${adminUrl}/welcome` })
+      if (error) throw new Error(error.status === 429 ? "Хэт олон оролдлого. Түр хүлээгээд дахин оролдоно уу" : error.message)
+    },
+    welcomeMember: profileOf,
+    async setPassword(password) {
+      if (await isPwnedPassword(password)) throw new Error("Энэ нууц үг өмнө нь алдагдсан нууц үгийн жагсаалтад орсон байна. Өөр нууц үг сонгоно уу")
+      const { error } = await client.auth.updateUser({ password })
+      if (error) throw new Error(/different from the old/i.test(error.message) ? "Шинэ нууц үг хуучнаасаа өөр байх ёстой" : /at least/i.test(error.message) ? "Нууц үг хэт богино байна" : error.message)
     },
     async signOut() {
       await client.auth.signOut()
@@ -236,8 +254,13 @@ export function createSupabaseBackend(): Backend {
       if (error) fail(error)
     },
     async addMember(name, email, role) {
-      const { error } = await client.from("team_invites").upsert({ email: email.trim().toLowerCase(), name: name.trim(), role })
-      if (error) fail(error)
+      // The team-invite Edge Function sends the e-mail; the browser can't (it needs the service key).
+      const { data, error } = await client.functions.invoke("team-invite", { body: { name, email, role } })
+      if (error) {
+        const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
+        throw new Error(detail?.error ?? "Урьж чадсангүй")
+      }
+      return (data as { status: "invited" | "resent" | "joined" }).status
     },
 
     async listSubscribers() {

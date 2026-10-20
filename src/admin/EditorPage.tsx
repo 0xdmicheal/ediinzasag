@@ -43,6 +43,7 @@ import {
   statusMeta,
   timeAgo,
   transitionLabel,
+  isEditor,
   isScheduled,
   formatWhen,
   wordCount,
@@ -115,7 +116,7 @@ function toDraft(article: Article): ArticleDraft {
 /**
  * Writing view modelled on Substack: a quiet page with title, subtitle and
  * body; settings, tags and the approval steps live in a side panel opened
- * with "Үргэлжлүүлэх". Saves on its own as you type. Agent briefings get a
+ * with "Илгээх" (writers) or "Нийтлэх" (editors). Saves on its own as you type. Agent briefings get a
  * review card on top (source, what to verify, claim) and an EZ take below.
  */
 export function EditorPage() {
@@ -217,6 +218,8 @@ export function EditorPage() {
   const isAgent = article?.origin === "bot"
   const unclaimed = article ? canClaim(article) : false
   const editable = article ? canEdit(member, article) : true
+  // What the top-right button leads to, in words a new writer reads at a glance.
+  const panelLabel = isEditor(member) ? "Нийтлэх" : article?.status === "in_review" ? "Тохиргоо" : "Илгээх"
   const checks = useMemo(() => readiness(draft, article?.origin), [draft, article?.origin])
   const styleHits = useMemo(() => lintStyle(draft), [draft])
   const required = checks.filter((check) => check.required)
@@ -479,7 +482,7 @@ export function EditorPage() {
               )}
             >
               {requiredOk ? <Check className="size-3.5" /> : <Circle className="size-3.5" />}
-              {doneCount}/{required.length}
+              Бэлэн {doneCount}/{required.length}
             </button>
             <button
               type="button"
@@ -505,13 +508,13 @@ export function EditorPage() {
               <span className="hidden sm:inline">Урьдчилан харах</span>
             </button>
             {unclaimed ? (
-              <button type="button" disabled={busy} onClick={claim} className={buttonClass.brand}>
+              <button type="button" disabled={busy} onClick={claim} className={buttonClass.primary}>
                 <Hand className="size-4" />
                 Би засна
               </button>
             ) : (
-              <button type="button" onClick={openPanel} className={buttonClass.brand}>
-                Үргэлжлүүлэх
+              <button type="button" onClick={openPanel} className={buttonClass.primary}>
+                {panelLabel}
               </button>
             )}
           </div>
@@ -524,7 +527,7 @@ export function EditorPage() {
           <div className="mb-6 flex flex-col gap-3 empty:hidden">
             {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
             {article && isScheduled(article) ? (
-              <Notice>{formatWhen(article.publishedAt!)}-д сайт дээр автоматаар нийтлэгдэнэ. Цуцлах бол “Үргэлжлүүлэх” → “Товлолт цуцлах”.</Notice>
+              <Notice>{formatWhen(article.publishedAt!)}-д сайт дээр автоматаар нийтлэгдэнэ. Цуцлах бол “{panelLabel}” → “Товлолт цуцлах”.</Notice>
             ) : null}
             {article?.status === "changes_requested" && article.reviewNote ? (
               <Notice tone="error">Редакторын тэмдэглэл: “{article.reviewNote}”</Notice>
@@ -532,7 +535,7 @@ export function EditorPage() {
             {!editable && !unclaimed ? (
               <Notice>
                 {article?.status === "in_review"
-                  ? "Редактор хянаж байна. Засах бол “Үргэлжлүүлэх” → “Ноорог руу буцаах”."
+                  ? `Редактор хянаж байна. Засах бол “${panelLabel}” → “Ноорог руу буцаах”.`
                   : "Энэ нийтлэлийг засах эрх танд алга. Зөвхөн уншина."}
               </Notice>
             ) : null}

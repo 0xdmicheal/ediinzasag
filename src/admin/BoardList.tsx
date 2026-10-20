@@ -226,7 +226,7 @@ export function BoardList({ articles, tags, member }: { articles: Article[] | nu
             >
               <span className="font-news text-[1.75rem] leading-none tabular-nums">{articles ? count.toLocaleString("en-US") : "…"}</span>
               <span className="text-[14px] font-medium">{t.label}</span>
-              <span className={cn("text-[12px]", selected ? "text-background/70" : "text-muted-foreground")}>{t.hint}</span>
+              <span className={cn("text-[12px]", selected ? "text-background/70" : "text-muted-foreground")}>{t.key === "review" && !isEditor(member) ? "Редактор хянаж байна" : t.hint}</span>
             </button>
           )
         })}

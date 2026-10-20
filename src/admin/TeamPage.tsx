@@ -58,6 +58,7 @@ export function TeamPage() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [role, setRole] = useState<Role>("writer")
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     backend.listMembers().then(setMembers)
@@ -92,21 +93,25 @@ export function TeamPage() {
 
   async function add(event: FormEvent) {
     event.preventDefault()
+    const address = email.trim()
+    setInviting(true)
     try {
-      await backend.addMember(name.trim(), email.trim(), role)
-      const next = await backend.listMembers()
-      const joined = next.some((item) => item.email.toLowerCase() === email.trim().toLowerCase())
-      setMembers(next)
+      const status = await backend.addMember(name.trim(), address, role)
+      setMembers(await backend.listMembers())
       setName("")
       setEmail("")
       setMessage({
         tone: "success",
-        text: joined
-          ? "Гишүүн нэмэгдлээ"
-          : "Урилга бүртгэгдлээ. Одоо Supabase → Authentication → Users → “Invite user”-ээр энэ и-мэйлийг урина уу.",
+        text: {
+          invited: `${address} руу урилга илгээлээ. Холбоосоор орж нууц үгээ үүсгээд, утасны баталгаажуулах аппаа холбоно.`,
+          resent: `${address} руу урилгыг дахин илгээлээ.`,
+          joined: `${address} багт нэмэгдлээ. Дараагийн нэвтрэлтээрээ утасны баталгаажуулах аппаа холбоно.`,
+        }[status],
       })
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Нэмж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Урьж чадсангүй" })
+    } finally {
+      setInviting(false)
     }
   }
 
@@ -167,10 +172,10 @@ export function TeamPage() {
             <UserPlus className="size-4" />
           </span>
           <div>
-            <p className="text-[14px] font-semibold">Гишүүн нэмэх{backend.mode === "demo" ? " (демо)" : ""}</p>
+            <p className="text-[14px] font-semibold">Гишүүн урих{backend.mode === "demo" ? " (демо)" : ""}</p>
             {backend.mode === "supabase" ? (
               <p className="text-muted-foreground text-[12px]">
-                И-мэйлийг энд нэмээд Supabase-аас урина. Уншигчаар бүртгэлтэй хүн бол шууд багт нэмэгдэнэ.
+                Урилгын и-мэйл очно. Уншигчаар бүртгэлтэй хүн шууд нэмэгдэнэ. И-мэйл ирээгүй бол ижил хаягаар дахин урина.
               </p>
             ) : null}
           </div>
@@ -189,9 +194,9 @@ export function TeamPage() {
               <span className="text-[13px] font-medium">Эрх</span>
               <RolePicker value={role} onChange={setRole} label="Шинэ гишүүний эрх" />
             </div>
-            <button type="submit" className={buttonClass.primary}>
+            <button type="submit" disabled={inviting} className={buttonClass.primary}>
               <UserPlus className="size-4" />
-              Нэмэх
+              {inviting ? "Илгээж байна…" : "Урих"}
             </button>
           </div>
         </div>

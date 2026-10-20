@@ -1,13 +1,13 @@
 import { useState, type FormEvent } from "react"
 import { Navigate, useLocation, useNavigate } from "react-router-dom"
-import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react"
+import { ArrowRight, LockKeyhole } from "lucide-react"
 
 import { roleLabel } from "@/admin/rules"
 import { useSession } from "@/admin/session"
+import { AuthShell, TwoStepForm } from "@/admin/TwoStepForm"
 import type { TwoStep } from "@/admin/types"
 import { Field, inputClass, Notice } from "@/admin/ui"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
-import { publicUrl } from "@/lib/public-url"
 
 const demoAccounts = [
   { email: "writer@demo.ez", role: "writer" as const, note: "Ноорог бичиж, хянуулахаар илгээнэ" },
@@ -16,7 +16,7 @@ const demoAccounts = [
 ]
 
 export function LoginPage() {
-  const { backend, member, refresh } = useSession()
+  const { backend, member } = useSession()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? "/"
@@ -25,7 +25,9 @@ export function LoginPage() {
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
   const [step, setStep] = useState<TwoStep | null>(null)
-  const [code, setCode] = useState("")
+  // "Нууц үгээ мартсан": the same card asks for the e-mail and sends a reset link.
+  const [forgot, setForgot] = useState(false)
+  const [sent, setSent] = useState(false)
 
   if (member) return <Navigate to={from} replace />
 
@@ -47,23 +49,17 @@ export function LoginPage() {
     }
   }
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault()
-    signIn(email, password)
-  }
-
-  async function verify(event: FormEvent) {
-    event.preventDefault()
-    if (!backend || !step) return
+    if (!forgot) return signIn(email, password)
+    if (!backend) return
     setBusy(true)
     setError("")
     try {
-      await backend.verifyTwoStep(step.factorId, code)
-      await refresh()
-      navigate(from, { replace: true })
+      await backend.sendPasswordReset(email)
+      setSent(true)
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Баталгаажуулж чадсангүй")
-      setCode("")
+      setError(failure instanceof Error ? failure.message : "Илгээж чадсангүй")
     } finally {
       setBusy(false)
     }
@@ -72,69 +68,30 @@ export function LoginPage() {
   async function back() {
     await backend?.signOut()
     setStep(null)
-    setCode("")
+    setError("")
+  }
+
+  function toggleForgot() {
+    setForgot((value) => !value)
+    setSent(false)
     setError("")
   }
 
   return (
-    <div className="bg-background text-foreground relative isolate grid min-h-svh place-items-center px-4 py-10">
-      <div className="w-full max-w-sm">
-        <div className="mb-6 flex flex-col items-center gap-3 text-center">
-          <img src={publicUrl("brand/logo-black.png")} alt="Эдийн засаг" className="h-8 w-auto dark:hidden" />
-          <img src={publicUrl("brand/logo-white.png")} alt="Эдийн засаг" className="hidden h-8 w-auto dark:block" />
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Редакцын нэвтрэлт</p>
-        </div>
-
-        {step ? (
-          <form onSubmit={verify} className="bg-card flex flex-col gap-4 rounded-xl border p-6">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="text-muted-foreground size-4" />
-              <h1 className="font-news text-xl">{step.enroll ? "Апп холбох" : "Баталгаажуулах код"}</h1>
-            </div>
-            {step.enroll ? (
-              <>
-                <p className="text-muted-foreground text-[13px] leading-relaxed">
-                  Редакцад нэвтрэхэд нууц үгээс гадна утасны апп дахь кодыг асууна. Google Authenticator, Microsoft
-                  Authenticator эсвэл 1Password-оор доорх QR кодыг уншуулаад, гарч ирсэн 6 оронтой кодыг бичнэ үү.
-                </p>
-                <img src={step.enroll.qr} alt="Баталгаажуулах аппад уншуулах QR код" className="mx-auto size-44 rounded-lg bg-white p-2" />
-                <p className="text-muted-foreground text-center text-[12px]">
-                  Уншихгүй бол аппад энэ түлхүүрийг гараар оруулна:
-                  <span className="text-foreground mt-1 block font-mono text-[12px] break-all select-all">{step.enroll.secret}</span>
-                </p>
-              </>
-            ) : (
-              <p className="text-muted-foreground text-[13px] leading-relaxed">Утасны апп дахь 6 оронтой кодоо бичнэ үү.</p>
-            )}
-            <Field label="Код" htmlFor="login-code">
-              <input
-                id="login-code"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9 ]{6,7}"
-                maxLength={7}
-                required
-                autoFocus
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                className={`${inputClass} text-center font-mono text-lg tracking-[0.3em]`}
-              />
-            </Field>
-            {error ? <Notice tone="error">{error}</Notice> : null}
-            <ShimmerButton type="submit" disabled={busy} className="h-11 w-full text-[13px] font-medium">
-              {busy ? "Шалгаж байна…" : "Баталгаажуулах"}
-              <ArrowRight className="size-4" />
-            </ShimmerButton>
-            <button type="button" onClick={back} className="text-muted-foreground hover:text-foreground text-center text-[12px]">
-              Өөр бүртгэлээр нэвтрэх
-            </button>
-          </form>
-        ) : (
+    <AuthShell label="Редакцын нэвтрэлт">
+      {step ? (
+        <TwoStepForm step={step} onDone={() => navigate(from, { replace: true })} onBack={back} backLabel="Өөр бүртгэлээр нэвтрэх" />
+      ) : (
         <form onSubmit={submit} className="bg-card flex flex-col gap-4 rounded-xl border p-6">
           <div className="flex items-center gap-2">
             <LockKeyhole className="text-muted-foreground size-4" />
-            <h1 className="font-news text-xl">Багийн гишүүн</h1>
+            <h1 className="font-news text-xl">{forgot ? "Нууц үг сэргээх" : "Багийн гишүүн"}</h1>
           </div>
+          {forgot ? (
+            <p className="text-muted-foreground text-[13px] leading-relaxed">
+              Бүртгэлтэй и-мэйлээ бичнэ үү. Шинэ нууц үг үүсгэх холбоос илгээнэ.
+            </p>
+          ) : null}
           <Field label="И-мэйл" htmlFor="login-email">
             <input
               id="login-email"
@@ -146,48 +103,55 @@ export function LoginPage() {
               className={inputClass}
             />
           </Field>
-          <Field label="Нууц үг" htmlFor="login-password">
-            <input
-              id="login-password"
-              type="password"
-              autoComplete="current-password"
-              required={backend?.mode === "supabase"}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className={inputClass}
-            />
-          </Field>
+          {forgot ? null : (
+            <Field label="Нууц үг" htmlFor="login-password">
+              <input
+                id="login-password"
+                type="password"
+                autoComplete="current-password"
+                required={backend?.mode === "supabase"}
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className={inputClass}
+              />
+            </Field>
+          )}
           {error ? <Notice tone="error">{error}</Notice> : null}
-          <ShimmerButton type="submit" disabled={busy || !backend} className="h-11 w-full text-[13px] font-medium">
-            {busy ? "Нэвтэрч байна…" : "Нэвтрэх"}
+          {sent ? <Notice tone="success">Холбоос илгээлээ. И-мэйлээ шалгана уу (spam хавтсыг ч мөн).</Notice> : null}
+          <ShimmerButton type="submit" disabled={busy || !backend || sent} className="h-11 w-full text-[13px] font-medium">
+            {forgot ? (busy ? "Илгээж байна…" : "Холбоос илгээх") : busy ? "Нэвтэрч байна…" : "Нэвтрэх"}
             <ArrowRight className="size-4" />
           </ShimmerButton>
+          {backend?.mode === "supabase" ? (
+            <button type="button" onClick={toggleForgot} className="text-muted-foreground hover:text-foreground text-center text-[12px]">
+              {forgot ? "Нэвтрэх рүү буцах" : "Нууц үгээ мартсан уу?"}
+            </button>
+          ) : null}
           <p className="text-muted-foreground text-center text-[12px]">
-            Бүртгэлийг зөвхөн админ урина. Нээлттэй бүртгэл байхгүй.
+            Бүртгэлийг зөвхөн админ урина. Урилгын и-мэйл дэх холбоосоор анх нэвтэрнэ.
           </p>
         </form>
-        )}
+      )}
 
-        {backend?.mode === "demo" ? (
-          <div className="mt-4 flex flex-col gap-2">
-            <p className="text-muted-foreground text-center text-[12px]">Демо горим: эрх сонгоод туршаарай</p>
-            {demoAccounts.map((account) => (
-              <button
-                key={account.email}
-                type="button"
-                onClick={() => signIn(account.email, "")}
-                className="bg-card hover:border-foreground/25 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors"
-              >
-                <span>
-                  <span className="block text-[14px] font-medium">{roleLabel[account.role]}</span>
-                  <span className="text-muted-foreground block text-[12px]">{account.note}</span>
-                </span>
-                <ArrowRight className="text-muted-foreground size-4 shrink-0" />
-              </button>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    </div>
+      {backend?.mode === "demo" ? (
+        <div className="mt-4 flex flex-col gap-2">
+          <p className="text-muted-foreground text-center text-[12px]">Демо горим: эрх сонгоод туршаарай</p>
+          {demoAccounts.map((account) => (
+            <button
+              key={account.email}
+              type="button"
+              onClick={() => signIn(account.email, "")}
+              className="bg-card hover:border-foreground/25 flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors"
+            >
+              <span>
+                <span className="block text-[14px] font-medium">{roleLabel[account.role]}</span>
+                <span className="text-muted-foreground block text-[12px]">{account.note}</span>
+              </span>
+              <ArrowRight className="text-muted-foreground size-4 shrink-0" />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </AuthShell>
   )
 }

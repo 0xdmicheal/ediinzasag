@@ -198,7 +198,14 @@ export interface Backend {
   onAuthChange(callback: () => void): () => void
   /** Checks the password; resolves to the code step that must follow, or null when there is none. */
   signIn(email: string, password: string): Promise<TwoStep | null>
+  /** The code step for the session in hand (after the password, or after /welcome sets one). */
+  twoStep(): Promise<TwoStep | null>
   verifyTwoStep(factorId: string, code: string): Promise<void>
+  /** "Нууц үгээ мартсан": e-mails a link to /welcome, where a new password is set. */
+  sendPasswordReset(email: string): Promise<void>
+  /** /welcome: the team member the invite or reset link signed in, before any code. Null when the link gave no session. */
+  welcomeMember(): Promise<Member | null>
+  setPassword(password: string): Promise<void>
   signOut(): Promise<void>
 
   listArticles(): Promise<Article[]>
@@ -220,8 +227,11 @@ export interface Backend {
 
   listMembers(): Promise<Member[]>
   setRole(memberId: string, role: Role): Promise<void>
-  /** Demo: adds the member. Supabase: lists the e-mail in team_invites; the Supabase invite still sends the e-mail. */
-  addMember(name: string, email: string, role: Role): Promise<void>
+  /**
+   * Invites someone to the team. "invited"/"resent": an e-mail with a link to /welcome went out.
+   * "joined": they already had an account (a reader) and are in at once. Demo: always "joined".
+   */
+  addMember(name: string, email: string, role: Role): Promise<"invited" | "resent" | "joined">
 
   /** Admin only: registered readers (name, e-mail, sign-up date), newest first. */
   listReaders(): Promise<ReaderRecord[]>

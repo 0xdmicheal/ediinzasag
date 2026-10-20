@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link } from "react-router-dom"
-import { CalendarDays, Download, FilePlus2, Lock } from "lucide-react"
+import { BookOpen, CalendarDays, Download, FilePlus2, Lock } from "lucide-react"
 
 import { BoardList } from "@/admin/BoardList"
 import { importBuiltins, pendingBuiltins } from "@/admin/import-builtin"
 import { canClaim, canManageTeam, isEditor } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import { buttonClass, Notice } from "@/admin/ui"
+import { WelcomeGuide } from "@/admin/WelcomeGuide"
 import type { Article, Tag } from "@/admin/types"
 
 const weekdays = ["Ням", "Даваа", "Мягмар", "Лхагва", "Пүрэв", "Баасан", "Бямба"]
@@ -24,6 +25,7 @@ export function BoardPage() {
   const isAdmin = canManageTeam(member)
   const [importing, setImporting] = useState<{ done: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<{ tone: "success" | "error"; text: string } | null>(null)
+  const [guideOpen, setGuideOpen] = useState(() => WelcomeGuide.initiallyOpen(member))
 
   useEffect(() => {
     Promise.all([backend.listArticles(), backend.listTags()])
@@ -77,11 +79,21 @@ export function BoardPage() {
             {articles === null ? "Ачаалж байна…" : todo > 0 ? `Танд ${todo} хийх ажил байна.` : "Таны хийх ажил дууссан байна."}
           </p>
         </div>
-        <Link to="/new" className={buttonClass.primary}>
-          <FilePlus2 className="size-4" />
-          Шинэ нийтлэл
-        </Link>
+        <div className="flex items-center gap-2">
+          {guideOpen ? null : (
+            <button type="button" onClick={() => setGuideOpen(true)} className={buttonClass.ghost}>
+              <BookOpen className="size-4" />
+              Заавар
+            </button>
+          )}
+          <Link to="/new" className={buttonClass.primary}>
+            <FilePlus2 className="size-4" />
+            Шинэ нийтлэл
+          </Link>
+        </div>
       </header>
+
+      <WelcomeGuide member={member} open={guideOpen} onClose={() => setGuideOpen(false)} />
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
