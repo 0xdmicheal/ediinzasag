@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react"
+import { Suspense, useEffect, useLayoutEffect, useState } from "react"
 import { Outlet, useLocation } from "react-router-dom"
 import {
   FaFacebookF,
@@ -130,7 +130,9 @@ export function Layout() {
         </a>
         <Navigation1 theme={theme} onThemeChange={changeTheme} />
         <main id="content" className="flex-1">
-          <Outlet />
+          <Suspense fallback={<div className="min-h-[70vh]" />}>
+            <Outlet />
+          </Suspense>
         </main>
         <Footer12
           brandName="ЭДИЙН ЗАСАГ"

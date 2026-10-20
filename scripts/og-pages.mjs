@@ -55,8 +55,9 @@ async function siteContent() {
   try {
     const { stories, storyArt, tagsOf, topicLabel, deskLabel } = await vite.ssrLoadModule("/src/content/stories.ts")
     const { substackPosts } = await vite.ssrLoadModule("/src/content/substack.posts.ts")
+    const { substackBodies } = await vite.ssrLoadModule("/src/content/substack.bodies.ts")
     const topicHubs = await vite.ssrLoadModule("/src/content/topics.ts")
-    return { stories, storyArt, tagsOf, labels: { ...topicLabel, ...deskLabel }, letters: substackPosts, topicHubs }
+    return { stories, storyArt, tagsOf, labels: { ...topicLabel, ...deskLabel }, letters: substackPosts.map((letter) => ({ ...letter, html: substackBodies[letter.slug] ?? "" })), topicHubs }
   } finally {
     await vite.close()
   }

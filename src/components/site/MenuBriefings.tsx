@@ -78,7 +78,7 @@ export function MenuBriefings() {
         <SheetClose asChild>
           <NavLink to={`/story/${lead.slug}`} className="group mt-3 block overflow-hidden rounded-lg border bg-card">
             <span className="relative block aspect-[16/9] overflow-hidden">
-              <img
+              <img loading="lazy" decoding="async"
                 src={storyArt(lead.slug).src}
                 alt=""
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -102,7 +102,7 @@ export function MenuBriefings() {
             <li key={story.slug}>
               <SheetClose asChild>
                 <NavLink to={`/story/${story.slug}`} className="group flex items-center gap-3 py-2.5">
-                  <img src={storyArt(story.slug).src} alt="" className="size-14 shrink-0 rounded-md object-cover" />
+                  <img loading="lazy" decoding="async" src={storyArt(story.slug).src} alt="" className="size-14 shrink-0 rounded-md object-cover" />
                   <span className="min-w-0">
                     <span className="text-muted-foreground flex items-center gap-1.5 font-mono text-[11px]">
                       <span className="bg-muted-foreground/60 size-1.5 rounded-full" aria-hidden />

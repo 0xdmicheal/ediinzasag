@@ -295,6 +295,7 @@ function SlideVisual({
 }) {
   const [src, setSrc] = useState(slide.image)
   const [failed, setFailed] = useState(false)
+  const settled = usePageSettled()
   const showImage = src && !failed
 
   return (
@@ -307,7 +308,9 @@ function SlideVisual({
       ) : (
         <>
           <img
-            src={src}
+            // Only the first photo competes with the page for bandwidth; the rest load once it has settled (slides turn every 7 s).
+            src={active || settled ? src : undefined}
+            fetchPriority={active ? "high" : "low"}
             alt={slide.imageAlt ?? ""}
             referrerPolicy="no-referrer"
             draggable={false}
@@ -329,6 +332,25 @@ function SlideVisual({
       )}
     </div>
   )
+}
+
+/** True a moment after the page's load event. */
+function usePageSettled() {
+  const [settled, setSettled] = useState(() => typeof document !== "undefined" && document.readyState === "complete")
+  useEffect(() => {
+    if (settled) return
+    let timer = 0
+    const done = () => {
+      timer = window.setTimeout(() => setSettled(true), 1200)
+    }
+    if (document.readyState === "complete") done()
+    else window.addEventListener("load", done, { once: true })
+    return () => {
+      window.removeEventListener("load", done)
+      window.clearTimeout(timer)
+    }
+  }, [settled])
+  return settled
 }
 
 function SlideThumb({ slide }: { slide: HeroSlide }) {

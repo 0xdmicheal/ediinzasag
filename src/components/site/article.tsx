@@ -78,7 +78,7 @@ function AdCard({ ad }: { ad: AdSlot }) {
     <>
       <span className="text-muted-foreground block font-mono text-[11px] uppercase">{ad.label}</span>
       {ad.image ? (
-        <img src={ad.image} alt="" className="mt-2 aspect-[16/10] w-full rounded-md object-cover" />
+        <img loading="lazy" decoding="async" src={ad.image} alt="" className="mt-2 aspect-[16/10] w-full rounded-md object-cover" />
       ) : (
         <span className="bg-studio mt-2 grid aspect-[16/10] place-items-center rounded-md">
           <img src={publicUrl("brand/logo-white.png")} alt="" className="h-8 w-auto" />

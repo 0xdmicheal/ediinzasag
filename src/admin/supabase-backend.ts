@@ -4,6 +4,7 @@ import { devLinkPreview, plainPreview, type LinkPreview } from "@/admin/link-pre
 import { adminUrl } from "@/lib/admin-url"
 import { isPwnedPassword } from "@/lib/pwned-password"
 import { supabaseClient } from "@/lib/supabase"
+import { shrinkImage } from "@/admin/shrink-image"
 
 /* Supabase backend. Permissions are enforced by the database (supabase/schema.sql). */
 
@@ -214,7 +215,8 @@ export function createSupabaseBackend(): Backend {
       // Function not deployed yet: the dev server can still read the page; otherwise show the bare address.
       return devLinkPreview(url).catch(() => plainPreview(url))
     },
-    async uploadCover(file) {
+    async uploadCover(original) {
+      const file = await shrinkImage(original)
       const { data: auth } = await client.auth.getUser()
       const extension = file.name.split(".").pop()?.toLowerCase() || "jpg"
       const path = `${auth.user?.id ?? "anon"}/${Date.now()}.${extension}`

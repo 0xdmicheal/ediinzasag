@@ -1,22 +1,25 @@
-import { useEffect } from "react"
+import { lazy, useEffect } from "react"
 import { BrowserRouter, Link, Route, Routes, useLocation } from "react-router-dom"
 
 import { Layout } from "@/components/site/Layout"
-import { AboutPage } from "@/pages/AboutPage"
-import { AccountPage } from "@/pages/AccountPage"
-import { DesignPage } from "@/pages/DesignPage"
-import { DeskPage } from "@/pages/DeskPage"
-import { EduPage } from "@/pages/EduPage"
 import { HomePage } from "@/pages/HomePage"
-import { LetterPage } from "@/pages/LetterPage"
-import { LoginPage } from "@/pages/LoginPage"
-import { MarketsPage } from "@/pages/MarketsPage"
-import { NewsletterPage } from "@/pages/NewsletterPage"
 import { StoryPage } from "@/pages/StoryPage"
-import { TagPage } from "@/pages/TagPage"
-import { TalkPage } from "@/pages/TalkPage"
-import { TopicPage, TopicsPage } from "@/pages/TopicPage"
 import { adminUrl } from "@/lib/admin-url"
+
+// Home and articles (where search visitors land) ship in the main bundle; every other page loads its own chunk.
+const AboutPage = lazy(() => import("@/pages/AboutPage").then((module) => ({ default: module.AboutPage })))
+const AccountPage = lazy(() => import("@/pages/AccountPage").then((module) => ({ default: module.AccountPage })))
+const DesignPage = lazy(() => import("@/pages/DesignPage").then((module) => ({ default: module.DesignPage })))
+const DeskPage = lazy(() => import("@/pages/DeskPage").then((module) => ({ default: module.DeskPage })))
+const EduPage = lazy(() => import("@/pages/EduPage").then((module) => ({ default: module.EduPage })))
+const LetterPage = lazy(() => import("@/pages/LetterPage").then((module) => ({ default: module.LetterPage })))
+const LoginPage = lazy(() => import("@/pages/LoginPage").then((module) => ({ default: module.LoginPage })))
+const MarketsPage = lazy(() => import("@/pages/MarketsPage").then((module) => ({ default: module.MarketsPage })))
+const NewsletterPage = lazy(() => import("@/pages/NewsletterPage").then((module) => ({ default: module.NewsletterPage })))
+const TagPage = lazy(() => import("@/pages/TagPage").then((module) => ({ default: module.TagPage })))
+const TalkPage = lazy(() => import("@/pages/TalkPage").then((module) => ({ default: module.TalkPage })))
+const TopicPage = lazy(() => import("@/pages/TopicPage").then((module) => ({ default: module.TopicPage })))
+const TopicsPage = lazy(() => import("@/pages/TopicPage").then((module) => ({ default: module.TopicsPage })))
 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined
 

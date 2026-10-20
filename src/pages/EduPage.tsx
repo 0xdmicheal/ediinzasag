@@ -164,7 +164,7 @@ function Catalog({ courses: list }: { courses: Course[] }) {
             <li key={item.href}>
               <button type="button" onClick={() => play(item)} className="group w-full text-left">
                 <span className={`relative block aspect-video overflow-hidden rounded-lg ${current ? "ring-foreground ring-2 ring-offset-2 ring-offset-background" : ""}`}>
-                  <img src={thumb(item.href)} alt="" className="size-full object-cover" />
+                  <img loading="lazy" decoding="async" src={thumb(item.href)} alt="" className="size-full object-cover" />
                   <span className="absolute right-2 bottom-2 rounded-sm bg-black/75 px-1.5 py-0.5 text-[11px] text-white tabular-nums">
                     {clock(item.seconds)}
                   </span>

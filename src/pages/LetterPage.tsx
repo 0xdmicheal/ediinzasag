@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom"
 import { ArticleLayout, EndActions, excerpt, NextCard, proseClass, type TocItem } from "@/components/site/article"
 import { articleAd } from "@/content/ads"
 import { formatStoryDate } from "@/content/stories"
+import { substackBodies } from "@/content/substack.bodies"
 import { substackPosts } from "@/content/substack.posts"
 import { Comments } from "@/reader/Comments"
 import { letterKey } from "@/reader/library-items"
@@ -40,7 +41,8 @@ export function LetterPage() {
   const { slug = "" } = useParams()
   const post = substackPosts.find((item) => item.slug === slug)
   usePageTitle(post?.title)
-  const prepared = useMemo(() => (post?.html ? prepareLetter(post.html) : { html: "", toc: [] }), [post])
+  const body = post ? substackBodies[post.slug] : ""
+  const prepared = useMemo(() => (body ? prepareLetter(body) : { html: "", toc: [] }), [body])
   useMarkReadAtEnd(post ? letterKey(post.slug) : undefined, "letter-end")
   const fire = useFire(letterKey(slug))
 

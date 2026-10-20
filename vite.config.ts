@@ -99,10 +99,35 @@ function adminHeaders() {
   }
 }
 
+/**
+ * Public site only: a preconnect to Supabase (articles, quotes, comments all come from there) and,
+ * when VITE_GA_ID is set (GitHub → Settings → Variables), Google Analytics 4. GA4's enhanced
+ * measurement counts the app's route changes as page views, so nothing else is needed in the app.
+ */
+function publicHead() {
+  return {
+    name: "public-head",
+    transformIndexHtml(html: string) {
+      const supabase = process.env.VITE_SUPABASE_URL
+      const ga = process.env.VITE_GA_ID?.trim()
+      const tags = [
+        ...(supabase ? [`<link rel="preconnect" href="${new URL(supabase).origin}" crossorigin />`] : []),
+        ...(ga && /^G-[A-Z0-9]+$/.test(ga)
+          ? [
+              `<script async src="https://www.googletagmanager.com/gtag/js?id=${ga}"></script>`,
+              `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${ga}")</script>`,
+            ]
+          : []),
+      ]
+      return tags.length ? html.replace("</head>", `  ${tags.join("\n    ")}\n  </head>`) : html
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => ({
   base: process.env.VITE_BASE || "/",
-  // The Substack pull only feeds the public site.
-  plugins: [...(mode === "admin" ? [adminEntry(), adminHeaders()] : [substackRss()]), linkPreviewDev(), react(), tailwindcss()],
+  // The Substack pull and the public head (preconnect, analytics) only belong to the public site.
+  plugins: [...(mode === "admin" ? [adminEntry(), adminHeaders()] : [substackRss(), publicHead()]), linkPreviewDev(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(root, "./src"),

@@ -201,7 +201,7 @@ export function DeskSpread({ stories }: { stories: Story[] }) {
         className="group ez-lift bg-card flex flex-col overflow-hidden rounded-lg border lg:col-span-7"
       >
         <div className="ez-clip-top relative aspect-[16/9] overflow-hidden lg:aspect-[2/1]">
-          <img src={art.src} alt={art.alt} className={`h-full w-full object-cover ${zoom}`} />
+          <img loading="lazy" decoding="async" src={art.src} alt={art.alt} className={`h-full w-full object-cover ${zoom}`} />
           <div className="absolute top-4 left-4">
             <TopicChip topic={lead.topic} onPhoto />
           </div>
@@ -243,7 +243,7 @@ export function DeskSpread({ stories }: { stories: Story[] }) {
                   </span>
                 </span>
                 <span className="relative size-16 shrink-0 overflow-hidden rounded-md sm:size-[4.5rem]">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={thumb.src}
                     alt=""
                     className="h-full w-full object-cover grayscale-[60%] transition duration-500 group-hover:scale-105 group-hover:grayscale-0"
@@ -315,7 +315,7 @@ export function StoryRail({
               className="group ez-lift relative isolate flex aspect-[4/5] w-[72%] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-lg sm:w-[17rem] lg:w-[calc((100%-2.25rem)/4)]"
             >
               <span aria-hidden className="ez-clip absolute inset-0 -z-10 overflow-hidden rounded-lg">
-                <img src={art.src} alt={art.alt} className={`h-full w-full object-cover ${zoom}`} />
+                <img loading="lazy" decoding="async" src={art.src} alt={art.alt} className={`h-full w-full object-cover ${zoom}`} />
                 <span className="absolute inset-0 bg-gradient-to-t from-black/95 from-20% via-black/60 via-55% to-black/15" />
               </span>
               <div className="flex items-start justify-between p-3.5">
@@ -360,7 +360,7 @@ export function CompactGrid({ stories }: { stories: Story[] }) {
             className="group ez-lift bg-card flex items-center gap-3.5 rounded-lg border p-2.5"
           >
             <span className="ez-clip-md relative size-[4.5rem] shrink-0 overflow-hidden rounded-md">
-              <img src={art.src} alt="" className={`h-full w-full object-cover ${zoom}`} />
+              <img loading="lazy" decoding="async" src={art.src} alt="" className={`h-full w-full object-cover ${zoom}`} />
             </span>
             <span className="min-w-0 flex-1">
               <span className="text-muted-foreground flex items-center gap-1.5 text-[11px] tracking-[0.12em] uppercase">

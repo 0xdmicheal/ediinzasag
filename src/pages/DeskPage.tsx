@@ -72,7 +72,7 @@ function DeskHero({ lead, sides }: { lead: Story; sides: Story[] }) {
         to={`/story/${lead.slug}`}
         className="group bg-studio text-photo-foreground relative isolate flex min-h-[26rem] flex-col justify-end overflow-hidden rounded-xl lg:col-span-7 lg:h-full"
       >
-        <img
+        <img loading="lazy" decoding="async"
           src={art.src}
           alt={art.alt}
           className="absolute inset-0 -z-10 size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]"
@@ -110,7 +110,7 @@ function DeskHero({ lead, sides }: { lead: Story; sides: Story[] }) {
               to={`/story/${story.slug}`}
               className="group bg-studio text-photo-foreground relative isolate flex min-h-[13rem] flex-col justify-end overflow-hidden rounded-xl lg:h-full lg:min-h-0"
             >
-              <img
+              <img loading="lazy" decoding="async"
                 src={side.src}
                 alt={side.alt}
                 className="absolute inset-0 -z-10 size-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
