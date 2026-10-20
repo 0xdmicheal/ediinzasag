@@ -147,7 +147,9 @@ function pageFor(shell, page) {
     `<meta name="twitter:description" content="${dek}" />`,
     `<meta name="twitter:image" content="${image}" />`,
     ...jsonLd(page).map((data) => `<script type="application/ld+json">${JSON.stringify(data).replace(/</g, "\\u003c")}</script>`),
-    `<style>.ez-static{max-width:42rem;margin:0 auto;padding:2.5rem 1rem;line-height:1.7}.ez-static h1{font-size:2rem;line-height:1.25;margin:1rem 0}.ez-static p,.ez-static ul{margin:0 0 1rem}.ez-static a{text-decoration:underline}</style>`,
+    // Readers with JavaScript never see the static text (the app replaces it); crawlers that skip JS still read it.
+    `<script>document.documentElement.classList.add("js")</script>`,
+    `<style>html.js .ez-static{display:none}.ez-static{max-width:42rem;margin:0 auto;padding:2.5rem 1rem;line-height:1.7}.ez-static h1{font-size:2rem;line-height:1.25;margin:1rem 0}.ez-static p,.ez-static ul{margin:0 0 1rem}.ez-static a{text-decoration:underline}</style>`,
     `<title>${title === NAME ? title : `${title} · ${NAME}`}</title>`,
   ].join("\n    ")
   return shell
