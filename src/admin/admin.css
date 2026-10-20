@@ -139,3 +139,11 @@ html:has(.ez-admin) {
     scrollbar-color: color-mix(in oklch, var(--foreground) 22%, transparent) transparent;
   }
 }
+
+/* The folder column's bar sits on its outer (left) edge, away from the arrow and the list. */
+.ez-admin .ez-scroll-left {
+  direction: rtl;
+}
+.ez-admin .ez-scroll-left > * {
+  direction: ltr;
+}

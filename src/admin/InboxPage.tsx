@@ -336,7 +336,7 @@ export function InboxPage() {
 
       <div className="bg-card flex min-h-[420px] flex-1 gap-4 overflow-hidden rounded-2xl border p-5">
         {/* Folders, with an arrow from the open one to its list. */}
-        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[148px] shrink-0 ez-scroll flex-col gap-2 pt-1 pr-4 pb-1">
+        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[148px] shrink-0 ez-scroll ez-scroll-left flex-col gap-2 pt-1 pr-4 pb-1 pl-1">
           {FOLDERS.map((entry) => (
             <div key={entry.key} className="relative">
               <Folder
