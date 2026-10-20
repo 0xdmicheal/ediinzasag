@@ -450,9 +450,15 @@ export function InboxPage() {
                           </button>
                         ) : (
                           <>
-                            <button type="button" disabled={working} onClick={() => file(item)} className={buttonClass.primary}>
-                              <FilePlus2 className="size-4" />
-                              {working ? "Preparing…" : "Make card"}
+                            <button
+                              type="button"
+                              disabled={working}
+                              onClick={() => file(item)}
+                              title={working ? "The agent is drafting the card; this can take up to 2 minutes." : undefined}
+                              className={buttonClass.primary}
+                            >
+                              {working ? <RefreshCw className="size-4 animate-spin" /> : <FilePlus2 className="size-4" />}
+                              {working ? "Drafting…" : "Make card"}
                             </button>
                             <button type="button" disabled={working} onClick={() => dismiss(item, true)} className={buttonClass.ghost}>
                               <X className="size-4" />
@@ -461,9 +467,6 @@ export function InboxPage() {
                           </>
                         )}
                       </div>
-                      {working && item.status === "new" ? (
-                        <p className="text-muted-foreground mt-2 text-[12px]">The agent is drafting; this can take up to 2 minutes.</p>
-                      ) : null}
                       {failed.has(item.id) ? (
                         <div className="mt-3">
                           <Notice tone="error">{failed.get(item.id)}</Notice>
