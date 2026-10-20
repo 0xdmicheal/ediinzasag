@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+
+Sitemap: https://ediinzasag.mn/sitemap.xml
+Sitemap: https://ediinzasag.mn/news-sitemap.xml
