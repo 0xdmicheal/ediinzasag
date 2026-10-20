@@ -41,8 +41,9 @@ const statusOptions: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
 ]
 
-/** The folders, in the sketch's order first. A story can sit in several. */
+/** The folders: everything first, then the sketch's order. A story can sit in several. */
 const FOLDERS: { key: string; label: string; holds: (item: NewsItem, topics: string[]) => boolean }[] = [
+  { key: "all", label: "All news", holds: () => true },
   { key: "asia", label: "Asia", holds: (_, topics) => topics.includes("asia") || topics.includes("china") },
   { key: "america", label: "America", holds: (_, topics) => topics.includes("us") },
   { key: "economy", label: "Economy", holds: (_, topics) => topics.includes("economy") },
@@ -54,7 +55,6 @@ const FOLDERS: { key: string; label: string; holds: (item: NewsItem, topics: str
   { key: "europe", label: "Europe", holds: (_, topics) => topics.includes("europe") },
   { key: "tech", label: "Tech & AI", holds: (_, topics) => topics.includes("tech") || topics.includes("ai") },
   { key: "crypto", label: "Crypto", holds: (_, topics) => topics.includes("crypto") },
-  { key: "all", label: "All news", holds: () => true },
 ]
 
 const PAGE = 60

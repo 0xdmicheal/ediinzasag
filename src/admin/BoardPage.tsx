@@ -49,6 +49,7 @@ type Desk = "all" | "mongolia" | "world"
 const PAGE = 36
 
 const FOLDERS: { key: FolderKey; label: string; tone?: string; holds: (article: Article, member: Member) => boolean; empty: string }[] = [
+  { key: "all", label: "All stories", holds: () => true, empty: "No stories yet." },
   {
     key: "todo",
     label: "To do",
@@ -74,8 +75,10 @@ const FOLDERS: { key: FolderKey; label: string; tone?: string; holds: (article: 
     holds: (article) => article.status === "published" && !isScheduled(article),
     empty: "Nothing published yet.",
   },
-  { key: "all", label: "All stories", holds: () => true, empty: "No stories yet." },
 ]
+
+/** Opens on what needs you; «All stories» sits on top of the column. */
+const DEFAULT_FOLDER: FolderKey = "todo"
 
 /** Status as an icon and a word, coloured only where it asks for something. */
 function StatusText({ article }: { article: Article }) {
@@ -129,7 +132,7 @@ export function BoardPage() {
   const [importing, setImporting] = useState<{ done: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<{ tone: "success" | "error"; text: string } | null>(null)
 
-  const folder = FOLDERS.find((entry) => entry.key === params.get("folder")) ?? FOLDERS[0]
+  const folder = FOLDERS.find((entry) => entry.key === params.get("folder")) ?? FOLDERS.find((entry) => entry.key === DEFAULT_FOLDER)!
   const desk = (["mongolia", "world"].includes(params.get("desk") ?? "") ? params.get("desk") : "all") as Desk
   const mineOnly = params.get("mine") === "1"
   const query = params.get("q") ?? ""
@@ -271,7 +274,7 @@ export function BoardPage() {
                 tone={entry.tone}
                 count={articles ? counts.get(entry.key) : undefined}
                 open={entry.key === folder.key}
-                onClick={() => setParam("folder", entry.key === FOLDERS[0].key ? null : entry.key)}
+                onClick={() => setParam("folder", entry.key === DEFAULT_FOLDER ? null : entry.key)}
               />
               {entry.key === folder.key ? (
                 <ArrowRight className="text-muted-foreground absolute top-1/2 -right-4 size-4 -translate-y-1/2" aria-hidden />
