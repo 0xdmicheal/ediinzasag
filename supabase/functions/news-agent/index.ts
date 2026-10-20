@@ -20,7 +20,7 @@
 // Optional: AI_PROVIDER ("rules" | "gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, GEMINI_FALLBACK_MODEL
 // (used when GEMINI_MODEL is overloaded or out of quota: a model name, "auto" (default: other Flash models
 // the key can use, asked from Google) or "none"), NEWS_PER_RUN (default 3),
-// NEWS_TIME_BUDGET_S (default 110: no new draft starts after this many seconds).
+// NEWS_MIN_PRIORITY (default 5). Runs rank and queue; { action: "next" } (cron, every two minutes) drafts one queued story.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase. NEWS_CRON_SECRET
 // is a password for the morning call, not an AI key. Deploy with --no-verify-jwt:
 // the cron call has no user token, so this function checks the cron secret or the editor's token itself.
@@ -146,7 +146,12 @@ interface RunDetails {
   fresh: number
   new: number
   picked: { title: string; source: string; priority: number }[]
+  /** Drafts that never became a card; draftNext() adds to it after the run. */
   failures: string[]
+  /** Set when the model couldn't rank and the rules did. */
+  ranking?: string
+  /** Picks put in the draft queue. */
+  queued?: number
 }
 
 /* ------------------------------------------------------------------ */
@@ -409,13 +414,19 @@ const GEMINI_FALLBACK = (Deno.env.get("GEMINI_FALLBACK_MODEL") || "auto").trim()
 /** Which Gemini models actually answered during this run, for the run log. */
 const geminiServed = new Set<string>()
 
-/** Supabase stops an edge function at ~150 s; after this budget no new draft is started. */
-const TIME_BUDGET_MS = Math.max(30, Number(Deno.env.get("NEWS_TIME_BUDGET_S") ?? "110") || 110) * 1000
 /**
- * A draft still unfinished this long after the request began is dropped, so the card
- * (or the run log) is saved before Supabase stops the function and the admin waits on nothing.
+ * Supabase stops an edge function at ~150 s, and one draft (classify + write) takes 40-110 s,
+ * so a run never writes: it ranks and queues its picks, and each draft gets a call of its own
+ * ({ action: "next" }, pg_cron every two minutes). A draft still unfinished this long after its
+ * call began is dropped, so the queue row is saved before Supabase stops the function.
  */
-const DRAFT_DEADLINE_MS = 105_000
+const DRAFT_DEADLINE_MS = 125_000
+/** The model's ranking gets this long; past it (or on an error) the run ranks by rules instead. */
+const RANK_BUDGET_MS = 60_000
+/** A queued story is tried this many times (Gemini busy, too slow), then goes back to the inbox. */
+const QUEUE_ATTEMPTS = 3
+/** A draft call that died without saving (Supabase stopped it) frees its story after this. */
+const DRAFTING_STALE_MS = 5 * 60_000
 
 class DraftTimeout extends Error {}
 
@@ -595,8 +606,9 @@ export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
       return n <= perSource
     })
   }
-  const mongolia = capped(items.filter((item) => item.mongolia), 10).slice(0, 40)
-  const world = capped(items.filter((item) => !item.mongolia), 10).slice(0, 110 - mongolia.length)
+  // 80 headlines: 110 at "medium" thinking ran past Gemini's 90 s limit (12-18 Oct, "Signal timed out").
+  const mongolia = capped(items.filter((item) => item.mongolia), 8).slice(0, 30)
+  const world = capped(items.filter((item) => !item.mongolia), 8).slice(0, 80 - mongolia.length)
   const pool = [...mongolia, ...world]
   const list = pool
     .map((item, index) => `[${index}]${item.mongolia ? " [MN]" : ""} (${item.source}) ${item.title}${item.summary ? ` — ${item.summary.slice(0, 200)}` : ""}`)
@@ -607,9 +619,10 @@ export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
       `Rank the ${count * 2} stories that matter most to Mongolian readers, best first: direct Mongolia news, ` +
       `effects on Mongolia's exports (copper, coal, gold), fuel, prices, the tögrög, China's demand, investment, or major global economic turning points. ` +
       `Prefer hard news with clear facts over opinion, live blogs, videos, podcasts or listicles. Never pick two stories about the same event. ` +
+      `This is an economics desk: never pick sport, crime, culture, courtesy visits or personnel appointments, even about Mongolia, unless the story itself is about money (a budget, prices, a deal, a loan). ` +
       `priority: 10 = must cover today, 5 = useful context, 1 = barely relevant.\n\n${list}`,
     RANK_SCHEMA,
-    "medium",
+    "low",
   )
   const seen = new Set<number>()
   const ranked = (result?.picks ?? [])
@@ -952,8 +965,101 @@ async function fileFromInbox(db: SupabaseClient, id: number, deadline: number) {
   return { article_id: articleId }
 }
 
+interface QueueRow {
+  id: number
+  link: string
+  source: string
+  title: string
+  summary: string
+  image: string
+  published_at: string | null
+  mongolia: boolean
+  priority: number
+  why: string
+  tags: string[]
+  desk: "mongolia" | "world"
+  status: "queued" | "drafting"
+  attempts: number
+  run_id: number | null
+}
+
+/** Adds to the run that queued a story: one more card, or a failure line for the board. */
+async function noteOnRun(db: SupabaseClient, runId: number | null, outcome: { created: true } | { failure: string }) {
+  if (!runId) return
+  const { data: row } = await db.from("news_runs").select("created, error, details").eq("id", runId).maybeSingle()
+  if (!row) return
+  if ("created" in outcome) {
+    await db.from("news_runs").update({ created: (row.created ?? 0) + 1 }).eq("id", runId)
+    return
+  }
+  const details = { ...(row.details ?? {}), failures: [...(row.details?.failures ?? []), outcome.failure] }
+  await db.from("news_runs").update({ details, error: (row.error || outcome.failure).slice(0, 300) }).eq("id", runId)
+}
+
+/**
+ * { action: "next" } from pg_cron: drafts the best queued story, one per call, so every draft
+ * has the whole function time to itself. A busy or slow model puts the story back for the next
+ * call; after QUEUE_ATTEMPTS tries it returns to the inbox («Шинэ») for «Карт болгох».
+ */
+async function draftNext(db: SupabaseClient, deadline: number) {
+  const stale = new Date(Date.now() - DRAFTING_STALE_MS).toISOString()
+  const { data: rows, error } = await db
+    .from("news_items")
+    .select("id, link, source, title, summary, image, published_at, mongolia, priority, why, tags, desk, status, attempts, run_id")
+    .or(`status.eq.queued,and(status.eq.drafting,queued_at.lt.${stale})`)
+    .order("run_id", { ascending: true, nullsFirst: false })
+    .order("priority", { ascending: false })
+    .limit(1)
+  if (error) throw error
+  const row = (rows as QueueRow[] | null)?.[0]
+  if (!row) return { idle: true }
+  const title = row.title.slice(0, 60)
+  if (row.attempts >= QUEUE_ATTEMPTS) {
+    await db.from("news_items").update({ status: "new" }).eq("id", row.id).eq("status", row.status)
+    await noteOnRun(db, row.run_id, { failure: `${title}: ${QUEUE_ATTEMPTS} удаа оролдоод бичиж чадсангүй. Мэдээний урсгалаас «Карт болгох»-оор нэмнэ` })
+    return { gave_up: row.id }
+  }
+  // Claim it; a parallel call that got here first wins and this one stops.
+  const { data: claimed } = await db
+    .from("news_items")
+    .update({ status: "drafting", attempts: row.attempts + 1, queued_at: new Date().toISOString() })
+    .eq("id", row.id)
+    .eq("status", row.status)
+    .eq("attempts", row.attempts)
+    .select("id")
+    .maybeSingle()
+  if (!claimed) return { idle: true }
+
+  const { data: tagRows } = await db.from("tags").select("slug, label")
+  const item: FeedItem = {
+    source: row.source,
+    title: row.title,
+    link: row.link,
+    summary: row.summary,
+    published: row.published_at ? Date.parse(row.published_at) : null,
+    image: row.image,
+    mongolia: row.mongolia,
+  }
+  try {
+    const articleId = await fileStory(db, { item, why: row.why, priority: row.priority, tags: row.tags, desk: row.desk }, (tagRows ?? []) as Tags, deadline)
+    if (articleId) {
+      await noteOnRun(db, row.run_id, { created: true })
+      return { article_id: articleId }
+    }
+    // The model declined the story: back to the inbox, where a person can still make a card.
+    await db.from("news_items").update({ status: "new" }).eq("id", row.id)
+    await noteOnRun(db, row.run_id, { failure: `${title}: загвар бичихээс татгалзсан` })
+    return { declined: row.id }
+  } catch (failure) {
+    const message = failure instanceof Error ? failure.message : String(failure)
+    const last = row.attempts + 1 >= QUEUE_ATTEMPTS
+    await db.from("news_items").update({ status: last ? "new" : "queued" }).eq("id", row.id)
+    if (last) await noteOnRun(db, row.run_id, { failure: `${title}: ${message.slice(0, 160)}` })
+    return { retry: !last, error: message.slice(0, 200) }
+  }
+}
+
 async function run(db: SupabaseClient, trigger: "cron" | "manual") {
-  const startedAt = Date.now()
   const { data: runRow } = await db.from("news_runs").insert({ trigger }).select("id").single()
   const finish = async (patch: Record<string, unknown>) => {
     if (!runRow) return
@@ -993,61 +1099,50 @@ async function run(db: SupabaseClient, trigger: "cron" | "manual") {
     // Stories someone closed or whose card was deleted stay out of the picks.
     const { data: closed } = await db.from("news_items").select("link").eq("status", "dismissed")
     const closedUrls = new Set((closed ?? []).map((row: { link: string }) => row.link))
-    const items = fresh.filter((item) => !knownUrls.has(item.link) && !closedUrls.has(item.link))
+    // Stories already waiting in the queue aren't picked twice.
+    const { data: waiting } = await db.from("news_items").select("link").in("status", ["queued", "drafting"])
+    const waitingUrls = new Set((waiting ?? []).map((row: { link: string }) => row.link))
+    const items = fresh.filter((item) => !knownUrls.has(item.link) && !closedUrls.has(item.link) && !waitingUrls.has(item.link))
     details.new = items.length
     await saveInbox(db, fresh, knownUrls)
     if (items.length === 0) {
       const error = feeds.ok === 0 ? "Нэг ч эх сурвалж уншигдсангүй" : ""
       await finish({ scanned: fresh.length, created: 0, error, details })
-      return { scanned: fresh.length, created: 0, details }
+      return { scanned: fresh.length, created: 0, queued: 0, details }
     }
 
-    const { data: tagRows } = await db.from("tags").select("slug, label")
-    const tags = (tagRows ?? []) as Tags
+    const byRules = () =>
+      rankByRules(items, PER_RUN, MIN_PRIORITY).map((pick) => ({ item: items[pick.index], why: pick.why, priority: pick.priority, tags: pick.tags, desk: pick.desk }))
+    // A busy or slow model no longer ends the run (12-20 Oct): the rules pick instead, and the drafts still go to the model.
     const picks: Pick[] =
       PROVIDER === "rules"
-        ? rankByRules(items, PER_RUN, MIN_PRIORITY).map((pick) => ({
-            item: items[pick.index],
-            why: pick.why,
-            priority: pick.priority,
-            tags: pick.tags,
-            desk: pick.desk,
-          }))
-        : await rank(items, PER_RUN)
+        ? byRules()
+        : await beforeDeadline(rank(items, PER_RUN), Date.now() + RANK_BUDGET_MS).catch((error) => {
+            details.ranking = `Дүрмээр эрэмбэлсэн (AI: ${(error instanceof Error ? error.message : String(error)).slice(0, 120)})`
+            return byRules()
+          })
     details.picked = picks.map(({ item, priority }) => ({ title: item.title.slice(0, 140), source: item.source, priority }))
-
-    // Rules and Claude: all at once. Gemini's free tier: two at a time, to stay under its per-minute limit.
-    // Gemini: one at a time, so the free tier's per-minute limit isn't hit in a burst.
-    const written = await settleInBatches(picks, PROVIDER === "gemini" ? 1 : picks.length, async (pick) => {
-      if (Date.now() - startedAt > TIME_BUDGET_MS) throw new Error("Хугацаа хүрэлцсэнгүй. Мэдээний урсгалаас «Карт болгох»-оор нэмнэ")
-      return Boolean(await fileStory(db, pick, tags, startedAt + DRAFT_DEADLINE_MS))
-    })
-    const created = written.filter((result) => result.status === "fulfilled" && result.value).length
     if (PROVIDER === "gemini" && geminiServed.size) details.provider = `gemini · ${[...geminiServed].join(" + ")}`
-    details.failures = written.flatMap((result, index) =>
-      result.status === "rejected"
-        ? [`${picks[index].item.title.slice(0, 60)}: ${String(result.reason?.message ?? result.reason).slice(0, 160)}`]
-        : result.value
-          ? []
-          : [`${picks[index].item.title.slice(0, 60)}: ${PROVIDER === "rules" ? "хадгалж чадсангүй" : "загвар бичихээс татгалзсан"}`],
-    )
-    const error = details.failures.length ? `${details.failures.length}/${picks.length} бичиж чадсангүй: ${details.failures[0]}` : ""
-    await finish({ scanned: fresh.length, created, error: error.slice(0, 300), details })
-    return { scanned: fresh.length, created, details }
+
+    // Queue the picks with their reasons; draftNext() writes them one call at a time.
+    let queued = 0
+    for (const pick of picks) {
+      const { data } = await db
+        .from("news_items")
+        .update({ status: "queued", attempts: 0, queued_at: new Date().toISOString(), run_id: runRow?.id ?? null, why: pick.why.slice(0, 300), priority: Math.round(pick.priority) })
+        .eq("link", pick.item.link)
+        .eq("status", "new")
+        .select("id")
+      queued += data?.length ?? 0
+    }
+    details.queued = queued
+    await finish({ scanned: fresh.length, created: 0, error: "", details })
+    return { scanned: fresh.length, created: 0, queued, details }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     await finish({ error: message.slice(0, 300), details })
     throw error
   }
-}
-
-/** Runs `task` over `list`, `size` at a time, keeping every result like Promise.allSettled. */
-async function settleInBatches<T, R>(list: T[], size: number, task: (value: T) => Promise<R>) {
-  const results: PromiseSettledResult<R>[] = []
-  for (let start = 0; start < list.length; start += Math.max(1, size)) {
-    results.push(...(await Promise.allSettled(list.slice(start, start + Math.max(1, size)).map(task))))
-  }
-  return results
 }
 
 /* ------------------------------------------------------------------ */
@@ -1065,18 +1160,21 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
   })
 
   // { action: "file", id } turns one inbox story into a card, { action: "delete", id } removes
-  // that card again; anything else is a full run.
+  // that card again, { action: "next" } (cron only) drafts one queued story; anything else is a run.
   const body = await request.json().catch(() => ({})) as { action?: string; id?: number }
   const filing = body.action === "file"
   const deleting = body.action === "delete"
+  const drafting = body.action === "next"
 
-  // The daily cron sends the shared secret. People must be signed in: any team member
+  // The cron jobs send the shared secret. People must be signed in: any team member
   // may file an inbox story, only editors and admins start a run.
   const cronSecret = Deno.env.get("NEWS_CRON_SECRET")
   let trigger: "cron" | "manual" = "manual"
   let role = ""
   if (!filing && !deleting && cronSecret && request.headers.get("x-cron-secret") === cronSecret) {
     trigger = "cron"
+  } else if (drafting) {
+    return json({ error: "Зөвхөн автомат ажил" }, 403)
   } else {
     const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
     const { data } = await db.auth.getUser(token)
@@ -1108,6 +1206,7 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
       if (!Number.isInteger(body.id)) return json({ error: "id хэрэгтэй" }, 400)
       return json(await fileFromInbox(db, body.id!, received + DRAFT_DEADLINE_MS))
     }
+    if (drafting) return json(await draftNext(db, received + DRAFT_DEADLINE_MS))
     return json(await run(db, trigger))
   } catch (error) {
     console.error(error)

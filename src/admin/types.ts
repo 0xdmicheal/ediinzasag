@@ -45,6 +45,10 @@ export interface RunDetails {
   new?: number
   picked?: { title: string; source: string; priority: number }[]
   failures?: string[]
+  /** Set when the model couldn't rank and the rules did. */
+  ranking?: string
+  /** Picks put in the draft queue; the agent writes them one by one after the run. */
+  queued?: number
 }
 
 /** One run of the news agent. */
@@ -75,8 +79,8 @@ export interface NewsItem {
   why: string
   tags: string[]
   desk: "mongolia" | "world"
-  /** "filed": an article card exists (articleId). */
-  status: "new" | "filed" | "dismissed"
+  /** "queued"/"drafting": picked by a run, the agent is writing it. "filed": an article card exists (articleId). */
+  status: "new" | "queued" | "drafting" | "filed" | "dismissed"
   articleId: string | null
   seenAt: string
 }
@@ -229,8 +233,8 @@ export interface Backend {
 
   /** Takes an unclaimed agent briefing: you become its author and it returns to draft. */
   claimArticle(id: string): Promise<Article>
-  /** Editors and admins: run the news agent now. Resolves with how many briefings were added. */
-  runNewsAgent(): Promise<{ created: number; scanned: number; details?: RunDetails }>
+  /** Editors and admins: run the news agent now. Resolves with how many stories it queued for drafting. */
+  runNewsAgent(): Promise<{ created: number; scanned: number; queued?: number; details?: RunDetails }>
   listNewsRuns(): Promise<NewsRun[]>
   /** Every story the agent read in the last two weeks, newest first. */
   listNewsItems(): Promise<NewsItem[]>

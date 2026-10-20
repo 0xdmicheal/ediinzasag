@@ -17,7 +17,17 @@ export interface RulePick {
   desk: "mongolia" | "world"
 }
 
-const word = (body: string) => new RegExp(`(?<![\\p{L}\\p{N}])(?:${body})(?![\\p{L}\\p{N}])`, "iu")
+/**
+ * Mongolian nouns take case endings («Шатахууны», «толгойн», «хүүг»), so a Cyrillic
+ * keyword also matches with one of them. Only real endings: «хүү» must not match «хүүхэд».
+ */
+const ENDINGS =
+  "(?:ы|ий|н|ын|ийн|ны|ний|ыг|ийг|г|д|т|нд|аас|ээс|оос|өөс|наас|нээс|ноос|нөөс|аар|ээр|оор|өөр|гаар|гээр|гоор|гөөр|тай|тэй|той|ууд|үүд|нууд|нүүд)?"
+
+const word = (body: string) => {
+  const alternatives = body.split("|").map((part) => (/[Ѐ-ӿ]/.test(part) && !part.includes("\\p{L}") ? `${part}${ENDINGS}` : part))
+  return new RegExp(`(?<![\\p{L}\\p{N}])(?:${alternatives.join("|")})(?![\\p{L}\\p{N}])`, "iu")
+}
 
 /** Points are additive. A Mongolia hit outranks a general market headline. */
 const TOPICS: { test: RegExp; points: number; why: string; tag?: string; mongolia?: boolean }[] = [
@@ -42,6 +52,26 @@ const TOPICS: { test: RegExp; points: number; why: string; tag?: string; mongoli
 /** Opinion, video and listicles lose to a straight news report. */
 const SKIP = word("opinion|podcast|video|newsletter|quiz|live blog")
 
+/**
+ * Mongolian feeds (iKon, Сонин, Montsame…) carry everything: sport, crime, appointments.
+ * Being about Mongolia only counts when the story is also about money; this is that test.
+ */
+const ECONOMY = word(
+  "эдийн засаг\\p{L}*|үнэ\\p{L}*|төсөв\\p{L}*|татвар\\p{L}*|зээл\\p{L}*|хүү|банк\\p{L}*|валют\\p{L}*|ханш\\p{L}*|инфляц\\p{L}*|" +
+    "экспорт\\p{L}*|импорт\\p{L}*|худалдаа\\p{L}*|хөрөнгө\\p{L}*|бирж\\p{L}*|хувьцаа\\p{L}*|компани\\p{L}*|үйлдвэр\\p{L}*|уул уурхай\\p{L}*|" +
+    "орлого\\p{L}*|цалин\\p{L}*|тэтгэвэр\\p{L}*|өр|бонд\\p{L}*|тэрбум|их наяд|ам\\.?доллар\\p{L}*|төсв\\p{L}*|үнийн|төгрөг\\p{L}*|түлш\\p{L}*|шатахуун\\p{L}*|" +
+    "эрчим хүч\\p{L}*|тариф\\p{L}*|гааль\\p{L}*|ДНБ|ажилгүй\\p{L}*|" +
+    "econom\\p{L}*|price\\p{L}*|budget|tax\\p{L}*|loan\\p{L}*|bank\\p{L}*|invest\\p{L}*|export\\p{L}*|import\\p{L}*|trade|mining|mine|" +
+    "copper|coal|gold|fuel|oil|bond\\p{L}*|debt|gdp|inflation|currency|tugrik|revenue|stock\\p{L}*|market\\p{L}*|billion|million",
+)
+
+/** Off-desk news that Mongolian feeds mix in. */
+const OFF_DESK = word(
+  "спорт\\p{L}*|тамирчин\\p{L}*|наадам\\p{L}*|тэмцээн\\p{L}*|медаль\\p{L}*|аварга\\p{L}*|шигшээ\\p{L}*|бөх|хөлбөмбөг\\p{L}*|" +
+    "осол\\p{L}*|гэмт хэрэг\\p{L}*|цагдаа\\p{L}*|хулгай\\p{L}*|дуучин|жүжигчин|кино|концерт\\p{L}*|олимп\\p{L}*|" +
+    "томилогдсон|томилогдлоо|томиллоо|чөлөөлөгдлөө|sport\\p{L}*|football|olympic\\p{L}*|medal\\p{L}*|concert",
+)
+
 function tokens(title: string) {
   return new Set(title.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((part) => part.length > 3))
 }
@@ -61,12 +91,22 @@ export function score(item: RuleItem) {
   const whys: string[] = []
   const tags: string[] = []
   let mongolia = item.mongolia
+  const economic = ECONOMY.test(text)
+  // Sport, crime, culture, appointments: in the inbox, but never picked on Mongolia alone.
+  if (OFF_DESK.test(item.title) && !economic) return { priority: 1, why: "эдийн засгийн бус мэдээ", tags: [] as string[], desk: item.mongolia ? ("mongolia" as const) : ("world" as const) }
   for (const rule of TOPICS) {
     if (!rule.test.test(text)) continue
+    // "Монгол" alone is no reason to pick a story; it has to be about the economy too.
+    if (rule.why === "Монголын тухай" && !economic) continue
     topic += rule.points
     whys.push(rule.why)
     if (rule.tag && !tags.includes(rule.tag)) tags.push(rule.tag)
     if (rule.mongolia) mongolia = true
+  }
+  // A Mongolian source on prices, budgets or companies is the desk's core, even with no keyword above.
+  if (item.mongolia && economic && topic === 0) {
+    topic = 4
+    whys.push("Монголын эдийн засаг")
   }
   if (item.mongolia && !whys.includes("Монголын тухай")) whys.unshift("Монголын эх сурвалж")
   let recency = 0
@@ -75,9 +115,9 @@ export function score(item: RuleItem) {
     if (hours >= 0 && hours <= 12) recency = 2
     else if (hours <= 24) recency = 1
   }
-  const bonus = item.mongolia ? 2 : 0
+  const bonus = item.mongolia && economic ? 2 : 0
   // A headline with no topic match stays a filler (1), so it only fills an empty quota.
-  const priority = topic === 0 && !item.mongolia ? (recency > 0 ? 1 : 0) : Math.min(10, topic + recency + bonus)
+  const priority = topic === 0 ? (recency > 0 || item.mongolia ? 1 : 0) : Math.min(10, topic + recency + bonus)
   return {
     priority,
     why: whys.join(", ") || "шинэ мэдээ",

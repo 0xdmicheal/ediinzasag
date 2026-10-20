@@ -304,7 +304,7 @@ export function createSupabaseBackend(): Backend {
         const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
         throw new Error(detail?.error ?? "Мэдээ татаж чадсангүй. Edge Function суулгасан эсэхийг шалгана уу (ADMIN.md).")
       }
-      return data as { created: number; scanned: number; details?: RunDetails }
+      return data as { created: number; scanned: number; queued?: number; details?: RunDetails }
     },
     async listNewsItems() {
       const { data, error } = await client

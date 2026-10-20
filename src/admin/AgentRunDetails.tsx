@@ -33,6 +33,7 @@ export function RunDetailsView({ run, problem }: { run: NewsRun | undefined; pro
         <p className="text-muted-foreground">
           Сүүлд {timeAgo(run.startedAt)} · {run.trigger === "cron" ? "автомат" : "гараар"}
           {d.provider ? ` · ${d.provider}` : ""}
+          {d.ranking ? ` · ${d.ranking}` : ""}
           {runReason(run) ? ` · ${runReason(run)}` : ""}
         </p>
       ) : null}

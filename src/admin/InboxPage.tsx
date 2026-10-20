@@ -24,6 +24,7 @@ type DeskFilter = NewsItem["desk"] | "all"
 
 const statusTabs: { key: StatusFilter; label: string }[] = [
   { key: "new", label: "Шинэ" },
+  { key: "queued", label: "Бичиж байна" },
   { key: "filed", label: "Карт болсон" },
   { key: "dismissed", label: "Хаасан" },
   { key: "all", label: "Бүгд" },
@@ -108,10 +109,11 @@ export function InboxPage() {
   const categories = useMemo(() => new Map((items ?? []).map((item) => [item.id, categoriesOf(item)])), [items])
 
   const counts = useMemo(() => {
-    const result: Record<StatusFilter, number> = { new: 0, filed: 0, dismissed: 0, all: 0 }
+    const result: Record<StatusFilter, number> = { new: 0, queued: 0, drafting: 0, filed: 0, dismissed: 0, all: 0 }
     for (const item of items ?? []) {
       if ((desk !== "all" && item.desk !== desk) || (category !== "all" && !categories.get(item.id)?.includes(category))) continue
-      result[item.status] += 1
+      // "Бичиж байна" covers both waiting and being written.
+      result[item.status === "drafting" ? "queued" : item.status] += 1
       result.all += 1
     }
     return result
@@ -133,7 +135,7 @@ export function InboxPage() {
     const needle = query.trim().toLowerCase()
     const list = (items ?? []).filter(
       (item) =>
-        (status === "all" || item.status === status || touched.has(item.id)) &&
+        (status === "all" || item.status === status || (status === "queued" && item.status === "drafting") || touched.has(item.id)) &&
         (desk === "all" || item.desk === desk) &&
         (category === "all" || Boolean(categories.get(item.id)?.includes(category))) &&
         (!needle || item.title.toLowerCase().includes(needle) || item.source.toLowerCase().includes(needle) || item.summary.toLowerCase().includes(needle)),
@@ -150,7 +152,12 @@ export function InboxPage() {
       const [list, nextRuns] = await Promise.all([backend.listNewsItems(), backend.listNewsRuns()])
       setItems(list)
       setRuns(nextRuns)
-      setRunResult({ text: result.created ? `${result.created} карт нэмэгдлээ.` : "Шинэ карт нэмэгдсэнгүй.", problem: "" })
+      setRunResult({
+        text: result.queued
+          ? `${result.queued} мэдээ сонгогдлоо. Агент нэг нэгээр нь бичиж, хэдэн минутын дотор самбарт нэмнэ («Бичиж байна»).`
+          : "Шинэ мэдээ сонгогдсонгүй.",
+        problem: "",
+      })
     } catch (failure) {
       setRunResult({ text: "Мэдээ татаж чадсангүй. Дэлгэрэнгүйг харна уу.", problem: failure instanceof Error ? failure.message : String(failure) })
       setDetailsOpen(true)
@@ -224,7 +231,7 @@ export function InboxPage() {
         <p className="text-muted-foreground font-mono text-[11px] uppercase">Мэдээний агент</p>
         <h1 className="font-news mt-1 text-3xl">Мэдээний урсгал</h1>
         <p className="text-muted-foreground mt-1 max-w-2xl text-[13px]">
-          Агентын уншсан бүх мэдээ (сүүлийн 14 хоног). Хамгийн чухлыг нь агент өглөө бүр карт болгодог. Бусдаас нь хүссэнээ
+          Агентын уншсан бүх мэдээ (сүүлийн 14 хоног). Хамгийн чухлыг нь агент өдөрт гурван удаа (08:00, 14:00, 20:00) карт болгодог. Бусдаас нь хүссэнээ
           <strong className="text-foreground"> Карт болгох</strong>-оор самбарт нэмж засна, хэрэггүйг нь хаана.
         </p>
         </div>
@@ -242,7 +249,7 @@ export function InboxPage() {
             {runResult?.text ??
               (runs[0]
                 ? `Сүүлд ажилласан: ${runs[0].trigger === "cron" ? "автомат" : "гараар"} · ${runs[0].details?.fresh ?? runs[0].scanned} мэдээ уншсан · ${runs[0].created} карт`
-                : "Агент одоогоор ажиллаагүй байна. Өдөр бүр 08:00-д автоматаар ажиллана.")}
+                : "Агент одоогоор ажиллаагүй байна. Өдөр бүр 08:00, 14:00, 20:00-д автоматаар ажиллана.")}
           </span>
           <button type="button" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)} className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 text-[12px]">
             <ChevronDown className={cn("size-3.5 transition-transform", detailsOpen && "rotate-180")} />
@@ -359,6 +366,11 @@ export function InboxPage() {
                           </button>
                         ) : null}
                       </>
+                    ) : item.status === "queued" || item.status === "drafting" ? (
+                      <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[12px]">
+                        <RefreshCw className={cn("size-3.5", item.status === "drafting" && "animate-spin")} />
+                        {item.status === "drafting" ? "Агент ноорог бичиж байна…" : "Дараалалд, агент удахгүй бичнэ"}
+                      </span>
                     ) : item.status === "dismissed" ? (
                       <button type="button" disabled={working} onClick={() => dismiss(item, false)} className={buttonClass.ghost}>
                         <Undo2 className="size-4" />

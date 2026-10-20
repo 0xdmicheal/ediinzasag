@@ -956,9 +956,19 @@ create policy "team reads news items" on public.news_items for select to authent
 -- Dismissing (and undoing it) is the only change made from the browser; filing goes through the news-agent function.
 drop policy if exists "team dismisses news items" on public.news_items;
 create policy "team dismisses news items" on public.news_items for update to authenticated
-  using (public.current_team_role() is not null and status <> 'filed')
+  using (public.current_team_role() is not null and status not in ('filed', 'drafting'))
   with check (public.current_team_role() is not null and status in ('new', 'dismissed'));
 revoke insert, update, delete on public.news_items from anon, authenticated;
+
+-- Draft queue: a run queues its picks ('queued'); every two minutes pg_cron calls the agent with
+-- { action: "next" }, which drafts one ('drafting') with the whole function time to itself.
+alter table public.news_items add column if not exists attempts smallint not null default 0;
+alter table public.news_items add column if not exists queued_at timestamptz;
+alter table public.news_items add column if not exists run_id bigint references public.news_runs (id) on delete set null;
+alter table public.news_items drop constraint if exists news_items_status_check;
+alter table public.news_items add constraint news_items_status_check
+  check (status in ('new', 'queued', 'drafting', 'filed', 'dismissed'));
+create index if not exists news_items_queue on public.news_items (run_id, priority desc) where status in ('queued', 'drafting');
 grant update (status) on public.news_items to authenticated;
 
 -- ---------------------------------------------------------------- market calendar
@@ -1149,17 +1159,26 @@ create policy "team uploads covers" on storage.objects for insert to authenticat
 -- after you already have an account; it then applies immediately):
 --   insert into public.team_invites (email, role) values ('you@example.com', 'admin');
 
--- ---------------------------------------------------------------- daily news agent
+-- ---------------------------------------------------------------- news agent
 -- After deploying supabase/functions/news-agent (see ADMIN.md), schedule it once.
 -- Database → Extensions: enable pg_cron and pg_net, then run (fill in the two values):
---   select cron.schedule('ez-news-agent', '0 0 * * *', $cron$
+--   select cron.schedule('ez-news-agent', '0 0,6,12 * * *', $cron$
 --     select net.http_post(
 --       url := 'https://<project-ref>.supabase.co/functions/v1/news-agent',
 --       headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<NEWS_CRON_SECRET>'),
 --       body := '{"trigger":"cron"}'::jsonb,
 --       timeout_milliseconds := 300000)
 --   $cron$);
--- 00:00 UTC is 08:00 in Ulaanbaatar. Remove with: select cron.unschedule('ez-news-agent');
+-- 00:00, 06:00 and 12:00 UTC are 08:00, 14:00 and 20:00 in Ulaanbaatar. Each run only ranks and
+-- queues; the drafts are written by this second job, one per call (same two values):
+--   select cron.schedule('ez-news-drafts', '*/2 * * * *', $cron$
+--     select net.http_post(
+--       url := 'https://<project-ref>.supabase.co/functions/v1/news-agent',
+--       headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<NEWS_CRON_SECRET>'),
+--       body := '{"action":"next"}'::jsonb,
+--       timeout_milliseconds := 300000)
+--   $cron$);
+-- Remove with: select cron.unschedule('ez-news-agent'); select cron.unschedule('ez-news-drafts');
 
 -- ---------------------------------------------------------------- market quotes
 -- After deploying supabase/functions/market-quotes (--no-verify-jwt), every 15 minutes:
