@@ -69,10 +69,10 @@ create unique index if not exists readers_member_no_idx on public.readers (membe
 
 alter table public.readers enable row level security;
 drop policy if exists "reader reads self" on public.readers;
-create policy "reader reads self" on public.readers for select to authenticated using (id = auth.uid());
+-- Reading your own row is merged with the admin read further down ("reader or admin reads readers").
 drop policy if exists "reader updates self" on public.readers;
 create policy "reader updates self" on public.readers for update to authenticated
-  using (id = auth.uid()) with check (id = auth.uid());
+  using (id = (select auth.uid())) with check (id = (select auth.uid()));
 -- Readers may change their name, comment setting, picture, birth date, gender and region, nothing else.
 revoke update on public.readers from anon, authenticated;
 grant update (name, comment_anonymous, avatar, birth_date, gender, badge, region) on public.readers to authenticated;
@@ -102,19 +102,19 @@ create table if not exists public.reader_saves (
 
 alter table public.reader_reads enable row level security;
 drop policy if exists "reader reads own history" on public.reader_reads;
-create policy "reader reads own history" on public.reader_reads for select to authenticated using (reader_id = auth.uid());
+create policy "reader reads own history" on public.reader_reads for select to authenticated using (reader_id = (select auth.uid()));
 drop policy if exists "reader logs own reads" on public.reader_reads;
-create policy "reader logs own reads" on public.reader_reads for insert to authenticated with check (reader_id = auth.uid());
+create policy "reader logs own reads" on public.reader_reads for insert to authenticated with check (reader_id = (select auth.uid()));
 revoke insert, update on public.reader_reads from anon, authenticated;
 grant insert (slug, desk, topic) on public.reader_reads to authenticated;
 
 alter table public.reader_saves enable row level security;
 drop policy if exists "reader reads own saves" on public.reader_saves;
-create policy "reader reads own saves" on public.reader_saves for select to authenticated using (reader_id = auth.uid());
+create policy "reader reads own saves" on public.reader_saves for select to authenticated using (reader_id = (select auth.uid()));
 drop policy if exists "reader saves" on public.reader_saves;
-create policy "reader saves" on public.reader_saves for insert to authenticated with check (reader_id = auth.uid());
+create policy "reader saves" on public.reader_saves for insert to authenticated with check (reader_id = (select auth.uid()));
 drop policy if exists "reader unsaves" on public.reader_saves;
-create policy "reader unsaves" on public.reader_saves for delete to authenticated using (reader_id = auth.uid());
+create policy "reader unsaves" on public.reader_saves for delete to authenticated using (reader_id = (select auth.uid()));
 revoke insert, update on public.reader_saves from anon, authenticated;
 grant insert (slug) on public.reader_saves to authenticated;
 
@@ -162,11 +162,11 @@ create trigger count_fires after insert or delete on public.article_fires
 
 alter table public.article_fires enable row level security;
 drop policy if exists "reader sees own fires" on public.article_fires;
-create policy "reader sees own fires" on public.article_fires for select to authenticated using (reader_id = auth.uid());
+create policy "reader sees own fires" on public.article_fires for select to authenticated using (reader_id = (select auth.uid()));
 drop policy if exists "reader fires" on public.article_fires;
-create policy "reader fires" on public.article_fires for insert to authenticated with check (reader_id = auth.uid());
+create policy "reader fires" on public.article_fires for insert to authenticated with check (reader_id = (select auth.uid()));
 drop policy if exists "reader takes fire back" on public.article_fires;
-create policy "reader takes fire back" on public.article_fires for delete to authenticated using (reader_id = auth.uid());
+create policy "reader takes fire back" on public.article_fires for delete to authenticated using (reader_id = (select auth.uid()));
 revoke insert, update on public.article_fires from anon, authenticated;
 grant insert (slug) on public.article_fires to authenticated;
 
@@ -265,19 +265,23 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 create or replace function public.is_editor() returns boolean
-language sql stable as $$ select coalesce(public.current_team_role() in ('editor', 'admin'), false) $$;
+language sql stable set search_path = public as $$ select coalesce(public.current_team_role() in ('editor', 'admin'), false) $$;
 
 create or replace function public.is_admin() returns boolean
-language sql stable as $$ select coalesce(public.current_team_role() = 'admin', false) $$;
+language sql stable set search_path = public as $$ select coalesce(public.current_team_role() = 'admin', false) $$;
 
 alter table public.team_invites enable row level security;
 drop policy if exists "admins manage invites" on public.team_invites;
 create policy "admins manage invites" on public.team_invites for all to authenticated
   using (public.is_admin()) with check (public.is_admin());
 
--- Admins see every reader's name and e-mail (/admin/readers).
+-- Readers see their own row; admins see every reader's name and e-mail (/admin/readers).
+-- One policy, so Postgres does not evaluate two permissive SELECT policies per row.
 drop policy if exists "admins read readers" on public.readers;
-create policy "admins read readers" on public.readers for select to authenticated using (public.is_admin());
+drop policy if exists "reader reads self" on public.readers;
+drop policy if exists "reader or admin reads readers" on public.readers;
+create policy "reader or admin reads readers" on public.readers for select to authenticated
+  using (id = (select auth.uid()) or public.is_admin());
 
 -- Newsletter sign-ups from /newsletter (Нийтлэл). Anyone may subscribe through
 -- subscribe_newsletter(); only admins can read the list (/admin/readers →
@@ -305,7 +309,7 @@ grant execute on function public.subscribe_newsletter(text, text) to anon, authe
 
 -- Only admins may change roles; anyone may update their own display name.
 create or replace function public.guard_profile_update() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
   if new.role is distinct from old.role and not public.is_admin() then
     raise exception 'Зөвхөн админ эрх өөрчилнө';
@@ -326,7 +330,7 @@ create policy "team reads profiles" on public.profiles for select to authenticat
   using (public.current_team_role() is not null);
 drop policy if exists "self or admin updates profile" on public.profiles;
 create policy "self or admin updates profile" on public.profiles for update to authenticated
-  using (id = auth.uid() or public.is_admin()) with check (id = auth.uid() or public.is_admin());
+  using (id = (select auth.uid()) or public.is_admin()) with check (id = (select auth.uid()) or public.is_admin());
 
 -- ---------------------------------------------------------------- tags
 create table if not exists public.tags (
@@ -387,13 +391,13 @@ create unique index if not exists articles_source_url_idx on public.articles (so
 
 -- True for requests made with the service_role key (the news agent), never for browsers.
 create or replace function public.is_service() returns boolean
-language sql stable as $$
+language sql stable set search_path = public as $$
   select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', '') = 'service_role'
 $$;
 
 -- Words in a text or HTML string, close to countWords() in src/lib/article-html.ts.
 create or replace function public.word_count(t text) returns integer
-language sql immutable as $$
+language sql immutable set search_path = public as $$
   select coalesce(array_length(regexp_split_to_array(nullif(btrim(regexp_replace(coalesce(t, ''), '<[^>]+>|&nbsp;', ' ', 'g')), ''), '\s+'), 1), 0)
 $$;
 
@@ -542,7 +546,7 @@ alter table public.articles enable row level security;
 drop policy if exists "public reads published" on public.articles;
 create policy "public reads published" on public.articles for select
   using (
-    (status = 'published' and published_at <= now()) or author_id = auth.uid() or public.is_editor()
+    (status = 'published' and published_at <= now()) or author_id = (select auth.uid()) or public.is_editor()
     -- Unclaimed agent briefings are visible to the whole team, so anyone can pick one up.
     or (origin = 'bot' and author_id is null and public.current_team_role() is not null)
   );
@@ -572,12 +576,12 @@ create policy "team creates" on public.articles for insert to authenticated
 
 drop policy if exists "author or editor updates" on public.articles;
 create policy "author or editor updates" on public.articles for update to authenticated
-  using (author_id = auth.uid() or public.is_editor())
-  with check (author_id = auth.uid() or public.is_editor());
+  using (author_id = (select auth.uid()) or public.is_editor())
+  with check (author_id = (select auth.uid()) or public.is_editor());
 
 drop policy if exists "admin or own draft deletes" on public.articles;
 create policy "admin or own draft deletes" on public.articles for delete to authenticated
-  using (public.is_admin() or (author_id = auth.uid() and status = 'draft'));
+  using (public.is_admin() or (author_id = (select auth.uid()) and status = 'draft'));
 
 alter table public.article_activity enable row level security;
 drop policy if exists "team reads activity" on public.article_activity;
@@ -669,13 +673,13 @@ drop policy if exists "anyone reads comments" on public.article_comments;
 create policy "anyone reads comments" on public.article_comments for select using (true);
 drop policy if exists "readers comment" on public.article_comments;
 create policy "readers comment" on public.article_comments for insert to authenticated
-  with check (reader_id = auth.uid());
+  with check (reader_id = (select auth.uid()));
 drop policy if exists "author edits comment" on public.article_comments;
 create policy "author edits comment" on public.article_comments for update to authenticated
-  using (reader_id = auth.uid()) with check (reader_id = auth.uid());
+  using (reader_id = (select auth.uid())) with check (reader_id = (select auth.uid()));
 drop policy if exists "author or editor deletes comment" on public.article_comments;
 create policy "author or editor deletes comment" on public.article_comments for delete to authenticated
-  using (reader_id = auth.uid() or public.is_editor());
+  using (reader_id = (select auth.uid()) or public.is_editor());
 -- Who wrote a comment (reader_id) is not readable; readers learn which comments
 -- are their own through my_comment_ids() instead.
 revoke select, insert, update on public.article_comments from anon, authenticated;
@@ -734,11 +738,11 @@ create trigger count_likes after insert or delete on public.comment_likes
 
 alter table public.comment_likes enable row level security;
 drop policy if exists "reader sees own likes" on public.comment_likes;
-create policy "reader sees own likes" on public.comment_likes for select to authenticated using (reader_id = auth.uid());
+create policy "reader sees own likes" on public.comment_likes for select to authenticated using (reader_id = (select auth.uid()));
 drop policy if exists "reader likes" on public.comment_likes;
-create policy "reader likes" on public.comment_likes for insert to authenticated with check (reader_id = auth.uid());
+create policy "reader likes" on public.comment_likes for insert to authenticated with check (reader_id = (select auth.uid()));
 drop policy if exists "reader unlikes" on public.comment_likes;
-create policy "reader unlikes" on public.comment_likes for delete to authenticated using (reader_id = auth.uid());
+create policy "reader unlikes" on public.comment_likes for delete to authenticated using (reader_id = (select auth.uid()));
 revoke insert, update on public.comment_likes from anon, authenticated;
 grant insert (comment_id) on public.comment_likes to authenticated;
 
@@ -792,7 +796,7 @@ create table if not exists public.reader_badges (
 
 alter table public.reader_badges enable row level security;
 drop policy if exists "reader sees own badges" on public.reader_badges;
-create policy "reader sees own badges" on public.reader_badges for select to authenticated using (reader_id = auth.uid());
+create policy "reader sees own badges" on public.reader_badges for select to authenticated using (reader_id = (select auth.uid()));
 -- No insert/update/delete for readers: badges are only bought through buy_badge().
 revoke insert, update, delete on public.reader_badges from anon, authenticated;
 
@@ -807,7 +811,7 @@ create table if not exists public.reader_point_grants (
 );
 alter table public.reader_point_grants enable row level security;
 drop policy if exists "reader sees own grants" on public.reader_point_grants;
-create policy "reader sees own grants" on public.reader_point_grants for select to authenticated using (reader_id = auth.uid());
+create policy "reader sees own grants" on public.reader_point_grants for select to authenticated using (reader_id = (select auth.uid()));
 revoke insert, update, delete on public.reader_point_grants from anon, authenticated;
 
 -- Points earned, mirroring src/reader/achievements.ts: 5 per finished story or
@@ -1117,7 +1121,7 @@ insert into storage.buckets (id, name, public) values ('covers', 'covers', true)
 on conflict (id) do nothing;
 
 drop policy if exists "anyone reads covers" on storage.objects;
-create policy "anyone reads covers" on storage.objects for select using (bucket_id = 'covers');
+-- No SELECT policy: a public bucket serves files by URL without one, and leaving it out stops anyone listing the bucket.
 drop policy if exists "team uploads covers" on storage.objects;
 create policy "team uploads covers" on storage.objects for insert to authenticated
   with check (bucket_id = 'covers' and public.current_team_role() is not null);
@@ -1149,3 +1153,21 @@ create policy "team uploads covers" on storage.objects for insert to authenticat
 --       timeout_milliseconds := 60000)
 --   $cron$);
 -- Remove with: select cron.unschedule('ez-market-quotes');
+
+-- ---------------------------------------------------------------- advisor hardening
+-- Trigger functions run as triggers only; nobody should call them through the API.
+do $$
+declare fn text;
+begin
+  foreach fn in array array[
+    'apply_team_invite', 'count_fires', 'count_likes', 'guard_article', 'guard_comment', 'guard_fire',
+    'guard_like', 'guard_profile_update', 'guard_reader_badge', 'handle_new_user', 'log_article',
+    'sync_comment_names', 'sync_reader_contact'
+  ] loop
+    execute format('revoke execute on function public.%I() from public, anon, authenticated', fn);
+  end loop;
+end $$;
+
+-- pg_net belongs in the extensions schema (it cannot be moved, only reinstalled;
+-- cron jobs call net.http_post by name and keep working):
+--   drop extension if exists pg_net; create extension pg_net schema extensions;

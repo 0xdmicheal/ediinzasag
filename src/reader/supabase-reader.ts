@@ -1,3 +1,4 @@
+import { isPwnedPassword } from "@/lib/pwned-password"
 import { supabaseClient } from "@/lib/supabase"
 import { accountUrl, siteUrl } from "@/reader/auth"
 import type { LibraryEntry, Reader, ReaderAuth, StoryComment } from "@/reader/types"
@@ -23,6 +24,8 @@ const messages: Record<string, string> = {
   "A user with this email address has already been registered": "Энэ и-мэйл өөр бүртгэлд холбогдсон байна",
   "Email address already registered by another user": "Энэ и-мэйл өөр бүртгэлд холбогдсон байна",
 }
+
+const pwnedMessage = "Энэ нууц үг өмнө нь алдагдсан нууц үгийн жагсаалтад орсон байна. Өөр нууц үг сонгоно уу"
 
 interface CommentRow {
   id: string
@@ -107,6 +110,7 @@ export function createSupabaseReader(): ReaderAuth {
       return () => data.subscription.unsubscribe()
     },
     async signUp(name, email, password) {
+      if (await isPwnedPassword(password)) throw new Error(pwnedMessage)
       const { data, error } = await client.auth.signUp({
         email,
         password,
@@ -155,6 +159,7 @@ export function createSupabaseReader(): ReaderAuth {
       if (error) fail(error)
     },
     async updatePassword(password) {
+      if (await isPwnedPassword(password)) throw new Error(pwnedMessage)
       const { error } = await client.auth.updateUser({ password })
       if (error) fail(error)
     },
