@@ -21,9 +21,9 @@ export function plainPreview(url: string): LinkPreview {
 
 /** The Vite dev server's preview route (scripts/link-preview.mjs). Not available in production builds. */
 export async function devLinkPreview(url: string): Promise<LinkPreview> {
-  if (!import.meta.env.DEV) throw new Error("Урьдчилан харах үйлчилгээ алга")
+  if (!import.meta.env.DEV) throw new Error("Link previews aren't available")
   const response = await fetch(`/__link-preview?url=${encodeURIComponent(url)}`)
   const data = await response.json()
-  if (!response.ok) throw new Error(data.error ?? "Урьдчилан харах боломжгүй")
+  if (!response.ok) throw new Error(data.error ?? "Couldn't preview this link")
   return data as LinkPreview
 }

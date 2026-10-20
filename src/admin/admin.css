@@ -1,0 +1,99 @@
+/*
+ * The newsroom admin's look: Watermelon UI's Tallie dashboard (ui.watermelon.sh),
+ * calm and monochrome. Geist for the interface, Instrument Serif for page titles.
+ * Scoped to .ez-admin, so the public site keeps its own theme; article previews
+ * (PreviewFrame) never sit inside it.
+ */
+@import "@fontsource-variable/geist";
+@import "@fontsource/instrument-serif/400.css";
+
+.ez-admin,
+body:has(.ez-admin) [data-slot="dropdown-menu-content"],
+body:has(.ez-admin) [data-slot="tooltip-content"],
+body:has(.ez-admin) [data-slot="sheet-content"] {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.2271 0.0625 260.828);
+  --card: oklch(0.97 0 0);
+  --card-foreground: oklch(0.2271 0.0625 260.828);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2271 0.0625 260.828);
+  --primary: oklch(0 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.9761 0 0);
+  --secondary-foreground: oklch(0.2271 0.0625 260.828);
+  --muted: oklch(0.9761 0 0);
+  --muted-foreground: oklch(0.5138 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.2271 0.0625 260.828);
+  --border: oklch(0.9401 0 0);
+  --input: oklch(0.9401 0 0);
+  --ring: oklch(0.708 0 0);
+  --sidebar: oklch(0.9431 0 0);
+  --sidebar-foreground: oklch(0.2271 0.0625 260.828);
+  --sidebar-primary: oklch(0.2271 0.0625 260.828);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.9761 0 0);
+  --sidebar-accent-foreground: oklch(0.2271 0.0625 260.828);
+  --sidebar-border: oklch(0.9189 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  /* Article states, quiet: only what asks for action has colour. */
+  --state-review: #2762ea;
+  --state-changes: #dc2627;
+  --state-approved: #16a34a;
+  --state-scheduled: #7c3aed;
+  font-family: "Geist Variable", "Segoe UI", sans-serif;
+}
+
+.dark .ez-admin,
+.dark body:has(.ez-admin) [data-slot="dropdown-menu-content"],
+.dark body:has(.ez-admin) [data-slot="tooltip-content"],
+.dark body:has(.ez-admin) [data-slot="sheet-content"] {
+  --background: oklch(0.244 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.281 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.173 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.922 0 0);
+  --sidebar-primary-foreground: oklch(0.205 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --state-review: #6b9bff;
+  --state-changes: #ff6b6b;
+  --state-approved: #4ade80;
+  --state-scheduled: #b794ff;
+}
+
+.ez-admin {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Page titles, as in Tallie. Instrument Serif is Latin only, so titles stay English;
+   Literata (Cyrillic) catches anything Mongolian. */
+.ez-admin .ez-title {
+  font-family: "Instrument Serif", "Literata Variable", Georgia, serif;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+/* The shell scrolls inside <main>; the site's reserved scrollbar gutter would leave a strip. */
+html:has(.ez-admin) {
+  scrollbar-gutter: auto;
+}

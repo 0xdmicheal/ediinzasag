@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import { Link } from "react-router-dom"
 import { Bookmark, CheckCheck, ChevronDown, X } from "lucide-react"
 
-import { buttonClass } from "@/admin/ui"
+import { buttonClass } from "@/components/site/controls"
 import type { LibraryItem } from "@/reader/library-items"
 import { useReader } from "@/reader/session"
 import type { LibraryEntry } from "@/reader/types"

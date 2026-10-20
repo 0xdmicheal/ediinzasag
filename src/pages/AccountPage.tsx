@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react"
 import { Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom"
 import { LogOut, Pencil, VenetianMask } from "lucide-react"
 
-import { buttonClass } from "@/admin/ui"
+import { buttonClass } from "@/components/site/controls"
 import { ContinuousTabs } from "@/components/ui/continuous-tabs"
 import { EditProfile, type ProfileValues } from "@/components/ui/edit-profile"
 import { readerProgress } from "@/reader/achievements"

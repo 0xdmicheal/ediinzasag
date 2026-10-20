@@ -72,18 +72,18 @@ const emptyDraft: ArticleDraft = {
 }
 
 const actionText: Record<string, string> = {
-  created: "үүсгэв",
-  edited: "засварлав",
-  claimed: "мэдээг авч засварлаж эхлэв",
-  filed: "Мэдээний урсгалаас карт үүсгэв",
-  draft: "ноорог руу буцаав",
-  in_review: "хянуулахаар илгээв",
-  changes_requested: "засвар хүсэв",
-  approved: "батлав",
-  published: "нийтлэв",
+  created: "created it",
+  edited: "edited",
+  claimed: "took the agent story",
+  filed: "made a card from the Inbox",
+  draft: "moved it back to draft",
+  in_review: "sent it for review",
+  changes_requested: "requested changes",
+  approved: "approved it",
+  published: "published it",
 }
 
-const AGENT_NAME = "EZ агент"
+const AGENT_NAME = "EZ agent"
 
 const AUTOSAVE_MS = 1500
 const SPLIT_KEY = "ez-editor-split"
@@ -203,7 +203,7 @@ export function EditorPage() {
         if (cancelled) return
         setLoading(false)
         if (!found) {
-          setMessage({ tone: "error", text: "Нийтлэл олдсонгүй эсвэл үзэх эрхгүй" })
+          setMessage({ tone: "error", text: "Story not found, or you can't open it" })
           return
         }
         load(found)
@@ -219,7 +219,7 @@ export function EditorPage() {
   const unclaimed = article ? canClaim(article) : false
   const editable = article ? canEdit(member, article) : true
   // What the top-right button leads to, in words a new writer reads at a glance.
-  const panelLabel = isEditor(member) ? "Нийтлэх" : article?.status === "in_review" ? "Тохиргоо" : "Илгээх"
+  const panelLabel = isEditor(member) ? "Publish" : article?.status === "in_review" ? "Settings" : "Send"
   const checks = useMemo(() => readiness(draft, article?.origin), [draft, article?.origin])
   const styleHits = useMemo(() => lintStyle(draft), [draft])
   const required = checks.filter((check) => check.required)
@@ -259,7 +259,7 @@ export function EditorPage() {
       if (!article) navigate(`/edit/${saved.id}`, { replace: true })
       return saved
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Хадгалж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't save" })
       return null
     } finally {
       savingRef.current = false
@@ -315,18 +315,18 @@ export function EditorPage() {
       return
     }
     if (status === "changes_requested" && !note.trim()) {
-      setMessage({ tone: "error", text: "Юуг засахыг тайлбарлана уу" })
+      setMessage({ tone: "error", text: "Say what needs fixing" })
       return
     }
     if ((status === "in_review" || status === "published") && !requiredOk) {
-      setMessage({ tone: "error", text: "Улаан тэмдэгтэй шалгуурыг эхлээд биелүүлнэ үү" })
+      setMessage({ tone: "error", text: "Finish the checklist items marked in red first" })
       return
     }
     let publishAt: string | undefined
     if (status === "published" && scheduleOn) {
       const when = scheduleAt ? new Date(scheduleAt) : null
       if (!when || Number.isNaN(when.getTime()) || when.getTime() <= Date.now() + 60_000) {
-        setMessage({ tone: "error", text: "Ирээдүйн огноо, цаг сонгоно уу" })
+        setMessage({ tone: "error", text: "Pick a date and time in the future" })
         return
       }
       publishAt = when.toISOString()
@@ -344,10 +344,10 @@ export function EditorPage() {
       setScheduleOn(false)
       setMessage({
         tone: "success",
-        text: isScheduled(next) ? `${formatWhen(next.publishedAt!)}-д нийтлэгдэхээр товлогдлоо` : `${statusMeta[status].label} боллоо`,
+        text: isScheduled(next) ? `Scheduled for ${formatWhen(next.publishedAt!)}` : `Now: ${statusMeta[status].label}`,
       })
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Алдаа гарлаа" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Something went wrong" })
     } finally {
       setBusy(false)
     }
@@ -360,9 +360,9 @@ export function EditorPage() {
       const next = await backend.claimArticle(article.id)
       load(next)
       setActivity(await backend.listActivity(next.id))
-      setMessage({ tone: "success", text: "Мэдээ таных боллоо. Засаж, дүгнэлтээ нэмээд хянуулахаар илгээнэ үү." })
+      setMessage({ tone: "success", text: "The story is yours. Edit it, add your view, then send it for review." })
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Авч чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't take the story" })
     } finally {
       setBusy(false)
     }
@@ -371,9 +371,9 @@ export function EditorPage() {
   async function remove() {
     if (!article) return
     const ok = await confirm({
-      title: "Энэ нийтлэлийг устгах уу?",
-      message: `“${article.title || "Гарчиггүй"}” бүр мөсөн устна. Буцаах боломжгүй.`,
-      confirmLabel: "Устгах",
+      title: "Delete this story?",
+      message: `“${article.title || "Untitled"}” is deleted for good. This can't be undone.`,
+      confirmLabel: "Delete",
       destructive: true,
     })
     if (!ok) return
@@ -381,7 +381,7 @@ export function EditorPage() {
       await backend.deleteArticle(article.id)
       navigate("/")
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Устгаж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't delete" })
     }
   }
 
@@ -394,7 +394,7 @@ export function EditorPage() {
       // Our own upload: rights are ours unless someone says otherwise.
       update("coverRightsOk", true)
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Зураг оруулж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't upload the picture" })
     } finally {
       setBusy(false)
       event.target.value = ""
@@ -407,10 +407,10 @@ export function EditorPage() {
   }
 
   if (loading) {
-    return <p className="text-muted-foreground grid min-h-svh place-items-center text-sm">Ачаалж байна…</p>
+    return <p className="text-muted-foreground grid min-h-svh place-items-center text-sm">Loading…</p>
   }
 
-  const saveText = saving ? "Хадгалж байна…" : dirty ? "Хадгалаагүй" : article ? "Хадгалсан" : "Ноорог"
+  const saveText = saving ? "Saving…" : dirty ? "Unsaved" : article ? "Saved" : "Draft"
   const author = article ? article.authorName || (isAgent ? AGENT_NAME : member.name) : member.name
   const doneCount = required.filter((check) => check.ok).length
   const date = (article?.publishedAt ?? article?.updatedAt ?? openedAt).slice(0, 10)
@@ -419,11 +419,11 @@ export function EditorPage() {
     .map((line) => line.replace(/^[-•*]\s*/, "").trim())
     .filter(Boolean)
   const deviceToggle = (
-    <div role="group" aria-label="Дэлгэцийн хэмжээ" className="flex items-center gap-1">
+    <div role="group" aria-label="Screen size" className="flex items-center gap-1">
       {(
         [
-          ["desktop", Monitor, "Компьютер"],
-          ["phone", Smartphone, "Утас"],
+          ["desktop", Monitor, "Desktop"],
+          ["phone", Smartphone, "Phone"],
         ] as const
       ).map(([key, Icon, label]) => (
         <button
@@ -449,7 +449,7 @@ export function EditorPage() {
       {/* Top bar */}
       <header className="bg-background/90 sticky top-0 z-30 border-b backdrop-blur-xl">
         <div className={cn("mx-auto flex h-14 items-center gap-3 px-4 sm:px-6", split ? "max-w-none" : "max-w-[1200px]")}>
-          <Link to="/" aria-label="Самбар руу буцах" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
+          <Link to="/" aria-label="Back to the dashboard" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
             <ArrowLeft className="size-4" />
           </Link>
           <img src={publicUrl("brand/logo-black.png")} alt="" className="hidden h-5 w-auto sm:block dark:hidden" />
@@ -457,7 +457,7 @@ export function EditorPage() {
           {article && isScheduled(article) ? (
             <span className="bg-foreground/[0.07] hidden h-6 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium sm:inline-flex">
               <CalendarClock className="size-3.5" />
-              Товлосон · {formatWhen(article.publishedAt!)}
+              Scheduled · {formatWhen(article.publishedAt!)}
             </span>
           ) : article ? (
             <StatusPill status={article.status} className="hidden sm:inline-flex" />
@@ -465,7 +465,7 @@ export function EditorPage() {
           {isAgent ? (
             <span className="bg-foreground/[0.07] hidden h-6 items-center gap-1 rounded-full px-2.5 text-[12px] font-medium md:inline-flex">
               <Bot className="size-3.5" />
-              Агент
+              Agent
             </span>
           ) : null}
           <span className="text-muted-foreground text-[13px]" aria-live="polite">
@@ -475,42 +475,42 @@ export function EditorPage() {
             <button
               type="button"
               onClick={openPanel}
-              title="Бэлэн байдал"
+              title="Readiness"
               className={cn(
                 "hidden h-9 items-center gap-1.5 rounded-full px-3 font-mono text-[12px] sm:inline-flex",
                 requiredOk ? "bg-[color-mix(in_oklch,var(--up)_12%,transparent)] text-[var(--up)]" : "bg-muted text-muted-foreground",
               )}
             >
               {requiredOk ? <Check className="size-3.5" /> : <Circle className="size-3.5" />}
-              Бэлэн {doneCount}/{required.length}
+              Ready {doneCount}/{required.length}
             </button>
             <button
               type="button"
               onClick={toggleSplit}
               aria-pressed={split}
-              title="Засвар ба урьдчилсан харагдацыг зэрэгцүүлэх"
+              title="Editor and preview side by side"
               className={cn(buttonClass.ghost, "hidden lg:inline-flex", split && "bg-foreground text-background hover:bg-foreground/90")}
             >
               <Columns2 className="size-4" />
-              Зэрэгцүүлэх
+              Side by side
             </button>
             <button
               type="button"
               onClick={() => setPosterInput({ title: draft.title, dek: draft.dek, desk: draft.desk, coverUrl: draft.coverUrl, date: article?.publishedAt ?? undefined })}
-              title="Facebook, Instagram, X-д зориулсан постер"
+              title="Poster for Facebook, Instagram and X"
               className={buttonClass.ghost}
             >
               <ImageIcon className="size-4" />
-              <span className="hidden sm:inline">Постер</span>
+              <span className="hidden sm:inline">Poster</span>
             </button>
             <button type="button" onClick={() => setPreviewOpen(true)} className={buttonClass.ghost}>
               <Eye className="size-4" />
-              <span className="hidden sm:inline">Урьдчилан харах</span>
+              <span className="hidden sm:inline">Preview</span>
             </button>
             {unclaimed ? (
               <button type="button" disabled={busy} onClick={claim} className={buttonClass.primary}>
                 <Hand className="size-4" />
-                Би засна
+                Take it
               </button>
             ) : (
               <button type="button" onClick={openPanel} className={buttonClass.primary}>
@@ -527,46 +527,46 @@ export function EditorPage() {
           <div className="mb-6 flex flex-col gap-3 empty:hidden">
             {message ? <Notice tone={message.tone}>{message.text}</Notice> : null}
             {article && isScheduled(article) ? (
-              <Notice>{formatWhen(article.publishedAt!)}-д сайт дээр автоматаар нийтлэгдэнэ. Цуцлах бол “{panelLabel}” → “Товлолт цуцлах”.</Notice>
+              <Notice>Goes live on the site at {formatWhen(article.publishedAt!)}. To cancel: “{panelLabel}” → “Cancel schedule”.</Notice>
             ) : null}
             {article?.status === "changes_requested" && article.reviewNote ? (
-              <Notice tone="error">Редакторын тэмдэглэл: “{article.reviewNote}”</Notice>
+              <Notice tone="error">Editor's note: “{article.reviewNote}”</Notice>
             ) : null}
             {!editable && !unclaimed ? (
               <Notice>
                 {article?.status === "in_review"
-                  ? `Редактор хянаж байна. Засах бол “${panelLabel}” → “Ноорог руу буцаах”.`
-                  : "Энэ нийтлэлийг засах эрх танд алга. Зөвхөн уншина."}
+                  ? `An editor is reviewing it. To edit: “${panelLabel}” → “Back to draft”.`
+                  : "You can't edit this story; it's read-only for you."}
               </Notice>
             ) : null}
           </div>
 
           {isAgent && article ? (
-            <section aria-label="Агентын мэдээ" className="bg-muted/50 mb-10 rounded-xl border p-4 sm:p-5">
+            <section aria-label="Agent story" className="bg-muted/50 mb-10 rounded-xl border p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <span className="bg-foreground text-background grid size-9 shrink-0 place-items-center rounded-full">
                     <Bot className="size-4" />
                   </span>
                   <div>
-                    <p className="text-[14px] font-semibold">Агентын орчуулсан мэдээ</p>
+                    <p className="text-[14px] font-semibold">Drafted by the news agent</p>
                     <p className="text-muted-foreground mt-0.5 text-[13px] leading-relaxed">
                       {unclaimed
-                        ? "Түүхий орчуулга. Хэн нэг нь авч, баримтыг шалгаж, өөрийн дүгнэлтийг нэмсний дараа нийтлэгдэнэ."
-                        : `${article.authorName || "Гишүүн"} засварлаж байна. Нийтлэхээс өмнө редактор баталж, зургийн эрхийг шалгана.`}
+                        ? "A raw draft. Someone takes it, checks the facts and adds their view before it can be published."
+                        : `${article.authorName || "A member"} is editing it. An editor approves it and checks the photo rights before publishing.`}
                     </p>
                   </div>
                 </div>
                 {article.sourceUrl ? (
                   <a href={article.sourceUrl} target="_blank" rel="noreferrer" className={cn(buttonClass.ghost, "h-8 px-3 text-[12px]")}>
-                    Эх мэдээ
+                    Original
                     <ArrowUpRight className="size-3.5" />
                   </a>
                 ) : null}
               </div>
               {botNotes.length > 0 ? (
                 <div className="mt-4 border-t pt-4">
-                  <p className="text-muted-foreground font-mono text-[11px] uppercase">Шалгах зүйлс</p>
+                  <p className="text-muted-foreground font-mono text-[11px] uppercase">To check</p>
                   <ul className="mt-2 flex flex-col gap-1.5">
                     {botNotes.map((line, index) => (
                       <li key={index} className="flex items-start gap-2 text-[13px] leading-relaxed">
@@ -580,14 +580,14 @@ export function EditorPage() {
               {unclaimed ? (
                 <button type="button" disabled={busy} onClick={claim} className={cn(buttonClass.primary, "mt-4")}>
                   <Hand className="size-4" />
-                  Би энэ мэдээг засна
+                  I'll take this story
                 </button>
               ) : null}
             </section>
           ) : null}
 
           <label htmlFor="article-title" className="sr-only">
-            Гарчиг
+            Headline
           </label>
           <textarea
             ref={titleField}
@@ -596,11 +596,11 @@ export function EditorPage() {
             disabled={!editable}
             value={draft.title}
             onChange={(event) => update("title", event.target.value.replace(/\n/g, " "))}
-            placeholder="Гарчиг"
+            placeholder="Headline"
             className="font-news field-sizing-content w-full resize-none bg-transparent text-[2.25rem] leading-[1.12] outline-none placeholder:text-muted-foreground/70 sm:text-[2.75rem]"
           />
           <label htmlFor="article-dek" className="sr-only">
-            Дэд гарчиг
+            Summary
           </label>
           <textarea
             id="article-dek"
@@ -608,7 +608,7 @@ export function EditorPage() {
             disabled={!editable}
             value={draft.dek}
             onChange={(event) => update("dek", event.target.value.replace(/\n/g, " "))}
-            placeholder="Дэд гарчиг нэмэх…"
+            placeholder="Add a summary…"
             className="text-muted-foreground field-sizing-content mt-3 w-full resize-none bg-transparent text-xl leading-relaxed outline-none placeholder:text-muted-foreground/80"
           />
 
@@ -617,7 +617,7 @@ export function EditorPage() {
             <div className="text-[13px]">
               <p className="font-medium">{author}</p>
               <p className="text-muted-foreground">
-                {date.replace(/-/g, ".")} · {words} үг · {Math.max(1, Math.round(words / 200))} мин унших
+                {date.replace(/-/g, ".")} · {words} words · {Math.max(1, Math.round(words / 200))} min read
               </p>
             </div>
           </div>
@@ -637,14 +637,14 @@ export function EditorPage() {
             <section aria-labelledby="take-label" className="border-brand/30 bg-brand-soft/40 mt-12 rounded-xl border p-4 sm:p-5">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <label id="take-label" htmlFor="article-take" className="text-brand-strong font-mono text-[11px] font-semibold uppercase">
-                  {BOX_LABEL} · заавал биш
+                  {BOX_LABEL} · optional
                 </label>
-                <span className="text-muted-foreground font-mono text-[11px]">{takeWords} үг</span>
+                <span className="text-muted-foreground font-mono text-[11px]">{takeWords} words</span>
               </div>
               <p className="text-muted-foreground mt-1 text-[12px] leading-relaxed">
-                Уншигчийн найздаа давтан хэлэх нэг гэнэтийн харьцуулалт: хэмжээ, хурд, хэн төлөх, Монгол хаана байгааг харуулна. Хоёроос дөрвөн өгүүлбэр, дараа
-                нь тооцооны мөр (жишээ нь «114,000 ÷ 92 ≈ 1,240»), тэр нь жижиг үсгээр харагдана. Тоо нь нийтлэлд байгаа эсвэл эх сурвалжтай байна; мэдээг давтсан
-                бол хасна.
+                One surprising comparison a reader would repeat to a friend: scale, speed, who pays, where Mongolia stands. Two to four sentences, then the
+                arithmetic on its own line (e.g. «114,000 ÷ 92 ≈ 1,240»), which shows in small type. Figures must be in the story or sourced; if it just
+                repeats the news, leave it out.
               </p>
               <textarea
                 id="article-take"
@@ -658,16 +658,16 @@ export function EditorPage() {
             </section>
           ) : editable ? (
             <button type="button" onClick={() => setTakeOpen(true)} className={cn(buttonClass.ghost, "mt-12")}>
-              + {BOX_LABEL} нэмэх
+              + Add {BOX_LABEL}
             </button>
           ) : null}
         </main>
 
         {/* Live preview beside the editor on wide screens. */}
         {split ? (
-          <aside aria-label="Урьдчилсан харагдац" className="bg-muted sticky top-14 hidden h-[calc(100svh-3.5rem)] overflow-y-auto border-l p-6 lg:block">
+          <aside aria-label="Preview" className="bg-muted sticky top-14 hidden h-[calc(100svh-3.5rem)] overflow-y-auto border-l p-6 lg:block">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <p className="text-muted-foreground font-mono text-[11px] uppercase">Сайт дээр ингэж харагдана</p>
+              <p className="text-muted-foreground font-mono text-[11px] uppercase">How it looks on the site</p>
               {deviceToggle}
             </div>
             <div
@@ -685,16 +685,16 @@ export function EditorPage() {
       {/* Publish settings panel */}
       {panelOpen ? (
         <div className="fixed inset-0 z-40 flex justify-end">
-          <button type="button" aria-label="Хаах" className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={() => setPanelOpen(false)} />
+          <button type="button" aria-label="Close" className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" onClick={() => setPanelOpen(false)} />
           <aside
             role="dialog"
             aria-modal="true"
-            aria-label="Нийтлэх тохиргоо"
+            aria-label="Publishing settings"
             className="bg-background relative flex h-full w-full flex-col border-l shadow-2xl sm:w-[460px]"
           >
             <div className="flex h-14 shrink-0 items-center justify-between border-b px-5">
-              <p className="font-news text-lg">Нийтлэх тохиргоо</p>
-              <button type="button" aria-label="Хаах" onClick={() => setPanelOpen(false)} className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
+              <p className="text-lg font-medium">Publishing settings</p>
+              <button type="button" aria-label="Close" onClick={() => setPanelOpen(false)} className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
                 <X className="size-4" />
               </button>
             </div>
@@ -703,7 +703,7 @@ export function EditorPage() {
               {/* Readiness */}
               <section>
                 <div className="flex items-center justify-between">
-                  <p className="text-[13px] font-semibold">Бэлэн байдал</p>
+                  <p className="text-[13px] font-semibold">Readiness</p>
                   <span className="text-muted-foreground font-mono text-[12px]">
                     {doneCount}/{required.length}
                   </span>
@@ -724,7 +724,7 @@ export function EditorPage() {
                       )}
                       <span className={check.ok ? "text-muted-foreground" : ""}>
                         {check.label}
-                        {!check.required ? <span className="text-muted-foreground"> · зөвлөмж</span> : null}
+                        {!check.required ? <span className="text-muted-foreground"> · suggested</span> : null}
                       </span>
                     </li>
                   ))}
@@ -733,9 +733,9 @@ export function EditorPage() {
 
               {/* House style: EZ Article Bot Writing Guide (Mode W). Advice only; it never blocks publishing. */}
               {styleHits.length ? (
-                <section aria-label="Хэв маяг">
-                  <p className="text-[13px] font-semibold">Хэв маяг</p>
-                  <p className="text-muted-foreground mt-0.5 text-[12px]">EZ-ийн бичгийн дүрэм. Улаан нь алдаа, бусад нь зөвлөмж. Нийтлэхэд саад болохгүй.</p>
+                <section aria-label="House style">
+                  <p className="text-[13px] font-semibold">House style</p>
+                  <p className="text-muted-foreground mt-0.5 text-[12px]">The EZ writing rules. Red is an error, the rest are suggestions. None of it blocks publishing.</p>
                   <ul className="mt-3 flex flex-col gap-2.5">
                     {styleHits.map((hit) => (
                       <li key={hit.rule} className={cn("rounded-lg border p-2.5 text-[12.5px]", hit.severity === "error" ? "border-[var(--down)]/40 bg-[color-mix(in_oklch,var(--down)_6%,transparent)]" : "bg-muted/40")}>
@@ -749,7 +749,7 @@ export function EditorPage() {
                         {hit.fix && editable ? (
                           <button type="button" onClick={() => applyFix(hit)} className={cn(buttonClass.ghost, "mt-2 ml-5 h-7 px-2.5 text-[12px]")}>
                             <Wand2 className="size-3.5" />
-                            {hit.fixLabel ?? "Засах"}
+                            {hit.fixLabel ?? "Fix"}
                           </button>
                         ) : null}
                       </li>
@@ -759,8 +759,8 @@ export function EditorPage() {
               ) : null}
 
               <Field
-                label="Шошго"
-                hint={canManageTags(member) ? "Enter дарж нэмнэ. Байхгүй шошгыг шинээр үүсгэж болно." : "Байгаа шошгоос сонгоно."}
+                label="Tags"
+                hint={canManageTags(member) ? "Press Enter to add. You can create a tag that doesn't exist yet." : "Pick from the existing tags."}
                 htmlFor="tag-input"
               >
                 <TagInput
@@ -777,8 +777,8 @@ export function EditorPage() {
                 />
               </Field>
 
-              <Field label="Ширээ">
-                <div role="radiogroup" aria-label="Ширээ" className="bg-muted flex rounded-full p-1">
+              <Field label="Desk">
+                <div role="radiogroup" aria-label="Desk" className="bg-muted flex rounded-full p-1">
                   {(["mongolia", "world"] as const).map((desk) => (
                     <button
                       key={desk}
@@ -789,20 +789,20 @@ export function EditorPage() {
                       onClick={() => update("desk", desk)}
                       className={cn("h-8 flex-1 rounded-full text-[13px] font-medium transition-colors", draft.desk === desk ? "bg-background shadow-sm" : "text-muted-foreground")}
                     >
-                      {desk === "mongolia" ? "Монгол" : "Дэлхий"}
+                      {desk === "mongolia" ? "Mongolia" : "World"}
                     </button>
                   ))}
                 </div>
               </Field>
 
-              <Field label="Нүүр зураг" hint="Сайт, сошиал хуваалцалт дээр харагдана.">
+              <Field label="Cover photo" hint="Shown on the site and when shared on social media.">
                 <div className="flex flex-col gap-2">
                   {draft.coverUrl ? (
                     <div className="relative overflow-hidden rounded-lg border">
                       <img src={draft.coverUrl} alt={draft.coverAlt} className="aspect-[16/9] w-full object-cover" />
                       {editable ? (
                         <button type="button" onClick={() => update("coverUrl", "")} className="bg-background/90 absolute top-2 right-2 rounded-full px-3 py-1 text-[12px]">
-                          Солих
+                          Replace
                         </button>
                       ) : null}
                     </div>
@@ -814,30 +814,30 @@ export function EditorPage() {
                       className="text-muted-foreground hover:text-foreground border-foreground/20 hover:border-foreground/40 flex aspect-[16/7] flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed text-[13px] transition-colors"
                     >
                       <ImagePlus className="size-5" />
-                      Зураг сонгох
+                      Choose a picture
                     </button>
                   )}
                   <input ref={coverInput} type="file" accept="image/*" className="hidden" onChange={onCover} />
                   <label htmlFor="article-cover-alt" className="sr-only">
-                    Зургийн тайлбар
+                    Caption
                   </label>
                   <input
                     id="article-cover-alt"
                     disabled={!editable}
                     value={draft.coverAlt}
                     onChange={(event) => update("coverAlt", event.target.value)}
-                    placeholder="Тайлбар (заавал биш, жишээ: Оюу толгойн далд уурхай)"
+                    placeholder="Caption, optional (e.g. Оюу толгойн далд уурхай)"
                     className={inputClass}
                   />
                   <label htmlFor="article-cover-credit" className="sr-only">
-                    Зургийн эх сурвалж
+                    Credit
                   </label>
                   <input
                     id="article-cover-credit"
                     disabled={!editable}
                     value={draft.coverCredit}
                     onChange={(event) => update("coverCredit", event.target.value)}
-                    placeholder="Зургийн эх сурвалж (жишээ: Зураг: Rio Tinto)"
+                    placeholder="Credit (e.g. Зураг: Rio Tinto)"
                     className={inputClass}
                   />
                   {draft.coverUrl && (isAgent || !draft.coverRightsOk) ? (
@@ -857,11 +857,11 @@ export function EditorPage() {
                       <span>
                         <span className="flex items-center gap-1 font-medium">
                           <ShieldCheck className="size-4" />
-                          Зургийг ашиглах эрхтэй
+                          We have the right to use this photo
                         </span>
                         <span className="text-muted-foreground block text-[12px]">
-                          Агентлагийн зураг ихэвчлэн зөвшөөрөлгүй ашиглах боломжгүй. Эх сурвалж нь ашиглахыг зөвшөөрсөн (хэвлэлийн зураг, нээлттэй лиценз) эсвэл
-                          өөрсдийн зургаар сольсон бол тэмдэглэнэ.
+                          Agency photos usually can't be used without a licence. Tick this if the source allows it (press photo, open licence) or
+                          you replaced it with our own.
                         </span>
                       </span>
                     </label>
@@ -869,7 +869,7 @@ export function EditorPage() {
                 </div>
               </Field>
 
-              <Field label="Эх сурвалж" hint="Мөр бүрт нэг: Нэр | https://холбоос" htmlFor="article-sources">
+              <Field label="Sources" hint="One per line: Name | https://link" htmlFor="article-sources">
                 <textarea
                   id="article-sources"
                   rows={3}
@@ -884,7 +884,7 @@ export function EditorPage() {
                 />
               </Field>
 
-              <Field label="Хаяг" hint={`ediinzasag.mn/story/${draft.slug || "…"}`} htmlFor="article-slug">
+              <Field label="URL" hint={`ediinzasag.mn/story/${draft.slug || "…"}`} htmlFor="article-slug">
                 <input
                   id="article-slug"
                   disabled={!editable}
@@ -905,7 +905,7 @@ export function EditorPage() {
                     onClick={() => setHistoryOpen((value) => !value)}
                     className="flex w-full items-center justify-between text-[13px] font-semibold"
                   >
-                    Түүх
+                    History
                     <ChevronDown className={cn("size-4 transition-transform", historyOpen && "rotate-180")} />
                   </button>
                   {historyOpen ? (
@@ -915,8 +915,8 @@ export function EditorPage() {
                         return (
                           <li key={item.id} className="border-l-2 pl-3 text-[13px]">
                             <p>
-                              <span className="font-medium">{byAgent ? AGENT_NAME : item.actorName || "Гишүүн"}</span>{" "}
-                              {byAgent ? "мэдээг орчуулж нэмэв" : (actionText[item.action] ?? item.action)}
+                              <span className="font-medium">{byAgent ? AGENT_NAME : item.actorName || "A member"}</span>{" "}
+                              {byAgent ? "translated and added the story" : (actionText[item.action] ?? item.action)}
                             </p>
                             {item.note && !byAgent ? <p className="text-muted-foreground mt-0.5">“{item.note}”</p> : null}
                             <p className="text-muted-foreground font-mono text-[11px]">{timeAgo(item.at)}</p>
@@ -935,7 +935,7 @@ export function EditorPage() {
               {noteOpen ? (
                 <div className="flex flex-col gap-2">
                   <label htmlFor="review-note" className="text-[13px] font-medium">
-                    Зохиогчид юуг засахыг бичнэ үү
+                    Tell the writer what to fix
                   </label>
                   <textarea id="review-note" autoFocus rows={2} value={note} onChange={(event) => setNote(event.target.value)} className={inputClass} />
                 </div>
@@ -950,7 +950,7 @@ export function EditorPage() {
                       className="accent-foreground size-4"
                     />
                     <CalendarClock className="size-4" />
-                    Цаг товлож нийтлэх
+                    Schedule for later
                   </label>
                   {scheduleOn ? (
                     <div className="flex flex-col gap-2">
@@ -963,7 +963,7 @@ export function EditorPage() {
                         onMinute={setScheduleMinute}
                       />
                       <p className="text-muted-foreground text-[12px]">
-                        {formatWhen(new Date(scheduleAt).toISOString())}-д сайт дээр автоматаар гарна. Тэр хүртэл уншигчид харахгүй.
+                        Goes live at {formatWhen(new Date(scheduleAt).toISOString())}. Readers won't see it before then.
                       </p>
                     </div>
                   ) : null}
@@ -971,7 +971,7 @@ export function EditorPage() {
               ) : null}
               <div className="flex flex-wrap items-center gap-2">
                 {article && canDelete(member, article) ? (
-                  <button type="button" onClick={remove} className={buttonClass.danger} aria-label="Устгах">
+                  <button type="button" onClick={remove} className={buttonClass.danger} aria-label="Delete">
                     <Trash2 className="size-4" />
                   </button>
                 ) : null}
@@ -979,16 +979,16 @@ export function EditorPage() {
                   {unclaimed ? (
                     <button type="button" disabled={busy} onClick={claim} className={buttonClass.ghost}>
                       <Hand className="size-4" />
-                      Би засна
+                      Take it
                     </button>
                   ) : null}
                   {noteOpen ? (
                     <>
                       <button type="button" onClick={() => setNoteOpen(false)} className={buttonClass.ghost}>
-                        Болих
+                        Cancel
                       </button>
                       <button type="button" disabled={busy} onClick={() => move("changes_requested")} className={buttonClass.primary}>
-                        Засвар хүсэх
+                        Request changes
                       </button>
                     </>
                   ) : article ? (
@@ -1001,15 +1001,15 @@ export function EditorPage() {
                         className={status === "published" || status === "approved" || status === "in_review" ? buttonClass.primary : buttonClass.ghost}
                       >
                         {status === "published" && scheduleOn
-                          ? "Товлох"
+                          ? "Schedule"
                           : status === "draft" && isScheduled(article)
-                            ? "Товлолт цуцлах"
+                            ? "Cancel schedule"
                             : transitionLabel(article.status, status)}
                       </button>
                     ))
                   ) : (
                     <button type="button" disabled={busy} onClick={() => move("in_review")} className={buttonClass.primary}>
-                      Хянуулахаар илгээх
+                      Send for review
                     </button>
                   )}
                 </div>
@@ -1021,13 +1021,13 @@ export function EditorPage() {
 
       {/* Full-screen preview */}
       {previewOpen ? (
-        <div role="dialog" aria-modal="true" aria-label="Урьдчилан харах" className="bg-muted fixed inset-0 z-40 flex flex-col">
+        <div role="dialog" aria-modal="true" aria-label="Preview" className="bg-muted fixed inset-0 z-40 flex flex-col">
           <div className="bg-background flex h-14 shrink-0 items-center gap-2 border-b px-4">
-            <p className="text-[13px] font-medium">Урьдчилан харах</p>
+            <p className="text-[13px] font-medium">Preview</p>
             <div className="ml-auto flex items-center gap-1">
               {deviceToggle}
               <button type="button" onClick={() => setPreviewOpen(false)} className={cn(buttonClass.ghost, "ml-2")}>
-                Засварлах руу буцах
+                Back to editing
               </button>
             </div>
           </div>

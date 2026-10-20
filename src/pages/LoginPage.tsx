@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react"
 import { Navigate, useLocation, useNavigate } from "react-router-dom"
 import { ArrowRight, X } from "lucide-react"
 
-import { buttonClass, Field, inputClass, Notice } from "@/admin/ui"
+import { buttonClass, Field, inputClass, Notice } from "@/components/site/controls"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { adminUrl } from "@/lib/admin-url"
 import { LoginShowcase, LoginShowcaseCompact } from "@/reader/LoginShowcase"

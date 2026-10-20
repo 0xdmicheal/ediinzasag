@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react"
 import { useConfirm } from "@/admin/ConfirmDialog"
 import { canManageTags, slugify } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
-import { buttonClass, inputClass, Notice } from "@/admin/ui"
+import { buttonClass, inputClass, Notice, PageHeader, pageClass } from "@/admin/ui"
 import type { Article, Tag } from "@/admin/types"
 
 export function TagsPage() {
@@ -38,9 +38,9 @@ export function TagsPage() {
       const tag = await backend.createTag(label)
       setTags((current) => (current.some((item) => item.slug === tag.slug) ? current : [...current, tag]))
       setLabel("")
-      setMessage({ tone: "success", text: `#${tag.label} нэмэгдлээ` })
+      setMessage({ tone: "success", text: `#${tag.label} added` })
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Нэмж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't add the tag" })
     }
   }
 
@@ -53,9 +53,9 @@ export function TagsPage() {
   async function remove(tag: Tag) {
     const count = usage.get(tag.slug) ?? 0
     const ok = await confirm({
-      title: `#${tag.label} шошгыг устгах уу?`,
-      message: count ? `${count} нийтлэлээс энэ шошго хасагдана. Буцаах боломжгүй.` : "Буцаах боломжгүй.",
-      confirmLabel: "Устгах",
+      title: `Delete #${tag.label}?`,
+      message: count ? `It comes off ${count} ${count === 1 ? "story" : "stories"}. This can't be undone.` : "This can't be undone.",
+      confirmLabel: "Delete",
       destructive: true,
     })
     if (!ok) return
@@ -67,21 +67,17 @@ export function TagsPage() {
   const max = Math.max(1, ...sorted.map((tag) => usage.get(tag.slug) ?? 0))
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <header>
-        <p className="text-muted-foreground font-mono text-[11px] uppercase">Ангилал</p>
-        <h1 className="font-news mt-1 text-3xl">Шошго</h1>
-        <p className="text-muted-foreground mt-1 text-[14px]">Шошго бүр сайт дээр өөрийн хуудастай: /tag/хаяг. Нэрийг дарж засна.</p>
-      </header>
+    <div className={pageClass}>
+      <PageHeader title="Tags" description="Every tag has its own page on the site at /tag/slug. Tags are shown to readers, so name them in Mongolian. Click a name to rename it." />
 
       <form onSubmit={create} className="flex gap-2">
         <label htmlFor="new-tag" className="sr-only">
-          Шинэ шошго
+          New tag
         </label>
-        <input id="new-tag" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Шинэ шошгоны нэр, жишээ: Төсөв" className={inputClass} />
+        <input id="new-tag" value={label} onChange={(event) => setLabel(event.target.value)} placeholder="New tag name, e.g. Төсөв" className={inputClass} />
         <button type="submit" className={buttonClass.primary}>
           <Plus className="size-4" />
-          Нэмэх
+          Add
         </button>
       </form>
       {label ? <p className="text-muted-foreground -mt-4 font-mono text-[12px]">/tag/{slugify(label) || "…"}</p> : null}
@@ -94,19 +90,19 @@ export function TagsPage() {
             <li key={tag.slug} className="flex items-center gap-3 px-4 py-3">
               <span className="text-muted-foreground font-mono text-[13px]">#</span>
               <input
-                aria-label={`${tag.label} нэр`}
+                aria-label={`${tag.label} name`}
                 defaultValue={tag.label}
                 onBlur={(event) => rename(tag, event.target.value)}
                 className="min-w-0 flex-1 rounded bg-transparent px-1 py-0.5 text-[14px] font-medium outline-none focus:ring-2 focus:ring-brand/20"
               />
               <span className="text-muted-foreground hidden font-mono text-[11px] sm:block">{tag.slug}</span>
-              <span className="flex w-28 items-center gap-2" title={`${count} нийтлэл`}>
+              <span className="flex w-28 items-center gap-2" title={`${count} ${count === 1 ? "story" : "stories"}`}>
                 <span className="bg-muted h-1.5 flex-1 overflow-hidden rounded-full">
                   <span className="bg-brand block h-full rounded-full" style={{ width: `${(count / max) * 100}%` }} />
                 </span>
                 <span className="text-muted-foreground w-6 text-right font-mono text-[12px]">{count}</span>
               </span>
-              <button type="button" aria-label={`${tag.label} устгах`} onClick={() => remove(tag)} className={buttonClass.danger}>
+              <button type="button" aria-label={`Delete ${tag.label}`} onClick={() => remove(tag)} className={buttonClass.danger}>
                 <Trash2 className="size-4" />
               </button>
             </li>

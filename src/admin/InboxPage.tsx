@@ -10,7 +10,7 @@ import { isEditor } from "@/admin/rules"
 
 import { useTeam } from "@/admin/session"
 import type { NewsItem, NewsRun } from "@/admin/types"
-import { buttonClass, inputClass, Notice } from "@/admin/ui"
+import { buttonClass, inputClass, Notice, PageHeader, pageClass } from "@/admin/ui"
 
 /*
  * "Мэдээний урсгал": every story the news agent read in the last two weeks.
@@ -23,17 +23,17 @@ type StatusFilter = NewsItem["status"] | "all"
 type DeskFilter = NewsItem["desk"] | "all"
 
 const statusTabs: { key: StatusFilter; label: string }[] = [
-  { key: "new", label: "Шинэ" },
-  { key: "queued", label: "Бичиж байна" },
-  { key: "filed", label: "Карт болсон" },
-  { key: "dismissed", label: "Хаасан" },
-  { key: "all", label: "Бүгд" },
+  { key: "new", label: "New" },
+  { key: "queued", label: "Drafting" },
+  { key: "filed", label: "Carded" },
+  { key: "dismissed", label: "Closed" },
+  { key: "all", label: "All" },
 ]
 
 const deskTabs: { key: DeskFilter; label: string }[] = [
-  { key: "all", label: "Бүгд" },
-  { key: "mongolia", label: "Монгол" },
-  { key: "world", label: "Дэлхий" },
+  { key: "all", label: "All" },
+  { key: "mongolia", label: "Mongolia" },
+  { key: "world", label: "World" },
 ]
 
 const PAGE = 60
@@ -43,9 +43,9 @@ const categoryLabel = new Map(NEWS_CATEGORIES.map((category) => [category.key, c
 function ago(iso: string | null) {
   if (!iso) return ""
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60_000))
-  if (minutes < 60) return `${minutes} мин`
-  if (minutes < 48 * 60) return `${Math.round(minutes / 60)} цаг`
-  return `${Math.round(minutes / 1440)} өдөр`
+  if (minutes < 60) return `${minutes} min`
+  if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h`
+  return `${Math.round(minutes / 1440)} d`
 }
 
 /** 8–10 strong, 5–7 worth a look, below that filler. */
@@ -101,7 +101,7 @@ export function InboxPage() {
     backend
       .listNewsItems()
       .then(setItems)
-      .catch((failure) => setError(failure instanceof Error ? failure.message : "Ачаалж чадсангүй"))
+      .catch((failure) => setError(failure instanceof Error ? failure.message : "Couldn't load the inbox"))
     backend.listNewsRuns().then(setRuns, () => setRuns([]))
   }, [backend])
 
@@ -154,12 +154,12 @@ export function InboxPage() {
       setRuns(nextRuns)
       setRunResult({
         text: result.queued
-          ? `${result.queued} мэдээ сонгогдлоо. Агент нэг нэгээр нь бичиж, хэдэн минутын дотор самбарт нэмнэ («Бичиж байна»).`
-          : "Шинэ мэдээ сонгогдсонгүй.",
+          ? `Picked ${result.queued} ${result.queued === 1 ? "story" : "stories"}. The agent drafts them one by one; cards appear within a few minutes (see Drafting).`
+          : "No new stories picked.",
         problem: "",
       })
     } catch (failure) {
-      setRunResult({ text: "Мэдээ татаж чадсангүй. Дэлгэрэнгүйг харна уу.", problem: failure instanceof Error ? failure.message : String(failure) })
+      setRunResult({ text: "The run failed. See details.", problem: failure instanceof Error ? failure.message : String(failure) })
       setDetailsOpen(true)
     } finally {
       setRunning(false)
@@ -188,7 +188,7 @@ export function InboxPage() {
     try {
       await task()
     } catch (failure) {
-      setFailed((map) => new Map(map).set(id, failure instanceof Error ? failure.message : "Алдаа гарлаа"))
+      setFailed((map) => new Map(map).set(id, failure instanceof Error ? failure.message : "Something went wrong"))
     } finally {
       setBusy((set) => {
         const next = new Set(set)
@@ -212,9 +212,9 @@ export function InboxPage() {
 
   const removeCard = async (item: NewsItem) => {
     const ok = await confirm({
-      title: "Энэ картыг устгах уу?",
-      message: `“${item.title}” карт самбараас бүр мөсөн устна. Мэдээ нь «Хаасан» руу орж, агент дахин карт болгохгүй.`,
-      confirmLabel: "Устгах",
+      title: "Delete this card?",
+      message: `“${item.title}” is removed from the board for good. The story moves to Closed and the agent won't card it again.`,
+      confirmLabel: "Delete",
       destructive: true,
     })
     if (!ok) return
@@ -225,35 +225,36 @@ export function InboxPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-        <p className="text-muted-foreground font-mono text-[11px] uppercase">Мэдээний агент</p>
-        <h1 className="font-news mt-1 text-3xl">Мэдээний урсгал</h1>
-        <p className="text-muted-foreground mt-1 max-w-2xl text-[13px]">
-          Агентын уншсан бүх мэдээ (сүүлийн 14 хоног). Хамгийн чухлыг нь агент өдөрт гурван удаа (08:00, 14:00, 20:00) карт болгодог. Бусдаас нь хүссэнээ
-          <strong className="text-foreground"> Карт болгох</strong>-оор самбарт нэмж засна, хэрэггүйг нь хаана.
-        </p>
-        </div>
-        {isEditor(member) ? (
-          <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
-            <RefreshCw className={cn("size-4", running && "animate-spin")} />
-            {running ? "Татаж байна…" : "Одоо татах"}
-          </button>
-        ) : null}
-      </header>
+    <div className={pageClass}>
+      <PageHeader
+        title="Inbox"
+        description={
+          <>
+            Every story the agent read in the last 14 days. It cards the best ones at 08:00, 14:00 and 20:00. Use{" "}
+            <strong className="text-foreground font-medium">Make card</strong> to add another to the board, or close what you don't need.
+          </>
+        }
+        actions={
+          isEditor(member) ? (
+            <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
+              <RefreshCw className={cn("size-4", running && "animate-spin")} />
+              {running ? "Pulling…" : "Pull now"}
+            </button>
+          ) : null
+        }
+      />
 
       <div className="bg-card rounded-xl border px-4 py-3 text-[13px]">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-muted-foreground">
             {runResult?.text ??
               (runs[0]
-                ? `Сүүлд ажилласан: ${runs[0].trigger === "cron" ? "автомат" : "гараар"} · ${runs[0].details?.fresh ?? runs[0].scanned} мэдээ уншсан · ${runs[0].created} карт`
-                : "Агент одоогоор ажиллаагүй байна. Өдөр бүр 08:00, 14:00, 20:00-д автоматаар ажиллана.")}
+                ? `Last run: ${runs[0].trigger === "cron" ? "scheduled" : "manual"} · ${runs[0].details?.fresh ?? runs[0].scanned} stories read · ${runs[0].created} ${runs[0].created === 1 ? "card" : "cards"}`
+                : "The agent hasn't run yet. It runs at 08:00, 14:00 and 20:00.")}
           </span>
           <button type="button" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)} className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 text-[12px]">
             <ChevronDown className={cn("size-3.5 transition-transform", detailsOpen && "rotate-180")} />
-            Дэлгэрэнгүй
+            Details
           </button>
         </div>
         {detailsOpen ? (
@@ -266,22 +267,22 @@ export function InboxPage() {
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <div className="flex flex-wrap items-center gap-2">
-        <Tabs label="Төлөв" value={status} onChange={(key) => refilter(() => setStatus(key))} options={statusTabs.map((tab) => ({ ...tab, count: items ? counts[tab.key] : undefined }))} />
-        <Tabs label="Бүс" value={desk} onChange={(key) => refilter(() => setDesk(key))} options={deskTabs} />
+        <Tabs label="Status" value={status} onChange={(key) => refilter(() => setStatus(key))} options={statusTabs.map((tab) => ({ ...tab, count: items ? counts[tab.key] : undefined }))} />
+        <Tabs label="Desk" value={desk} onChange={(key) => refilter(() => setDesk(key))} options={deskTabs} />
         <Tabs
-          label="Эрэмбэ"
+          label="Sort"
           value={byScore ? "score" : "time"}
           onChange={(key) => setByScore(key === "score")}
           options={[
-            { key: "score", label: "Чухал нь эхэнд" },
-            { key: "time", label: "Шинэ нь эхэнд" },
+            { key: "score", label: "Most important" },
+            { key: "time", label: "Newest" },
           ]}
         />
       </div>
 
       {items ? (
-        <div role="tablist" aria-label="Сэдэв" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {[{ key: "all", label: "Бүх сэдэв", count: categoryCounts.all }, ...NEWS_CATEGORIES.map((entry) => ({ key: entry.key, label: entry.label, count: categoryCounts.byKey.get(entry.key) ?? 0 }))]
+        <div role="tablist" aria-label="Topic" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {[{ key: "all", label: "All topics", count: categoryCounts.all }, ...NEWS_CATEGORIES.map((entry) => ({ key: entry.key, label: entry.label, count: categoryCounts.byKey.get(entry.key) ?? 0 }))]
             .filter((entry) => entry.key === "all" || entry.count > 0 || entry.key === category)
             .map((entry) => (
               <button
@@ -303,22 +304,22 @@ export function InboxPage() {
       ) : null}
 
       <label className="relative block">
-        <span className="sr-only">Хайх</span>
+        <span className="sr-only">Search</span>
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" />
         <input
           type="search"
           value={query}
           onChange={(event) => refilter(() => setQuery(event.target.value))}
-          placeholder="Гарчиг, эх сурвалжаар хайх"
+          placeholder="Search by headline or source"
           className={`${inputClass} pl-9`}
         />
       </label>
 
       {!items ? (
-        <p className="text-muted-foreground text-[14px]">Ачаалж байна…</p>
+        <p className="text-muted-foreground text-[14px]">Loading…</p>
       ) : shown.length === 0 ? (
         <p className="text-muted-foreground text-[14px]">
-          {items.length ? "Илэрц алга." : "Одоогоор мэдээ алга. Агент ажилласны дараа энд гарна (Самбар → Одоо татах)."}
+          {items.length ? "No matches." : "No stories yet. They show up here after the agent runs (Pull now)."}
         </p>
       ) : (
         <ul className="bg-card divide-y rounded-xl border">
@@ -356,36 +357,36 @@ export function InboxPage() {
                     {item.status === "filed" && item.articleId ? (
                       <>
                         <Link to={`/edit/${item.articleId}`} className={buttonClass.ghost}>
-                          Карт нээх
+                          Open card
                           <ArrowRight className="size-4" />
                         </Link>
                         {isEditor(member) ? (
                           <button type="button" disabled={working} onClick={() => removeCard(item)} className={buttonClass.danger}>
                             <Trash2 className="size-4" />
-                            {working ? "Устгаж байна…" : "Устгах"}
+                            {working ? "Deleting…" : "Delete"}
                           </button>
                         ) : null}
                       </>
                     ) : item.status === "queued" || item.status === "drafting" ? (
                       <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[12px]">
                         <RefreshCw className={cn("size-3.5", item.status === "drafting" && "animate-spin")} />
-                        {item.status === "drafting" ? "Агент ноорог бичиж байна…" : "Дараалалд, агент удахгүй бичнэ"}
+                        {item.status === "drafting" ? "The agent is drafting this…" : "Queued, the agent drafts it shortly"}
                       </span>
                     ) : item.status === "dismissed" ? (
                       <button type="button" disabled={working} onClick={() => dismiss(item, false)} className={buttonClass.ghost}>
                         <Undo2 className="size-4" />
-                        Буцаах
+                        Restore
                       </button>
                     ) : (
                       <>
                         <button type="button" disabled={working} onClick={() => file(item)} className={buttonClass.primary}>
                           <FilePlus2 className="size-4" />
-                          {working ? "Бэлдэж байна…" : "Карт болгох"}
+                          {working ? "Preparing…" : "Make card"}
                         </button>
-                        {working ? <span className="text-muted-foreground text-[12px]">Агент ноорог бичиж байна, 2 минут хүртэл үргэлжилнэ.</span> : null}
+                        {working ? <span className="text-muted-foreground text-[12px]">The agent is drafting; this can take up to 2 minutes.</span> : null}
                         <button type="button" disabled={working} onClick={() => dismiss(item, true)} className={buttonClass.ghost}>
                           <X className="size-4" />
-                          Хаах
+                          Close
                         </button>
                       </>
                     )}
@@ -414,7 +415,7 @@ export function InboxPage() {
 
       {shown.length > limit ? (
         <button type="button" onClick={() => setLimit((value) => value + PAGE)} className={`${buttonClass.ghost} self-center`}>
-          Цааш харах ({shown.length - limit})
+          Show more ({shown.length - limit})
         </button>
       ) : null}
     </div>

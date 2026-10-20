@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type Text
 import { Link } from "react-router-dom"
 import { Check, ChevronDown, MessageSquare, ThumbsUp, X } from "lucide-react"
 
-import { buttonClass, inputClass, Notice } from "@/admin/ui"
+import { buttonClass, inputClass, Notice } from "@/components/site/controls"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { getReaderAuth } from "@/reader/auth"
 import { BadgeMark } from "@/reader/badges"

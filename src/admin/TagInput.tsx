@@ -65,7 +65,7 @@ export function TagInput({
             {!disabled ? (
               <button
                 type="button"
-                aria-label={`${labels.get(slug) ?? slug} шошгыг хасах`}
+                aria-label={`Remove tag ${labels.get(slug) ?? slug}`}
                 onClick={() => onChange(value.filter((item) => item !== slug))}
                 className="hover:bg-background/20 grid size-5 place-items-center rounded-full"
               >
@@ -79,7 +79,7 @@ export function TagInput({
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
-          aria-label="Шошго нэмэх"
+          aria-label="Add a tag"
           disabled={disabled || full}
           value={query}
           onChange={(event) => {
@@ -89,7 +89,7 @@ export function TagInput({
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
           onKeyDown={onKeyDown}
-          placeholder={full ? `Дээд тал нь ${max} шошго` : value.length ? "" : "Шошго хайх эсвэл нэмэх…"}
+          placeholder={full ? `Up to ${max} tags` : value.length ? "" : "Search or add a tag…"}
           className="min-w-[8rem] flex-1 bg-transparent px-1 text-[14px] outline-none disabled:cursor-not-allowed"
         />
       </div>
@@ -121,7 +121,7 @@ export function TagInput({
                 className="hover:bg-foreground/5 text-brand-strong flex w-full items-center gap-2 border-t px-3 py-2 text-left text-[13px]"
               >
                 <Plus className="size-3.5" />
-                Шинэ шошго: “{query.trim()}”
+                New tag: “{query.trim()}”
               </button>
             </li>
           ) : null}

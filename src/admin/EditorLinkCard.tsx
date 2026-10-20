@@ -139,7 +139,7 @@ function LinkCardView({ node, updateAttributes, deleteNode, selected, editor }: 
         {pending ? (
           <strong className="text-muted-foreground inline-flex! items-center gap-2">
             <Loader2 className="size-4 animate-spin" aria-hidden />
-            Холбоосыг уншиж байна…
+            Reading the link…
           </strong>
         ) : (
           <strong>{title || site || href}</strong>
@@ -151,7 +151,7 @@ function LinkCardView({ node, updateAttributes, deleteNode, selected, editor }: 
       {editable && !pending ? (
         <div
           role="toolbar"
-          aria-label="Холбоосын карт"
+          aria-label="Link card"
           className="bg-popover absolute top-2 right-2 flex items-center gap-0.5 rounded-full border p-0.5 shadow-sm"
         >
           {image ? (
@@ -162,15 +162,15 @@ function LinkCardView({ node, updateAttributes, deleteNode, selected, editor }: 
               className="hover:bg-foreground/5 inline-flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[12px] font-medium"
             >
               {showImage ? <ImageOff className="size-3.5" /> : <ImageIcon className="size-3.5" />}
-              {showImage ? "Зураг нуух" : "Зураг харуулах"}
+              {showImage ? "Hide picture" : "Show picture"}
             </button>
           ) : null}
           <a
             href={href}
             target="_blank"
             rel="noreferrer"
-            aria-label="Холбоосыг шинэ цонхонд нээх"
-            title="Нээх"
+            aria-label="Open the link in a new tab"
+            title="Open"
             className="hover:bg-foreground/5 grid size-7 place-items-center rounded-full"
           >
             <ExternalLink className="size-3.5" />
@@ -178,8 +178,8 @@ function LinkCardView({ node, updateAttributes, deleteNode, selected, editor }: 
           <button
             type="button"
             onClick={deleteNode}
-            aria-label="Картыг устгах"
-            title="Устгах"
+            aria-label="Remove card"
+            title="Remove"
             className="grid size-7 place-items-center rounded-full text-[var(--down)] hover:bg-[color-mix(in_oklch,var(--down)_10%,transparent)]"
           >
             <Trash2 className="size-3.5" />

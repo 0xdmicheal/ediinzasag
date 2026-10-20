@@ -9,7 +9,7 @@ export function AdminGuard() {
   if (member === undefined || !backend) {
     return (
       <div className="text-muted-foreground grid min-h-svh place-items-center text-sm" role="status">
-        Ачаалж байна…
+        Loading…
       </div>
     )
   }

@@ -19,6 +19,7 @@ import { WelcomePage } from "@/admin/WelcomePage"
 export default function AdminApp() {
   return (
     <DesktopOnly>
+      <div className="ez-admin min-h-svh">
       <AdminSessionProvider>
         <ConfirmProvider>
         <Routes>
@@ -41,6 +42,7 @@ export default function AdminApp() {
         </Routes>
         </ConfirmProvider>
       </AdminSessionProvider>
+      </div>
     </DesktopOnly>
   )
 }

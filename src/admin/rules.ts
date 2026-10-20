@@ -7,36 +7,40 @@ import { countWords } from "@/lib/article-html"
  */
 
 export const roleLabel: Record<Role, string> = {
-  writer: "Сэтгүүлч",
-  editor: "Редактор",
-  admin: "Админ",
+  writer: "Writer",
+  editor: "Editor",
+  admin: "Admin",
 }
 
 export const statusMeta: Record<Status, { label: string; tone: string; hint: string }> = {
-  draft: { label: "Ноорог", tone: "bg-foreground/[0.07] text-muted-foreground", hint: "Зохиогч бичиж байна" },
-  in_review: { label: "Хянагдаж буй", tone: "bg-brand-soft text-brand-strong", hint: "Редактор хянана" },
+  draft: { label: "Draft", tone: "bg-foreground/[0.07] text-muted-foreground", hint: "The writer is working on it" },
+  in_review: {
+    label: "In review",
+    tone: "bg-[color-mix(in_oklch,var(--state-review,var(--brand))_12%,transparent)] text-[var(--state-review,var(--brand))]",
+    hint: "An editor reviews it",
+  },
   changes_requested: {
-    label: "Засвар хүссэн",
-    tone: "bg-[color-mix(in_oklch,var(--down)_12%,transparent)] text-[var(--down)]",
-    hint: "Зохиогч засна",
+    label: "Changes requested",
+    tone: "bg-[color-mix(in_oklch,var(--state-changes,var(--down))_12%,transparent)] text-[var(--state-changes,var(--down))]",
+    hint: "The writer revises it",
   },
   approved: {
-    label: "Батлагдсан",
-    tone: "bg-[color-mix(in_oklch,var(--up)_12%,transparent)] text-[var(--up)]",
-    hint: "Нийтлэхэд бэлэн",
+    label: "Approved",
+    tone: "bg-[color-mix(in_oklch,var(--state-approved,var(--up))_12%,transparent)] text-[var(--state-approved,var(--up))]",
+    hint: "Ready to publish",
   },
-  published: { label: "Нийтлэгдсэн", tone: "bg-foreground text-background", hint: "Сайт дээр байна" },
+  published: { label: "Published", tone: "bg-foreground text-background", hint: "Live on the site" },
 }
 
 export const statusOrder: Status[] = ["draft", "in_review", "changes_requested", "approved", "published"]
 
 /** Button text for moving an article to a status, from the actor's side. */
 export function transitionLabel(from: Status, to: Status) {
-  if (to === "in_review") return from === "changes_requested" ? "Засаад дахин илгээх" : "Хянуулахаар илгээх"
-  if (to === "draft") return from === "published" ? "Нийтлэлээс буулгах" : "Ноорог руу буцаах"
-  if (to === "approved") return "Батлах"
-  if (to === "changes_requested") return "Засвар хүсэх"
-  return from === "approved" ? "Нийтлэх" : "Батлаад нийтлэх"
+  if (to === "in_review") return from === "changes_requested" ? "Resend for review" : "Send for review"
+  if (to === "draft") return from === "published" ? "Unpublish" : "Back to draft"
+  if (to === "approved") return "Approve"
+  if (to === "changes_requested") return "Request changes"
+  return from === "approved" ? "Publish" : "Approve and publish"
 }
 
 export const isEditor = (member: Member) => member.role === "editor" || member.role === "admin"
@@ -117,22 +121,22 @@ export function readiness(draft: ArticleDraft, origin: Origin = "human"): Check[
   const titleLength = draft.title.trim().length
   // Agent briefings need a cleared photo (guard_article enforces it). The editor's approval is the human gate.
   const agentChecks: Check[] =
-    origin === "bot" ? [{ id: "rights", label: "Нүүр зургийн эрхийг шалгасан", ok: !draft.coverUrl || draft.coverRightsOk, required: true }] : []
+    origin === "bot" ? [{ id: "rights", label: "Cover photo rights checked", ok: !draft.coverUrl || draft.coverRightsOk, required: true }] : []
   return [
     ...agentChecks,
-    { id: "title", label: "Гарчиг бичсэн", ok: titleLength > 0, required: true },
-    { id: "dek", label: "Товч тайлбар бичсэн", ok: draft.dek.trim().length >= 30, required: true },
+    { id: "title", label: "Headline", ok: titleLength > 0, required: true },
+    { id: "dek", label: "Summary (30+ characters)", ok: draft.dek.trim().length >= 30, required: true },
     // The shortest format (Мэдээ) is 200 to 350 words; Мэдээ ба тайлбар 500 to 900.
-    { id: "body", label: `Үндсэн текст 200+ үг (${words})`, ok: words >= 200, required: true },
+    { id: "body", label: `Body, 200+ words (${words})`, ok: words >= 200, required: true },
     {
       id: "sources",
-      label: "Эх сурвалж текст дотор холбоосоор",
+      label: "Sources linked in the text",
       ok: /<a\s[^>]*href=/i.test(draft.body) || draft.sources.some((s) => s.label.trim()),
       required: false,
     },
-    { id: "tags", label: `1–5 шошго (${draft.tags.length})`, ok: draft.tags.length >= 1 && draft.tags.length <= 5, required: true },
-    { id: "cover", label: "Нүүр зураг", ok: Boolean(draft.coverUrl), required: true },
-    { id: "cover-alt", label: "Нүүр зургийн тайлбар, эх сурвалж", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: false },
+    { id: "tags", label: `1–5 tags (${draft.tags.length})`, ok: draft.tags.length >= 1 && draft.tags.length <= 5, required: true },
+    { id: "cover", label: "Cover photo", ok: Boolean(draft.coverUrl), required: true },
+    { id: "cover-alt", label: "Cover caption and credit", ok: Boolean(draft.coverUrl && draft.coverAlt.trim()), required: false },
     // House style (EZ Writing System v2.1) is advice only: findings and fixes live in the editor's style panel.
   ]
 }
@@ -177,10 +181,10 @@ export function formatSources(sources: { label: string; href?: string }[]) {
 
 export function timeAgo(iso: string) {
   const minutes = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-  if (minutes < 1) return "дөнгөж сая"
-  if (minutes < 60) return `${minutes} минутын өмнө`
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes} min ago`
   const hours = Math.round(minutes / 60)
-  if (hours < 24) return `${hours} цагийн өмнө`
+  if (hours < 24) return `${hours} h ago`
   const days = Math.round(hours / 24)
-  return days < 30 ? `${days} өдрийн өмнө` : iso.slice(0, 10).replace(/-/g, ".")
+  return days < 30 ? `${days} d ago` : iso.slice(0, 10).replace(/-/g, ".")
 }

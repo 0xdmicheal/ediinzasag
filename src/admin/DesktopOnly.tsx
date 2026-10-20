@@ -31,15 +31,15 @@ export function DesktopOnly({ children }: { children: ReactNode }) {
         <span className="bg-muted mx-auto mt-8 grid size-14 place-items-center rounded-2xl border">
           <Monitor className="size-6" />
         </span>
-        <h1 className="font-news mt-5 text-2xl">Компьютерээс нээнэ үү</h1>
+        <h1 className="ez-title mt-5 text-3xl">Open this on a computer</h1>
         <p className="text-muted-foreground mt-2 text-[14px] leading-relaxed">
-          Редакцын хэсэг зөвхөн компьютер, зөөврийн компьютер дээр ажиллана. Нийтлэл бичих, хянах, нийтлэхэд том дэлгэц хэрэгтэй.
+          The newsroom works on desktops and laptops only. Writing, reviewing and publishing need a bigger screen.
         </p>
         <a
           href={import.meta.env.BASE_URL}
-          className="border-foreground/20 hover:bg-foreground/5 mt-6 inline-flex h-10 items-center justify-center rounded-full border px-5 text-[14px] font-medium"
+          className="border-foreground/20 hover:bg-foreground/5 mt-6 inline-flex h-10 items-center justify-center rounded-lg border px-5 text-[14px] font-medium"
         >
-          Сайт руу буцах
+          Back to the site
         </a>
       </div>
     </main>

@@ -119,7 +119,7 @@ function sessionId() {
 
 function requireMember(store: Store) {
   const member = store.members.find((item) => item.id === sessionId())
-  if (!member) throw new Error("Нэвтэрнэ үү")
+  if (!member) throw new Error("Please sign in")
   return member
 }
 
@@ -160,7 +160,7 @@ export function createDemoBackend(): Backend {
     async signIn(email) {
       const store = load()
       const member = store.members.find((item) => item.email.toLowerCase() === email.trim().toLowerCase())
-      if (!member) throw new Error("Ийм гишүүн алга. Демо дээр доорх товчнуудаас сонгоно уу.")
+      if (!member) throw new Error("No such member. In the demo, pick one of the buttons below.")
       localStorage.setItem(SESSION, member.id)
       notify()
       return null
@@ -170,7 +170,7 @@ export function createDemoBackend(): Backend {
     },
     async verifyTwoStep() {},
     async sendPasswordReset() {
-      throw new Error("Демо горимд нууц үг байхгүй. Доорх товчнуудаас сонгоно уу.")
+      throw new Error("The demo has no passwords. Pick one of the buttons below.")
     },
     async welcomeMember() {
       return null
@@ -219,8 +219,8 @@ export function createDemoBackend(): Backend {
       const store = load()
       const member = requireMember(store)
       const article = store.articles.find((item) => item.id === id)
-      if (!article) throw new Error("Нийтлэл олдсонгүй")
-      if (!canEdit(member, article)) throw new Error("Энэ нийтлэлийг засах эрхгүй")
+      if (!article) throw new Error("Story not found")
+      if (!canEdit(member, article)) throw new Error("You can't edit this story")
       Object.assign(article, draft, { slug: uniqueSlug(store, draft.slug || draft.title, id), updatedAt: new Date().toISOString() })
       log(store, id, member, "edited")
       save(store)
@@ -230,10 +230,10 @@ export function createDemoBackend(): Backend {
       const store = load()
       const member = requireMember(store)
       const article = store.articles.find((item) => item.id === id)
-      if (!article) throw new Error("Нийтлэл олдсонгүй")
-      if (!allowedTransitions(member, article).includes(status)) throw new Error("Энэ алхмыг хийх эрхгүй")
+      if (!article) throw new Error("Story not found")
+      if (!allowedTransitions(member, article).includes(status)) throw new Error("You can't make this change")
       if (article.origin === "bot" && status === "published") {
-        if (article.coverUrl && !article.coverRightsOk) throw new Error("Нүүр зургийн эрхийг шалгаж баталгаажуулна уу")
+        if (article.coverUrl && !article.coverRightsOk) throw new Error("Confirm the cover photo rights first")
       }
       article.status = status
       article.updatedAt = new Date().toISOString()
@@ -248,7 +248,7 @@ export function createDemoBackend(): Backend {
       const store = load()
       const member = requireMember(store)
       const article = store.articles.find((item) => item.id === id)
-      if (!article || !canDelete(member, article)) throw new Error("Устгах эрхгүй")
+      if (!article || !canDelete(member, article)) throw new Error("You can't delete this")
       store.articles = store.articles.filter((item) => item.id !== id)
       save(store)
     },
@@ -261,11 +261,11 @@ export function createDemoBackend(): Backend {
       return devLinkPreview(url).catch(() => plainPreview(url))
     },
     async uploadCover(file) {
-      if (file.size > 1_500_000) throw new Error("Демо горимд 1.5MB-аас бага зураг оруулна уу")
+      if (file.size > 1_500_000) throw new Error("In the demo, pictures must be under 1.5 MB")
       return new Promise<string>((resolve, reject) => {
         const reader = new FileReader()
         reader.onload = () => resolve(String(reader.result))
-        reader.onerror = () => reject(new Error("Зураг уншиж чадсангүй"))
+        reader.onerror = () => reject(new Error("Couldn't read the picture"))
         reader.readAsDataURL(file)
       })
     },
@@ -275,9 +275,9 @@ export function createDemoBackend(): Backend {
     },
     async createTag(label) {
       const store = load()
-      if (!canManageTags(requireMember(store))) throw new Error("Шошго нэмэх эрхгүй")
+      if (!canManageTags(requireMember(store))) throw new Error("You can't add tags")
       const slug = slugify(label)
-      if (!slug) throw new Error("Шошгоны нэр хоосон байна")
+      if (!slug) throw new Error("The tag needs a name")
       const existing = store.tags.find((tag) => tag.slug === slug)
       if (existing) return existing
       const tag = { slug, label: label.trim() }
@@ -287,14 +287,14 @@ export function createDemoBackend(): Backend {
     },
     async renameTag(slug, label) {
       const store = load()
-      if (!canManageTags(requireMember(store))) throw new Error("Эрхгүй")
+      if (!canManageTags(requireMember(store))) throw new Error("Not allowed")
       const tag = store.tags.find((item) => item.slug === slug)
       if (tag) tag.label = label.trim()
       save(store)
     },
     async deleteTag(slug) {
       const store = load()
-      if (!canManageTags(requireMember(store))) throw new Error("Эрхгүй")
+      if (!canManageTags(requireMember(store))) throw new Error("Not allowed")
       store.tags = store.tags.filter((tag) => tag.slug !== slug)
       store.articles.forEach((article) => (article.tags = article.tags.filter((item) => item !== slug)))
       save(store)
@@ -305,7 +305,7 @@ export function createDemoBackend(): Backend {
     },
     async setRole(memberId, role: Role) {
       const store = load()
-      if (!canManageTeam(requireMember(store))) throw new Error("Зөвхөн админ эрх өөрчилнө")
+      if (!canManageTeam(requireMember(store))) throw new Error("Only admins change roles")
       const member = store.members.find((item) => item.id === memberId)
       if (member) member.role = role
       save(store)
@@ -313,15 +313,15 @@ export function createDemoBackend(): Backend {
     },
     async addMember(name, email, role) {
       const store = load()
-      if (!canManageTeam(requireMember(store))) throw new Error("Зөвхөн админ гишүүн нэмнэ")
-      if (store.members.some((item) => item.email === email)) throw new Error("Энэ и-мэйл бүртгэлтэй")
+      if (!canManageTeam(requireMember(store))) throw new Error("Only admins invite members")
+      if (store.members.some((item) => item.email === email)) throw new Error("This e-mail is already on the team")
       store.members.push({ id: `m-${Date.now()}`, name, email, role })
       save(store)
       return "joined"
     },
 
     async listSubscribers() {
-      if (!canManageTeam(requireMember(load()))) throw new Error("Зөвхөн админ харна")
+      if (!canManageTeam(requireMember(load()))) throw new Error("Admins only")
       // Demo sign-ups (src/content/newsletter.ts) live in this browser.
       try {
         const rows = JSON.parse(localStorage.getItem("ez-newsletter-demo-v1") ?? "[]") as Subscriber[]
@@ -332,7 +332,7 @@ export function createDemoBackend(): Backend {
     },
 
     async listReaders() {
-      if (!canManageTeam(requireMember(load()))) throw new Error("Зөвхөн админ харна")
+      if (!canManageTeam(requireMember(load()))) throw new Error("Admins only")
       // Demo reader accounts (src/reader/demo-reader.ts) live in this browser; ids carry the sign-up time.
       let accounts: { id: string; name: string; email: string; phone?: string; avatar?: string; birthDate?: string; gender?: ReaderRecord["gender"]; region?: string }[] = []
       try {
@@ -366,7 +366,7 @@ export function createDemoBackend(): Backend {
       const store = load()
       const member = requireMember(store)
       const article = store.articles.find((item) => item.id === id)
-      if (!article || !canClaim(article)) throw new Error("Энэ мэдээг өөр хүн авсан байна")
+      if (!article || !canClaim(article)) throw new Error("Someone else already took this story")
       Object.assign(article, { authorId: member.id, authorName: member.name, status: "draft", updatedAt: new Date().toISOString() })
       log(store, id, member, "claimed")
       save(store)
@@ -374,7 +374,7 @@ export function createDemoBackend(): Backend {
     },
     async runNewsAgent() {
       const store = load()
-      if (!isEditor(requireMember(store))) throw new Error("Редактор, админ л ажиллуулна")
+      if (!isEditor(requireMember(store))) throw new Error("Only editors and admins can run the agent")
       // The real agent runs in a Supabase Edge Function; the demo adds ready-made sample briefings.
       const known = new Set(store.articles.map((article) => article.sourceUrl).filter(Boolean))
       const fresh = demoBriefings(3, known)
@@ -407,7 +407,7 @@ export function createDemoBackend(): Backend {
         created: fresh.length,
         error: "",
         details: {
-          provider: "демо",
+          provider: "demo",
           feeds_ok: 25,
           feeds_total: 25,
           feeds_failed: [],
@@ -432,7 +432,7 @@ export function createDemoBackend(): Backend {
       const store = load()
       const member = requireMember(store)
       const item = (store.inbox ??= demoNewsItems()).find((entry) => entry.id === id)
-      if (!item) throw new Error("Мэдээ олдсонгүй")
+      if (!item) throw new Error("Story not found")
       if (item.articleId) return item.articleId
       // The real function drafts it (Gemini) or files a source card; the demo files a ready-made sample card.
       const [card] = demoBriefings(1)
@@ -457,9 +457,9 @@ export function createDemoBackend(): Backend {
       const store = load()
       const member = requireMember(store)
       const item = (store.inbox ??= demoNewsItems()).find((entry) => entry.id === id)
-      if (!item) throw new Error("Мэдээ олдсонгүй")
+      if (!item) throw new Error("Story not found")
       const article = store.articles.find((entry) => entry.id === item.articleId)
-      if (article && !canDeleteCard(member, article)) throw new Error("Устгах эрхгүй")
+      if (article && !canDeleteCard(member, article)) throw new Error("You can't delete this")
       store.articles = store.articles.filter((entry) => entry.id !== item.articleId)
       Object.assign(item, { status: "dismissed", articleId: null })
       save(store)
@@ -476,7 +476,7 @@ export function createDemoBackend(): Backend {
     },
     async insights() {
       const store = load()
-      if (!canManageTeam(requireMember(store))) throw new Error("Зөвхөн админ харна")
+      if (!canManageTeam(requireMember(store))) throw new Error("Admins only")
       return demoInsights(store.members, store.articles, store.runs ?? [])
     },
   }

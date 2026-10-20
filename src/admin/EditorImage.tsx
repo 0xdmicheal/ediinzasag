@@ -153,7 +153,7 @@ function ImageView({ node, deleteNode, selected, editor, getPos }: ReactNodeView
                 key={side}
                 data-resize-handle
                 role="separator"
-                aria-label="Хэмжээг өөрчлөх"
+                aria-label="Change size"
                 onPointerDown={(event) => startResize(event, side)}
                 className={cn(
                   "bg-background absolute top-1/2 h-12 w-2.5 -translate-y-1/2 cursor-ew-resize rounded-full border shadow-md",
@@ -178,11 +178,11 @@ function ImageView({ node, deleteNode, selected, editor, getPos }: ReactNodeView
                 type="button"
                 onClick={() => setAltOpen((open) => !open)}
                 className={cn("h-7 rounded-full px-2.5 font-medium", alt ? "text-[var(--up)]" : "", altOpen ? "bg-foreground/[0.07]" : "hover:bg-foreground/[0.07]")}
-                title="Хараагүй уншигчид зориулсан тайлбар (заавал биш)"
+                title="Description for blind readers (optional)"
               >
                 Alt
               </button>
-              <button type="button" onClick={deleteNode} aria-label="Зургийг устгах" className="grid size-7 place-items-center rounded-full text-[var(--down)] hover:bg-[color-mix(in_oklch,var(--down)_10%,transparent)]">
+              <button type="button" onClick={deleteNode} aria-label="Remove picture" className="grid size-7 place-items-center rounded-full text-[var(--down)] hover:bg-[color-mix(in_oklch,var(--down)_10%,transparent)]">
                 <Trash2 className="size-3.5" />
               </button>
             </div>
@@ -196,7 +196,7 @@ function ImageView({ node, deleteNode, selected, editor, getPos }: ReactNodeView
           value={alt}
           onChange={(event) => setAttr("alt", event.target.value)}
           onKeyDown={(event) => event.key === "Enter" && setAltOpen(false)}
-          placeholder="Зурагт юу байгааг товч бичнэ (заавал биш)"
+          placeholder="Describe what's in the picture (optional)"
           className="bg-muted mx-auto mt-2 block w-full max-w-md rounded-md border px-3 py-1.5 text-[13px] outline-none focus:border-[var(--brand)]"
         />
       ) : null}
@@ -205,8 +205,8 @@ function ImageView({ node, deleteNode, selected, editor, getPos }: ReactNodeView
         <input
           value={caption}
           onChange={(event) => setAttr("caption", event.target.value)}
-          placeholder={selected ? "Тайлбар нэмэх (заавал биш)" : ""}
-          aria-label="Зургийн тайлбар"
+          placeholder={selected ? "Add a caption (optional)" : ""}
+          aria-label="Caption"
           className="text-muted-foreground placeholder:text-muted-foreground/80 mt-2 block w-full bg-transparent text-center text-[13px] outline-none"
         />
       ) : caption ? (

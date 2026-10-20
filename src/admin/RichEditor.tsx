@@ -90,7 +90,7 @@ export function RichEditor({
         if (at !== undefined) chain.setTextSelection(at)
         chain.insertEzImage({ src }).run()
       } catch (failure) {
-        setProblem(failure instanceof Error ? failure.message : "Зураг оруулж чадсангүй")
+        setProblem(failure instanceof Error ? failure.message : "Couldn't upload the picture")
       } finally {
         setUploads((count) => count - 1)
       }
@@ -108,7 +108,7 @@ export function RichEditor({
       EzImage,
       EzLinkCard,
       Placeholder.configure({
-        placeholder: ({ node }) => (node.type.name === "heading" ? "Дэд гарчиг" : "Энд бичиж эхэлнэ үү…"),
+        placeholder: ({ node }) => (node.type.name === "heading" ? "Subheading" : "Start writing…"),
       }),
     ],
     content,
@@ -116,7 +116,7 @@ export function RichEditor({
     editorProps: {
       attributes: {
         class: cn(proseClass, "ez-editor min-h-[50vh] outline-none"),
-        "aria-label": "Нийтлэлийн текст",
+        "aria-label": "Story text",
       },
       // Paste or drop pictures straight into the text, like Substack.
       // A bare link pasted on an empty line becomes a link card; inside a sentence it stays a link.
@@ -265,7 +265,7 @@ function Toolbar({
     }
     if (!/^[a-z]+:/i.test(url)) url = `https://${url}`
     if (!/^https?:\/\//i.test(url)) {
-      setLinkError("Холбоос https:// эсвэл http://-ээр эхэлнэ")
+      setLinkError("Links start with https:// or http://")
       return
     }
     editor.chain().focus().extendMarkRange("link").setLink({ href: url }).run()
@@ -288,52 +288,52 @@ function Toolbar({
 
   return (
     <div className="bg-background/90 sticky top-14 z-20 -mx-4 mb-8 border-y backdrop-blur-xl sm:mx-0 sm:rounded-lg sm:border">
-      <div role="toolbar" aria-label="Форматлах" className="flex items-center gap-0.5 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] sm:px-2">
+      <div role="toolbar" aria-label="Formatting" className="flex items-center gap-0.5 overflow-x-auto px-4 py-1.5 [scrollbar-width:none] sm:px-2">
         <Select
-          label="Текстийн төрөл"
+          label="Text style"
           value={state.block}
           onChange={setBlock}
           className="w-[9.5rem] shrink-0"
           options={[
-            { value: "p", label: "Энгийн текст" },
-            { value: "h2", label: "Гарчиг" },
-            { value: "h3", label: "Дэд гарчиг" },
+            { value: "p", label: "Paragraph" },
+            { value: "h2", label: "Heading" },
+            { value: "h3", label: "Subheading" },
           ]}
         />
         {divider}
-        <ToolButton label="Тод (Ctrl+B)" active={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
+        <ToolButton label="Bold (Ctrl+B)" active={state.bold} onClick={() => editor.chain().focus().toggleBold().run()}>
           <Bold className="size-4" />
         </ToolButton>
-        <ToolButton label="Налуу (Ctrl+I)" active={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
+        <ToolButton label="Italic (Ctrl+I)" active={state.italic} onClick={() => editor.chain().focus().toggleItalic().run()}>
           <Italic className="size-4" />
         </ToolButton>
-        <ToolButton label="Дарах зураас" active={state.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
+        <ToolButton label="Strikethrough" active={state.strike} onClick={() => editor.chain().focus().toggleStrike().run()}>
           <Strikethrough className="size-4" />
         </ToolButton>
-        <ToolButton label="Холбоос (Ctrl+K)" active={state.link || linkOpen} onClick={openLink}>
+        <ToolButton label="Link (Ctrl+K)" active={state.link || linkOpen} onClick={openLink}>
           <Link2 className="size-4" />
         </ToolButton>
         {divider}
-        <ToolButton label="Ишлэл" active={state.quote} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
+        <ToolButton label="Quote" active={state.quote} onClick={() => editor.chain().focus().toggleBlockquote().run()}>
           <Quote className="size-4" />
         </ToolButton>
-        <ToolButton label="Жагсаалт" active={state.bullet} onClick={() => editor.chain().focus().toggleBulletList().run()}>
+        <ToolButton label="Bulleted list" active={state.bullet} onClick={() => editor.chain().focus().toggleBulletList().run()}>
           <List className="size-4" />
         </ToolButton>
-        <ToolButton label="Дугаартай жагсаалт" active={state.ordered} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
+        <ToolButton label="Numbered list" active={state.ordered} onClick={() => editor.chain().focus().toggleOrderedList().run()}>
           <ListOrdered className="size-4" />
         </ToolButton>
-        <ToolButton label={uploading ? "Зураг оруулж байна…" : "Зураг (эсвэл хуулж буулгах, чирж оруулах)"} disabled={uploading} onClick={() => file.current?.click()}>
+        <ToolButton label={uploading ? "Uploading…" : "Picture (or paste, or drag in)"} disabled={uploading} onClick={() => file.current?.click()}>
           {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
         </ToolButton>
-        <ToolButton label="Хуваах шугам" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
+        <ToolButton label="Divider" onClick={() => editor.chain().focus().setHorizontalRule().run()}>
           <Minus className="size-4" />
         </ToolButton>
         <span className="ml-auto flex shrink-0 items-center gap-0.5 pl-2">
-          <ToolButton label="Буцаах (Ctrl+Z)" disabled={!state.canUndo} onClick={() => editor.chain().focus().undo().run()}>
+          <ToolButton label="Undo (Ctrl+Z)" disabled={!state.canUndo} onClick={() => editor.chain().focus().undo().run()}>
             <Undo2 className="size-4" />
           </ToolButton>
-          <ToolButton label="Дахих" disabled={!state.canRedo} onClick={() => editor.chain().focus().redo().run()}>
+          <ToolButton label="Redo" disabled={!state.canRedo} onClick={() => editor.chain().focus().redo().run()}>
             <Redo2 className="size-4" />
           </ToolButton>
         </span>
@@ -354,7 +354,7 @@ function Toolbar({
         <form onSubmit={applyLink} className="flex items-center gap-2 border-t px-3 py-2">
           <Link2 className="text-muted-foreground size-4 shrink-0" />
           <label htmlFor="link-url" className="sr-only">
-            Холбоос
+            Link
           </label>
           <input
             id="link-url"
@@ -365,14 +365,14 @@ function Toolbar({
               setLinkError("")
             }}
             onKeyDown={(event) => event.key === "Escape" && (event.preventDefault(), setLinkOpen(false), editor.commands.focus())}
-            placeholder="https://… (хоосон бол холбоосыг арилгана)"
+            placeholder="https://… (empty removes the link)"
             className="min-w-0 flex-1 bg-transparent text-[14px] outline-none"
           />
           {linkError ? <span className="shrink-0 text-[12px] text-[var(--down)]">{linkError}</span> : null}
-          <ToolButton label="Хэрэглэх" onClick={() => applyLink()}>
+          <ToolButton label="Apply" onClick={() => applyLink()}>
             <Check className="size-4" />
           </ToolButton>
-          <ToolButton label="Болих" onClick={() => (setLinkOpen(false), editor.commands.focus())}>
+          <ToolButton label="Cancel" onClick={() => (setLinkOpen(false), editor.commands.focus())}>
             <X className="size-4" />
           </ToolButton>
         </form>
@@ -381,7 +381,7 @@ function Toolbar({
       {problem ? (
         <p role="alert" className="flex items-center gap-2 border-t px-3 py-2 text-[13px] text-[var(--down)]">
           <span className="flex-1">{problem}</span>
-          <button type="button" onClick={onDismiss} aria-label="Хаах" className="grid size-6 place-items-center rounded-md hover:bg-foreground/[0.07]">
+          <button type="button" onClick={onDismiss} aria-label="Close" className="grid size-6 place-items-center rounded-md hover:bg-foreground/[0.07]">
             <X className="size-3.5" />
           </button>
         </p>

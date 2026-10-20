@@ -62,7 +62,7 @@ export function ArticlePreview({
       {frameWidth > 0 ? (
         <iframe
           ref={frame}
-          title="Нийтлэлийн урьдчилсан харагдац"
+          title="Story preview"
           src={`${import.meta.env.BASE_URL}preview-frame`}
           className="block origin-top-left border-0"
           style={{ width: frameWidth, height, transform: scale < 1 ? `scale(${scale})` : undefined }}

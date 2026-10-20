@@ -5,7 +5,7 @@ import { cn } from "cn"
 
 import { canManageTeam, roleLabel, timeAgo } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
-import { Avatar, Notice, RoleBadge } from "@/admin/ui"
+import { Avatar, Notice, PageHeader, pageClass, RoleBadge } from "@/admin/ui"
 import type { AuthorStats, Insights } from "@/admin/types"
 import { genderLabel, type Gender } from "@/reader/types"
 import { regionLabel } from "@/reader/regions"
@@ -23,8 +23,8 @@ const fmt = (value: number) => number.format(Math.round(value))
 const percent = (value: number, total: number) => (total ? `${Math.round((value / total) * 100)}%` : "0%")
 
 const ageOrder = ["13-17", "18-24", "25-34", "35-44", "45-54", "55+", "unknown"]
-const ageLabel = (bucket: string) => (bucket === "unknown" ? "Тодорхойгүй" : bucket)
-const genderName = (key: string) => (key in genderLabel ? genderLabel[key as Gender] : "Тодорхойгүй")
+const ageLabel = (bucket: string) => (bucket === "unknown" ? "Unknown" : bucket)
+const genderName = (key: string) => (key in genderLabel ? genderLabel[key as Gender] : "Unknown")
 const shortDate = (iso: string) => iso.slice(5).replace("-", ".")
 
 interface Datum {
@@ -51,8 +51,8 @@ function ChartCard({ title, subtitle, table, children, className }: { title: str
             "text-muted-foreground hover:text-foreground grid size-8 shrink-0 place-items-center rounded-md transition-colors",
             showTable && "bg-foreground/[0.07] text-foreground",
           )}
-          aria-label="Хүснэгтээр харах"
-          title="Хүснэгтээр харах"
+          aria-label="Show as table"
+          title="Show as table"
         >
           <Table2 className="size-4" />
         </button>
@@ -144,7 +144,7 @@ function RankBars({ data, limit = 8 }: { data: Datum[]; limit?: number }) {
   const sorted = [...data].sort((a, b) => b.value - a.value)
   const shown = sorted.slice(0, limit)
   const rest = sorted.slice(limit).reduce((sum, item) => sum + item.value, 0)
-  const rows = rest > 0 ? [...shown, { key: "other", label: "Бусад", value: rest }] : shown
+  const rows = rest > 0 ? [...shown, { key: "other", label: "Other", value: rest }] : shown
   const max = Math.max(1, ...rows.map((item) => item.value))
   return (
     <ul className="flex flex-col gap-2">
@@ -185,7 +185,7 @@ function ReadsLine({ points }: { points: Insights["reading"] }) {
     <div className="relative">
       <div className="text-muted-foreground mb-1 text-right font-mono text-[10px] tabular-nums">{fmt(max)}</div>
       <div className="relative h-40">
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="size-full overflow-visible" role="img" aria-label="Өдөр бүрийн уншилт, сүүлийн 30 хоног">
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="size-full overflow-visible" role="img" aria-label="Daily reads, last 30 days">
           <line x1="0" x2={width} y1={height / 2} y2={height / 2} className="stroke-foreground/[0.07]" strokeDasharray="4 4" vectorEffect="non-scaling-stroke" />
           <line x1="0" x2={width} y1={height} y2={height} className="stroke-foreground/15" vectorEffect="non-scaling-stroke" />
           <path d={area} className="fill-[var(--brand)]" fillOpacity={0.12} />
@@ -216,8 +216,8 @@ function ReadsLine({ points }: { points: Insights["reading"] }) {
             style={{ left: `${(x(active) / width) * 100}%` }}
           >
             <span className="text-muted-foreground block">{current.day.replace(/-/g, ".")}</span>
-            <span className="font-mono font-semibold tabular-nums">{fmt(current.reads)} уншилт</span>
-            <span className="text-muted-foreground block font-mono tabular-nums">{fmt(current.readers)} уншигч</span>
+            <span className="font-mono font-semibold tabular-nums">{fmt(current.reads)} reads</span>
+            <span className="text-muted-foreground block font-mono tabular-nums">{fmt(current.readers)} readers</span>
           </div>
         </>
       ) : null}
@@ -245,24 +245,24 @@ function AuthorTable({ authors }: { authors: AuthorStats[] }) {
       <table className="w-full min-w-[56rem] text-[13px]">
         <thead>
           <tr className="text-muted-foreground border-b text-left text-[11px]">
-            <th className="px-4 py-2 font-medium sm:pl-0">Гишүүн</th>
-            <th className="px-2 py-2 font-medium">Нийтэлсэн · 30 хоног</th>
-            <th className="px-2 py-2 text-right font-medium">Нийт</th>
-            <th className="px-2 py-2 text-right font-medium">Явцад</th>
-            <th className="px-2 py-2 text-right font-medium">Ноорог</th>
-            <th className="px-2 py-2 text-right font-medium">Засвар хүссэн</th>
-            <th className="px-2 py-2 text-right font-medium" title="Агентын мэдээнээс авч засварласан">
-              Агентаас
+            <th className="px-4 py-2 font-medium sm:pl-0">Member</th>
+            <th className="px-2 py-2 font-medium">Published · 30 days</th>
+            <th className="px-2 py-2 text-right font-medium">Total</th>
+            <th className="px-2 py-2 text-right font-medium">In progress</th>
+            <th className="px-2 py-2 text-right font-medium">Drafts</th>
+            <th className="px-2 py-2 text-right font-medium">Changes</th>
+            <th className="px-2 py-2 text-right font-medium" title="Taken from the agent's cards and edited">
+              From agent
             </th>
-            <th className="px-2 py-2 text-right font-medium" title="Ноорог эхэлснээс нийтлэх хүртэлх дундаж хугацаа">
-              Дундаж хугацаа
+            <th className="px-2 py-2 text-right font-medium" title="Average time from first draft to published">
+              Avg. time
             </th>
-            <th className="px-2 py-2 font-medium">Уншилт</th>
+            <th className="px-2 py-2 font-medium">Reads</th>
             <th className="px-2 py-2 text-right font-medium">🔥</th>
-            <th className="px-2 py-2 text-right font-medium" title="Батлах, засвар хүсэх, нийтлэх шийдвэр">
-              Хянасан
+            <th className="px-2 py-2 text-right font-medium" title="Approve, request-changes and publish decisions">
+              Reviewed
             </th>
-            <th className="px-4 py-2 text-right font-medium sm:pr-0">Сүүлд</th>
+            <th className="px-4 py-2 text-right font-medium sm:pr-0">Last active</th>
           </tr>
         </thead>
         <tbody>
@@ -291,7 +291,7 @@ function AuthorTable({ authors }: { authors: AuthorStats[] }) {
               </td>
               <td className="px-2 py-2.5 text-right font-mono tabular-nums">{fmt(author.claimed)}</td>
               <td className="text-muted-foreground px-2 py-2.5 text-right font-mono tabular-nums">
-                {author.hoursToPublish === null ? "–" : author.hoursToPublish < 48 ? `${author.hoursToPublish} ц` : `${Math.round(author.hoursToPublish / 24)} хоног`}
+                {author.hoursToPublish === null ? "–" : author.hoursToPublish < 48 ? `${author.hoursToPublish} h` : `${Math.round(author.hoursToPublish / 24)} d`}
               </td>
               <td className="px-2 py-2.5">
                 <span className="flex items-center gap-2">
@@ -322,7 +322,7 @@ function FailedRun({ run }: { run: Insights["agent"]["runs"][number] }) {
         aria-describedby={`run-error-${run.id}`}
         className="bg-foreground/[0.07] text-muted-foreground hover:text-foreground focus-visible:text-foreground cursor-help rounded-full px-2 py-0.5 text-[11px] outline-none focus-visible:ring-2 focus-visible:ring-foreground/30"
       >
-        Амжилтгүй
+        Failed
       </button>
       <span
         role="tooltip"
@@ -338,7 +338,7 @@ function FailedRun({ run }: { run: Insights["agent"]["runs"][number] }) {
             ))}
           </span>
         ) : (
-          "Шалтгаан бүртгэгдээгүй."
+          "No reason recorded."
         )}
       </span>
     </span>
@@ -348,7 +348,7 @@ function FailedRun({ run }: { run: Insights["agent"]["runs"][number] }) {
 /** Past agent runs, folded away by default; failures are just marked, with the reason on hover. */
 function RunHistory({ runs }: { runs: Insights["agent"]["runs"] }) {
   const [open, setOpen] = useState(false)
-  if (runs.length === 0) return <p className="text-muted-foreground mt-4 text-[13px]">Агент одоогоор ажиллаагүй байна.</p>
+  if (runs.length === 0) return <p className="text-muted-foreground mt-4 text-[13px]">The agent hasn't run yet.</p>
   return (
     <div className="mt-4 border-t pt-3">
       <button
@@ -358,19 +358,19 @@ function RunHistory({ runs }: { runs: Insights["agent"]["runs"] }) {
         className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[12px]"
       >
         <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
-        Ажиллагааны түүх ({runs.length})
+        Run history ({runs.length})
       </button>
       {open ? (
         <ul className="mt-2 divide-y text-[13px]">
           {runs.map((run) => (
             <li key={run.id} className="flex items-center justify-between gap-2 py-2">
               <span>
-                {timeAgo(run.startedAt)} <span className="text-muted-foreground">· {run.trigger === "cron" ? "автомат" : "гараар"}</span>
+                {timeAgo(run.startedAt)} <span className="text-muted-foreground">· {run.trigger === "cron" ? "scheduled" : "manual"}</span>
               </span>
               {run.error && !run.created ? (
                 <FailedRun run={run} />
               ) : (
-                <span className="text-muted-foreground font-mono text-[12px] tabular-nums">{fmt(run.created)} нэмсэн</span>
+                <span className="text-muted-foreground font-mono text-[12px] tabular-nums">{fmt(run.created)} carded</span>
               )}
             </li>
           ))}
@@ -397,7 +397,7 @@ export function InsightsPage() {
     const genders: Datum[] = Object.entries(readers.genders).map(([key, value]) => ({ key, label: genderName(key), value }))
     const regions: Datum[] = Object.entries(readers.regions).map(([key, value]) => ({ key, label: regionLabel(key), value }))
     const weeks: Datum[] = readers.weeks.map((week) => ({ key: week.week, label: shortDate(week.week), value: week.n }))
-    const reading: Datum[] = data.reading.map((day) => ({ key: day.day, label: day.day.replace(/-/g, "."), value: day.reads, detail: `${fmt(day.readers)} уншигч` }))
+    const reading: Datum[] = data.reading.map((day) => ({ key: day.day, label: day.day.replace(/-/g, "."), value: day.reads, detail: `${fmt(day.readers)} readers` }))
     const reads30 = data.reading.reduce((sum, day) => sum + day.reads, 0)
     const known = readers.total - (readers.regions.unknown ?? 0)
     return { ages, genders, regions, weeks, reading, reads30, known }
@@ -406,55 +406,54 @@ export function InsightsPage() {
   if (!canManageTeam(member)) return <Navigate to="/" replace />
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Зөвхөн админ</p>
-          <h1 className="font-news mt-1 text-3xl">Хяналт</h1>
-          <p className="text-muted-foreground mt-1 text-[14px]">Уншигчид, багийн явц, мэдээний агентын ажил.</p>
-        </div>
-        <p className="text-muted-foreground flex max-w-sm items-start gap-1.5 text-[12px] leading-relaxed">
-          <Lock className="mt-0.5 size-3.5 shrink-0" />
-          Нас, хүйс, байршлыг зөвхөн нэгтгэсэн тоогоор харуулна. Хувь хүний мэдээлэл энд гарахгүй.
-        </p>
-      </header>
+    <div className={pageClass}>
+      <PageHeader
+        title="Insights"
+        description="Readers, the team's progress and the news agent's work."
+        actions={
+          <p className="text-muted-foreground flex max-w-xs items-start gap-1.5 text-[12px] leading-relaxed">
+            <Lock className="mt-0.5 size-3.5 shrink-0" />
+            Age, gender and region only appear as totals. No one's personal data shows here.
+          </p>
+        }
+      />
 
-      {backend.mode === "demo" ? <Notice>Демо горим: уншигчдын тоо жишээ өгөгдөл. Багийн явц энэ хөтөч дээрх нийтлэлээс тооцогдоно.</Notice> : null}
+      {backend.mode === "demo" ? <Notice>Demo mode: reader numbers are sample data. Team progress comes from the stories in this browser.</Notice> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
-      {!data && !error ? <p className="text-muted-foreground text-sm">Ачаалж байна…</p> : null}
+      {!data && !error ? <p className="text-muted-foreground text-sm">Loading…</p> : null}
 
       {data && view ? (
         <>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatTile label="Бүртгэлтэй уншигч" value={fmt(data.readers.total)} note={`+${fmt(data.readers.new7)} энэ 7 хоногт`} />
-            <StatTile label="Шинэ уншигч · 30 хоног" value={fmt(data.readers.new30)} />
-            <StatTile label="Идэвхтэй уншигч · 30 хоног" value={fmt(data.readers.active30)} note={`${percent(data.readers.active30, data.readers.total)} нь уншсан`} />
-            <StatTile label="Уншилт · 30 хоног" value={fmt(view.reads30)} />
+            <StatTile label="Registered readers" value={fmt(data.readers.total)} note={`+${fmt(data.readers.new7)} this week`} />
+            <StatTile label="New readers · 30 days" value={fmt(data.readers.new30)} />
+            <StatTile label="Active readers · 30 days" value={fmt(data.readers.active30)} note={`${percent(data.readers.active30, data.readers.total)} read something`} />
+            <StatTile label="Reads · 30 days" value={fmt(view.reads30)} />
           </div>
 
-          <ChartCard title="Өдөр бүрийн уншилт" subtitle="Сүүлийн 30 хоног · эцэс хүртэл уншсан тойм" table={view.reading}>
+          <ChartCard title="Daily reads" subtitle="Last 30 days · stories read to the end" table={view.reading}>
             <ReadsLine points={data.reading} />
           </ChartCard>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <ChartCard title="Насны бүлэг" subtitle="Бүртгэлтэй уншигчид" table={view.ages}>
-              <Columns data={view.ages} unit="уншигч" />
+            <ChartCard title="Age group" subtitle="Registered readers" table={view.ages}>
+              <Columns data={view.ages} unit="readers" />
             </ChartCard>
-            <ChartCard title="Шинэ бүртгэл" subtitle="7 хоног бүр · сүүлийн 12 долоо хоног" table={view.weeks}>
-              <Columns data={view.weeks} unit="шинэ уншигч" labelEvery={2} />
+            <ChartCard title="New sign-ups" subtitle="Per week · last 12 weeks" table={view.weeks}>
+              <Columns data={view.weeks} unit="new readers" labelEvery={2} />
             </ChartCard>
-            <ChartCard title="Байршил" subtitle={`Профайлдаа сонгосон · ${percent(view.known, data.readers.total)} нь хариулсан`} table={view.regions}>
+            <ChartCard title="Region" subtitle={`Chosen in their profile · ${percent(view.known, data.readers.total)} answered`} table={view.regions}>
               <RankBars data={view.regions} />
             </ChartCard>
-            <ChartCard title="Хүйс" subtitle="Бүртгэлтэй уншигчид" table={view.genders}>
+            <ChartCard title="Gender" subtitle="Registered readers" table={view.genders}>
               <RankBars data={view.genders} />
             </ChartCard>
           </div>
 
           <section className="bg-card rounded-xl border p-4 sm:p-5">
-            <h2 className="text-[14px] font-semibold">Багийн явц</h2>
+            <h2 className="text-[14px] font-semibold">Team progress</h2>
             <p className="text-muted-foreground mt-0.5 mb-4 text-[12px]">
-              Гишүүн бүрийн нийтлэл, хянасан шийдвэр, уншигчийн хариу. {Object.values(roleLabel).join(", ")} бүгд.
+              Each member's stories, review decisions and reader response. {Object.values(roleLabel).join(", ")}.
             </p>
             <AuthorTable authors={data.authors} />
           </section>
@@ -462,12 +461,12 @@ export function InsightsPage() {
           <section className="bg-card rounded-xl border p-4 sm:p-5">
             <h2 className="flex items-center gap-2 text-[14px] font-semibold">
               <Bot className="size-4" />
-              Мэдээний агент
+              News agent
             </h2>
             <div className="mt-4 grid grid-cols-3 gap-3">
-              <StatTile label="Авах хүнээ хүлээж буй" value={fmt(data.agent.waiting)} />
-              <StatTile label="Засварлаж буй" value={fmt(data.agent.claimed)} />
-              <StatTile label="Нийтлэгдсэн" value={fmt(data.agent.published)} />
+              <StatTile label="Waiting to be taken" value={fmt(data.agent.waiting)} />
+              <StatTile label="Being edited" value={fmt(data.agent.claimed)} />
+              <StatTile label="Published" value={fmt(data.agent.published)} />
             </div>
             <RunHistory runs={data.agent.runs} />
           </section>

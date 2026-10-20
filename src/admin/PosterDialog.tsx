@@ -24,7 +24,7 @@ import { buttonClass, inputClass, Notice } from "@/admin/ui"
 
 const formats = Object.keys(posterFormats) as PosterFormat[]
 const langs: { key: PosterLang; label: string }[] = [
-  { key: "mn", label: "Монгол" },
+  { key: "mn", label: "Mongolian" },
   { key: "en", label: "English" },
 ]
 const ZOOM = { min: 1, max: 4 }
@@ -124,8 +124,8 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
 
   function pickPhoto(file: File | undefined) {
     if (!file) return
-    if (!file.type.startsWith("image/")) return setError("Зөвхөн зураг оруулна уу (JPG, PNG, WebP).")
-    if (file.size > 20_000_000) return setError("Зураг 20MB-аас бага байх ёстой.")
+    if (!file.type.startsWith("image/")) return setError("Pictures only (JPG, PNG, WebP).")
+    if (file.size > 20_000_000) return setError("The picture must be under 20 MB.")
     setError("")
     // A data URL, so the canvas stays exportable (no cross-site image).
     const reader = new FileReader()
@@ -205,7 +205,7 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
       }
     } catch {
       // A cover from a site without CORS headers taints the canvas, so the browser refuses to export it.
-      setError("Постер хадгалж чадсангүй. Нүүр зургийг сайт руу (Supabase) дахин оруулаад оролдоно уу.")
+      setError("Couldn't save the poster. Upload the cover photo to the site (Supabase) again and retry.")
     } finally {
       setBusy(false)
     }
@@ -220,19 +220,19 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
   const { width, height, label, hint } = posterFormats[format]
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Сошиал постер" className="bg-muted fixed inset-0 z-40 flex flex-col">
+    <div role="dialog" aria-modal="true" aria-label="Social poster" className="bg-muted fixed inset-0 z-40 flex flex-col">
       <div className="bg-background flex h-14 shrink-0 items-center gap-2 border-b px-4">
-        <p className="text-[13px] font-medium">Сошиал постер</p>
+        <p className="text-[13px] font-medium">Social poster</p>
         <div className="ml-auto flex items-center gap-2">
           <button type="button" disabled={busy || !assets || !text[lang].trim()} onClick={() => download([{ format, lang }])} className={buttonClass.ghost}>
             <Download className="size-4" />
-            Энэ постер
+            This poster
           </button>
-          <button type="button" disabled={busy || !assets || !everything.length} onClick={() => download(everything)} className={buttonClass.brand}>
+          <button type="button" disabled={busy || !assets || !everything.length} onClick={() => download(everything)} className={buttonClass.primary}>
             <Download className="size-4" />
-            Бүгдийг татах ({everything.length})
+            Download all ({everything.length})
           </button>
-          <button type="button" onClick={onClose} aria-label="Хаах" className={buttonClass.ghost}>
+          <button type="button" onClick={onClose} aria-label="Close" className={buttonClass.ghost}>
             <X className="size-4" />
           </button>
         </div>
@@ -248,21 +248,21 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
             onPointerMove={onPointerMove}
             onPointerUp={() => (drag.current = null)}
             onPointerCancel={() => (drag.current = null)}
-            aria-label={`${label} урьдчилан харах: зургийг чирж зөөнө, хулганы дугуйгаар томруулна`}
+            aria-label={`${label} preview: drag the picture to move it, scroll to zoom`}
             className={cn("max-h-full max-w-full touch-none rounded-lg shadow-lg", assets ? "cursor-grab active:cursor-grabbing" : "animate-pulse")}
             style={{ aspectRatio: `${width} / ${height}`, height: "min(100%, calc(100svh - 9rem))" }}
           />
           <p className="text-muted-foreground text-[12px]">
-            {label} · {hint}. Зургийг чирж байрлуулна, хулганы дугуйгаар томруулна.
+            {label} · {hint}. Drag the picture to place it, scroll to zoom.
           </p>
         </div>
 
         <aside className="bg-background flex w-full shrink-0 flex-col gap-5 overflow-y-auto border-t p-5 lg:w-[340px] lg:border-t-0 lg:border-l">
-          <Tabs label="Хэмжээ" value={format} onChange={setFormat} options={formats.map((key) => ({ key, label: posterFormats[key].label.split(" ")[0] }))} />
-          <Tabs label="Хэл" value={lang} onChange={setLang} options={langs} />
+          <Tabs label="Size" value={format} onChange={setFormat} options={formats.map((key) => ({ key, label: posterFormats[key].label.split(" ")[0] }))} />
+          <Tabs label="Language" value={lang} onChange={setLang} options={langs} />
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium">{lang === "mn" ? "Гарчиг" : "Headline (English)"}</span>
+            <span className="text-[12px] font-medium">{lang === "mn" ? "Headline (Mongolian)" : "Headline (English)"}</span>
             <textarea
               value={text[lang]}
               onChange={(event) => setText((all) => ({ ...all, [lang]: event.target.value }))}
@@ -274,7 +274,7 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
 
           {headlineWords.length ? (
             <div className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-medium">Цэнхэр болгох үг</span>
+              <span className="text-[12px] font-medium">Words in blue</span>
               <div className="flex flex-wrap gap-1.5">
                 {headlineWords.map((word, index) => (
                   <button
@@ -291,26 +291,26 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
                   </button>
                 ))}
               </div>
-              <span className="text-muted-foreground text-[11px]">Үг дээр дарж цэнхэр болгоно, дахин дарвал буцна. 4 мөрөөс урт гарчиг дээшээ нэмэгдэнэ.</span>
+              <span className="text-muted-foreground text-[11px]">Click a word to make it blue, click again to undo. Headlines longer than 4 lines grow upwards.</span>
             </div>
           ) : null}
 
           <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] font-medium">Огноо</span>
+            <span className="text-[12px] font-medium">Date</span>
             <input value={date} onChange={(event) => setDate(event.target.value)} placeholder="2026/10/11" className={inputClass} />
           </label>
 
           <div className="flex flex-col gap-3">
-            <span className="text-[12px] font-medium">Зураг</span>
+            <span className="text-[12px] font-medium">Picture</span>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => fileRef.current?.click()} className={cn(buttonClass.ghost, "h-8 px-3 text-[12px]")}>
                 <ImageUp className="size-3.5" />
-                {upload ? "Өөр зураг" : "Зураг солих"}
+                {upload ? "Another picture" : "Replace picture"}
               </button>
               {upload ? (
                 <button type="button" onClick={() => setUpload(null)} className={cn(buttonClass.ghost, "h-8 px-3 text-[12px]")}>
                   <Undo2 className="size-3.5" />
-                  Нийтлэлийн зураг
+                  Story's picture
                 </button>
               ) : null}
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={(event) => {
@@ -318,26 +318,26 @@ export function PosterDialog({ input, slug, coverCleared, onClose }: { input: Po
                 event.target.value = ""
               }} />
             </div>
-            {upload ? <span className="text-muted-foreground truncate text-[11px]">Зөвхөн постерт: {upload.name}</span> : null}
-            <Slider label="Томруулах" value={layout.photo.scale} min={ZOOM.min} max={ZOOM.max} step={0.01} onChange={zoomTo} />
+            {upload ? <span className="text-muted-foreground truncate text-[11px]">Poster only: {upload.name}</span> : null}
+            <Slider label="Zoom" value={layout.photo.scale} min={ZOOM.min} max={ZOOM.max} step={0.01} onChange={zoomTo} />
           </div>
 
           <div className="flex flex-col gap-3">
-            <span className="text-[12px] font-medium">Харанхуй сүүдэр</span>
-            <Slider label="Бараан" value={layout.fade.amount} min={0} max={1} step={0.01} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, amount: value } }))} />
-            <Slider label="Өндөр" value={layout.fade.height} min={0.1} max={1} step={0.01} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, height: value } }))} />
+            <span className="text-[12px] font-medium">Dark fade</span>
+            <Slider label="Strength" value={layout.fade.amount} min={0} max={1} step={0.01} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, amount: value } }))} />
+            <Slider label="Height" value={layout.fade.height} min={0.1} max={1} step={0.01} onChange={(value) => setLayout((current) => ({ ...current, fade: { ...current.fade, height: value } }))} />
           </div>
 
           <button type="button" onClick={() => setLayout(() => defaultLayout())} className={cn(buttonClass.ghost, "self-start")}>
             <RotateCcw className="size-4" />
-            Зураг, сүүдрийг анхны болгох
+            Reset picture and fade
           </button>
 
           {error ? <Notice tone="error">{error}</Notice> : null}
-          {!coverUrl ? <Notice>Зураггүй байна. "Зураг солих"-оор постерт зураг нэмнэ үү.</Notice> : null}
-          {coverUrl && assets && !assets.cover ? <Notice tone="error">Зургийг ачаалж чадсангүй.</Notice> : null}
+          {!coverUrl ? <Notice>No picture yet. Add one with "Replace picture".</Notice> : null}
+          {coverUrl && assets && !assets.cover ? <Notice tone="error">Couldn't load the picture.</Notice> : null}
           {!upload && input.coverUrl && !coverCleared ? (
-            <Notice tone="error">Агентын оруулсан зургийг ашиглах эрхийг баталгаажуулаагүй байна. Сошиалд тавихаас өмнө шалгана уу.</Notice>
+            <Notice tone="error">The rights to the agent's photo aren't confirmed yet. Check them before posting it on social media.</Notice>
           ) : null}
         </aside>
       </div>

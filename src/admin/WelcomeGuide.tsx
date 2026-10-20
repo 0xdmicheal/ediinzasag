@@ -3,7 +3,7 @@ import { X } from "lucide-react"
 
 import { isEditor } from "@/admin/rules"
 import type { Member } from "@/admin/types"
-import { buttonClass } from "@/admin/ui"
+import { Button } from "@/components/ui/button"
 
 const key = (member: Member) => `ez-admin-guide-${member.id}`
 
@@ -15,47 +15,38 @@ function seen(member: Member) {
   }
 }
 
-/** How a piece moves through the newsroom, in the writer's words. */
+const link = "text-foreground underline underline-offset-4"
+
+/** How a story moves through the newsroom. */
 const steps = [
   {
-    title: "Бичих",
+    title: "Write",
     body: (
       <>
-        <Link to="/new" className="text-foreground underline underline-offset-4">Шинэ нийтлэл</Link>-ээр эхэлнэ, эсвэл{" "}
-        <Link to="/inbox" className="text-foreground underline underline-offset-4">Мэдээний урсгал</Link>-аас агентын бэлдсэн мэдээг
-        сонгоно. Бичсэн бүхэн өөрөө хадгалагдана.
+        Start a <Link to="/new" className={link}>New story</Link>, or pick one the agent prepared in the{" "}
+        <Link to="/inbox" className={link}>Inbox</Link>. Everything saves as you type.
       </>
     ),
   },
-  {
-    title: "Илгээх",
-    body: <>Баруун дээд талын «Илгээх»-ийг дарж бэлэн байдлын жагсаалтаа шалгаад, редакторт хянуулахаар илгээнэ.</>,
-  },
-  {
-    title: "Засах",
-    body: <>Редактор засвар хүсвэл нийтлэл «Хийх ажил»-д буцаж ирнэ. Тэмдэглэл нь нийтлэлийн дээд талд харагдана.</>,
-  },
-  {
-    title: "Нийтлэгдэх",
-    body: <>Редактор баталж нийтэлнэ эсвэл цаг товлоно. Нийтлэгдсэн нийтлэлд засвар хэрэгтэй бол редактортоо хэлнэ.</>,
-  },
+  { title: "Send for review", body: <>Press «Send» at the top right, finish the readiness checklist, and it goes to an editor.</> },
+  { title: "Revise", body: <>If the editor asks for changes, the story comes back to your To do with their note on top.</> },
+  { title: "Publish", body: <>The editor approves and publishes it, or schedules a time. Need a fix after that? Ask your editor.</> },
 ]
 
-/** EZ Writing System v2.1, the rules a new writer trips on first. */
+/** EZ Writing System v2.1: the rules new writers trip on first. Examples stay in Mongolian. */
 const rules = [
-  "Эх сурвалжаа текст дотор, нэр дээр нь холбоосоор өгнө. Тусдаа жагсаалт хийхгүй.",
-  "Тоо бүр суурь, хугацаатай байна: «өнгөрсөн оны мөн үеэс 12 хувиар».",
-  "Орчуулга шиг биш, монгол сэтгүүлчийн хэлээр бичнэ.",
-  "«Яагаад чухал вэ», «Дүгнэлт» гэх мэт шошго гарчиг тавихгүй. Дэд гарчиг өөрөө санаагаа хэлнэ.",
-  "Текстэд «хувь», ишлэлийг «» хашилтаар бичнэ. Анхаарлын тэмдэг хэрэглэхгүй.",
+  <>Link sources inline, on the name that carries the fact. No source list at the end.</>,
+  <>Every figure gets a base and a period: «өнгөрсөн оны мөн үеэс 12 хувиар».</>,
+  <>Write as a Mongolian journalist, never like a translation.</>,
+  <>No label headings («Яагаад чухал вэ», «Дүгнэлт»). A subhead states its section's point.</>,
+  <>«хувь» in the text, quotes in «», no exclamation marks.</>,
 ]
 
 /**
- * The board's welcome for new members: the four steps and the house rules, until they close
- * it. "Заавар" on the board brings it back.
+ * The dashboard's welcome: the four steps and the house rules, shown until the member closes
+ * it once. «Guide» in the sidebar brings it back.
  */
-export function WelcomeGuide({ member, open, onClose }: { member: Member; open: boolean; onClose: () => void }) {
-  if (!open) return null
+export function WelcomeGuide({ member, onClose }: { member: Member; onClose: () => void }) {
   const close = () => {
     try {
       localStorage.setItem(key(member), "1")
@@ -69,21 +60,25 @@ export function WelcomeGuide({ member, open, onClose }: { member: Member; open: 
       <button
         type="button"
         onClick={close}
-        aria-label="Хаах"
-        className="text-muted-foreground hover:text-foreground absolute top-3 right-3 grid size-8 place-items-center rounded-md"
+        aria-label="Close guide"
+        className="text-muted-foreground hover:text-foreground hover:bg-background absolute top-3 right-3 grid size-8 place-items-center rounded-lg"
       >
         <X className="size-4" />
       </button>
       <div className="grid gap-8 p-6 lg:grid-cols-[1.4fr_1fr] lg:gap-12">
         <div>
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Редакцад тавтай морил</p>
-          <h2 id="guide-title" className="font-news mt-1 text-2xl">Нийтлэл дөрвөн алхмаар гарна</h2>
+          <p className="text-muted-foreground text-[13px]">Welcome to the newsroom</p>
+          <h2 id="guide-title" className="ez-title mt-1 text-[1.75rem] leading-tight">
+            Four steps from draft to published
+          </h2>
           <ol className="mt-5 divide-y">
             {steps.map((step, index) => (
               <li key={step.title} className="flex gap-4 py-3 first:pt-0 last:pb-0">
-                <span className="text-muted-foreground w-5 shrink-0 pt-0.5 font-mono text-[12px] tabular-nums">{index + 1}</span>
+                <span className="bg-background text-muted-foreground grid size-6 shrink-0 place-items-center rounded-md text-[12px] tabular-nums">
+                  {index + 1}
+                </span>
                 <div>
-                  <p className="text-[14px] font-semibold">{step.title}</p>
+                  <p className="text-[14px] font-medium">{step.title}</p>
                   <p className="text-muted-foreground mt-0.5 text-[13px] leading-relaxed">{step.body}</p>
                 </div>
               </li>
@@ -91,22 +86,23 @@ export function WelcomeGuide({ member, open, onClose }: { member: Member; open: 
           </ol>
         </div>
         <div className="lg:border-l lg:pl-12">
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Бичих зарчим</p>
+          <p className="text-[14px] font-medium">House rules</p>
+          <p className="text-muted-foreground text-[12px]">EZ Writing System v2.1</p>
           <ul className="mt-3 space-y-2.5">
-            {rules.map((rule) => (
-              <li key={rule} className="text-muted-foreground border-foreground/15 border-l-2 pl-3 text-[13px] leading-relaxed">
+            {rules.map((rule, index) => (
+              <li key={index} className="text-muted-foreground border-foreground/15 border-l-2 pl-3 text-[13px] leading-relaxed">
                 {rule}
               </li>
             ))}
           </ul>
           <p className="text-muted-foreground mt-4 text-[12px] leading-relaxed">
             {isEditor(member)
-              ? "Засвар хүсэхдээ юуг, яагаад засахыг тэмдэглэлд тодорхой бичнэ."
-              : "Эргэлзвэл редактортоо асууна. Илгээхийн өмнө «Урьдчилан харах»-аар сайт дээр хэрхэн харагдахыг шалгана."}
+              ? "When you ask for changes, say what to fix and why in the note."
+              : "Unsure? Ask your editor. Use «Preview» to see the story as readers will."}
           </p>
-          <button type="button" onClick={close} className={`${buttonClass.ghost} mt-5`}>
-            Ойлголоо
-          </button>
+          <Button variant="outline" onClick={close} className="mt-5 h-9 px-4">
+            Got it
+          </Button>
         </div>
       </div>
     </section>

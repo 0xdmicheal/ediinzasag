@@ -103,7 +103,7 @@ function Dialog({ options, onClose }: { options: ConfirmOptions; onClose: (ok: b
         ) : null}
         <div className="mt-5 flex justify-end gap-2">
           <button ref={cancel} type="button" onClick={() => onClose(false)} className={buttonClass.ghost}>
-            Болих
+            Cancel
           </button>
           <button
             ref={confirm}

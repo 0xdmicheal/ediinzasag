@@ -6,15 +6,15 @@ import { Crown, PenLine, ShieldCheck, UserPlus } from "lucide-react"
 import { useConfirm } from "@/admin/ConfirmDialog"
 import { canManageTeam, roleLabel } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
-import { Avatar, buttonClass, Field, inputClass, Notice } from "@/admin/ui"
+import { Avatar, buttonClass, Field, inputClass, Notice, PageHeader, pageClass } from "@/admin/ui"
 import type { Member, Role } from "@/admin/types"
 
 const roles: Role[] = ["writer", "editor", "admin"]
 
 const roleRights: Record<Role, string> = {
-  writer: "Ноорог бичиж, хянуулахаар илгээнэ. Өөрийн нийтлэлийг л засна.",
-  editor: "Бүх нийтлэлийг засна, батална, засвар хүснэ, нийтэлнэ. Шошго удирдана.",
-  admin: "Редакторын бүх эрх + гишүүдийн эрхийг өөрчилнө.",
+  writer: "Writes drafts and sends them for review. Edits only their own stories.",
+  editor: "Edits every story, approves, requests changes and publishes. Manages tags.",
+  admin: "Everything an editor can do, plus the team and roles.",
 }
 
 const roleIcon: Record<Role, ReactNode> = {
@@ -74,9 +74,9 @@ export function TeamPage() {
       target.id === member.id &&
       next !== "admin" &&
       !(await confirm({
-        title: "Өөрийнхөө админ эрхийг хасах уу?",
-        message: "Баг, уншигч, хяналтын хуудас танд хаагдана. Буцааж авахын тулд өөр админ хэрэгтэй.",
-        confirmLabel: "Эрх хасах",
+        title: "Remove your own admin role?",
+        message: "You'll lose Team, Readers and Insights. Another admin would have to give it back.",
+        confirmLabel: "Remove role",
         destructive: true,
       }))
     )
@@ -87,7 +87,7 @@ export function TeamPage() {
       setMessage({ tone: "success", text: `${target.name}: ${roleLabel[next]}` })
       if (target.id === member.id) refresh()
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Өөрчилж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't change the role" })
     }
   }
 
@@ -103,29 +103,21 @@ export function TeamPage() {
       setMessage({
         tone: "success",
         text: {
-          invited: `${address} руу урилга илгээлээ. Холбоосоор орж нууц үгээ үүсгээд, утасны баталгаажуулах аппаа холбоно.`,
-          resent: `${address} руу урилгыг дахин илгээлээ.`,
-          joined: `${address} багт нэмэгдлээ. Дараагийн нэвтрэлтээрээ утасны баталгаажуулах аппаа холбоно.`,
+          invited: `Invite sent to ${address}. They open the link, set a password and link an authenticator app.`,
+          resent: `Invite sent to ${address} again.`,
+          joined: `${address} joined the team. They link an authenticator app at their next sign-in.`,
         }[status],
       })
     } catch (failure) {
-      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Урьж чадсангүй" })
+      setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't send the invite" })
     } finally {
       setInviting(false)
     }
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Админ</p>
-          <h1 className="font-news mt-1 text-3xl">Баг</h1>
-          <p className="text-muted-foreground mt-1 text-[14px]">
-            {members.length} гишүүн · эрх нь хэн юу хийж чадахыг тодорхойлно
-          </p>
-        </div>
-      </header>
+    <div className={pageClass}>
+      <PageHeader title="Team" description={`${members.length} ${members.length === 1 ? "member" : "members"} · a role decides what each person can do`} />
 
       {/* Roles: what each can do, and how many people hold it. */}
       <div className="grid gap-3 sm:grid-cols-3">
@@ -145,7 +137,7 @@ export function TeamPage() {
 
       <section aria-labelledby="members-title" className="bg-card overflow-hidden rounded-xl border">
         <h2 id="members-title" className="border-b px-4 py-3 text-[14px] font-semibold">
-          Гишүүд
+          Members
         </h2>
         <ul className="divide-y">
           {sorted.map((item) => (
@@ -155,12 +147,12 @@ export function TeamPage() {
                 <p className="flex items-center gap-2 truncate text-[14px] font-semibold">
                   {item.name}
                   {item.id === member.id ? (
-                    <span className="bg-foreground/[0.07] text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">та</span>
+                    <span className="bg-foreground/[0.07] text-muted-foreground rounded-full px-2 py-0.5 text-[11px] font-medium">you</span>
                   ) : null}
                 </p>
                 <p className="text-muted-foreground truncate text-[12px]">{item.email}</p>
               </div>
-              <RolePicker value={item.role} onChange={(next) => changeRole(item, next)} label={`${item.name} эрх`} size="sm" />
+              <RolePicker value={item.role} onChange={(next) => changeRole(item, next)} label={`${item.name} role`} size="sm" />
             </li>
           ))}
         </ul>
@@ -172,31 +164,31 @@ export function TeamPage() {
             <UserPlus className="size-4" />
           </span>
           <div>
-            <p className="text-[14px] font-semibold">Гишүүн урих{backend.mode === "demo" ? " (демо)" : ""}</p>
+            <p className="text-[14px] font-semibold">Invite a member{backend.mode === "demo" ? " (demo)" : ""}</p>
             {backend.mode === "supabase" ? (
               <p className="text-muted-foreground text-[12px]">
-                Урилгын и-мэйл очно. Уншигчаар бүртгэлтэй хүн шууд нэмэгдэнэ. И-мэйл ирээгүй бол ижил хаягаар дахин урина.
+                They get an invite e-mail. Someone with a reader account joins at once. No e-mail? Invite the same address again.
               </p>
             ) : null}
           </div>
         </div>
         <div className="flex flex-col gap-4 p-4">
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Нэр" htmlFor="member-name">
+            <Field label="Name" htmlFor="member-name">
               <input id="member-name" required value={name} onChange={(event) => setName(event.target.value)} className={inputClass} />
             </Field>
-            <Field label="И-мэйл" htmlFor="member-email">
+            <Field label="E-mail" htmlFor="member-email">
               <input id="member-email" type="email" required value={email} onChange={(event) => setEmail(event.target.value)} className={inputClass} />
             </Field>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-col gap-1.5">
-              <span className="text-[13px] font-medium">Эрх</span>
-              <RolePicker value={role} onChange={setRole} label="Шинэ гишүүний эрх" />
+              <span className="text-[13px] font-medium">Role</span>
+              <RolePicker value={role} onChange={setRole} label="New member's role" />
             </div>
             <button type="submit" disabled={inviting} className={buttonClass.primary}>
               <UserPlus className="size-4" />
-              {inviting ? "Илгээж байна…" : "Урих"}
+              {inviting ? "Sending…" : "Invite"}
             </button>
           </div>
         </div>

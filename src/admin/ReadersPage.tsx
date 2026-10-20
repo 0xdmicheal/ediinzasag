@@ -5,7 +5,7 @@ import { Download, Search } from "lucide-react"
 import { canManageTeam } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import type { ReaderRecord, Subscriber } from "@/admin/types"
-import { buttonClass, inputClass, Notice } from "@/admin/ui"
+import { buttonClass, inputClass, Notice, PageHeader, pageClass } from "@/admin/ui"
 import { formatPhone } from "@/reader/phone"
 import { ReaderAvatar } from "@/reader/ReaderAvatar"
 import { regionLabel } from "@/reader/regions"
@@ -18,7 +18,7 @@ function csvCell(value: string) {
 /** Downloads the list as CSV. The BOM makes Excel read Cyrillic correctly. */
 function downloadCsv(readers: ReaderRecord[]) {
   const rows = [
-    ["Нэр", "И-мэйл", "Утас", "Төрсөн огноо", "Хүйс", "Байршил", "Бүртгүүлсэн"],
+    ["Name", "E-mail", "Phone", "Birth date", "Gender", "Region", "Signed up"],
     ...readers.map((reader) => [
       reader.name,
       reader.email,
@@ -57,11 +57,11 @@ export function ReadersPage() {
   const [tab, setTab] = useState<Tab>("readers")
   if (!canManageTeam(member)) return <Navigate to="/" replace />
   const tabs = (
-    <div role="tablist" aria-label="Жагсаалт" className="bg-muted inline-flex w-fit gap-1 rounded-lg p-1">
+    <div role="tablist" aria-label="List" className="bg-muted inline-flex w-fit gap-1 rounded-lg p-1">
       {(
         [
-          ["readers", "Бүртгэлтэй уншигчид"],
-          ["subscribers", "Захиалагчид"],
+          ["readers", "Registered readers"],
+          ["subscribers", "Newsletter"],
         ] as const
       ).map(([id, label]) => (
         <button
@@ -91,7 +91,7 @@ function SubscribersList({ tabs }: { tabs: ReactNode }) {
     backend
       .listSubscribers()
       .then(setRows)
-      .catch((failure) => setError(failure instanceof Error ? failure.message : "Ачаалж чадсангүй"))
+      .catch((failure) => setError(failure instanceof Error ? failure.message : "Couldn't load"))
   }, [backend])
 
   const shown = useMemo(() => {
@@ -100,34 +100,33 @@ function SubscribersList({ tabs }: { tabs: ReactNode }) {
   }, [rows, query])
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Админ</p>
-          <h1 className="font-news mt-1 text-3xl">Уншигчид</h1>
-          <p className="text-muted-foreground mt-1 text-[13px]">{rows ? `Нийт ${rows.length} захиалагч` : "Ачаалж байна…"}</p>
-        </div>
-        <button type="button" disabled={!shown.length} onClick={() => downloadSubscribersCsv(shown)} className={buttonClass.primary}>
-          <Download className="size-4" />
-          Substack-д зориулсан CSV{query.trim() ? ` (${shown.length})` : ""}
-        </button>
-      </header>
+    <div className={pageClass}>
+      <PageHeader
+        title="Readers"
+        description={rows ? `${rows.length} newsletter ${rows.length === 1 ? "subscriber" : "subscribers"}` : "Loading…"}
+        actions={
+          <button type="button" disabled={!shown.length} onClick={() => downloadSubscribersCsv(shown)} className={buttonClass.primary}>
+            <Download className="size-4" />
+            CSV for Substack{query.trim() ? ` (${shown.length})` : ""}
+          </button>
+        }
+      />
       {tabs}
 
       <Notice>
-        Нийтлэл хуудсаар захиалсан хаягууд. CSV-г Substack → Settings → Import subscribers хэсэгт оруулна. Давхардсан хаягийг Substack өөрөө алгасна.
+        Addresses that subscribed on the Нийтлэл page. Import the CSV in Substack → Settings → Import subscribers; Substack skips duplicates.
       </Notice>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <label className="relative block">
-        <span className="sr-only">Хайх</span>
+        <span className="sr-only">Search</span>
         <Search className="text-muted-foreground pointer-events-none absolute z-10 top-1/2 left-3 size-4 -translate-y-1/2" />
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="И-мэйлээр хайх" className={`${inputClass} pl-9`} />
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by e-mail" className={`${inputClass} pl-9`} />
       </label>
 
       {rows && shown.length === 0 ? (
-        <p className="text-muted-foreground text-[14px]">{rows.length ? "Илэрц алга." : "Одоогоор захиалагч алга."}</p>
+        <p className="text-muted-foreground text-[14px]">{rows.length ? "No matches." : "No subscribers yet."}</p>
       ) : (
         <ul className="bg-card divide-y rounded-xl border">
           {shown.map((row) => (
@@ -157,7 +156,7 @@ function ReadersList({ tabs }: { tabs: ReactNode }) {
     backend
       .listReaders()
       .then(setReaders)
-      .catch((failure) => setError(failure instanceof Error ? failure.message : "Ачаалж чадсангүй"))
+      .catch((failure) => setError(failure instanceof Error ? failure.message : "Couldn't load"))
   }, [backend])
 
   const shown = useMemo(() => {
@@ -173,42 +172,39 @@ function ReadersList({ tabs }: { tabs: ReactNode }) {
   }, [readers, query])
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-muted-foreground font-mono text-[11px] uppercase">Админ</p>
-          <h1 className="font-news mt-1 text-3xl">Уншигчид</h1>
-          <p className="text-muted-foreground mt-1 text-[13px]">
-            {readers ? `Нийт ${readers.length} бүртгэлтэй уншигч` : "Ачаалж байна…"}
-          </p>
-        </div>
-        <button type="button" disabled={!shown.length} onClick={() => downloadCsv(shown)} className={buttonClass.primary}>
-          <Download className="size-4" />
-          CSV татах{query.trim() ? ` (${shown.length})` : ""}
-        </button>
-      </header>
+    <div className={pageClass}>
+      <PageHeader
+        title="Readers"
+        description={readers ? `${readers.length} registered ${readers.length === 1 ? "reader" : "readers"}` : "Loading…"}
+        actions={
+          <button type="button" disabled={!shown.length} onClick={() => downloadCsv(shown)} className={buttonClass.primary}>
+            <Download className="size-4" />
+            Download CSV{query.trim() ? ` (${shown.length})` : ""}
+          </button>
+        }
+      />
       {tabs}
 
       <Notice>
-        И-мэйлийг зөвхөн сайтын үйлчилгээнд ашиглана. Маркетингийн захидал илгээхийн өмнө уншигчаас зөвшөөрөл аваарай.
+        Use these e-mails only to run the site. Ask readers for consent before sending any marketing.
       </Notice>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <label className="relative block">
-        <span className="sr-only">Хайх</span>
+        <span className="sr-only">Search</span>
         <Search className="text-muted-foreground pointer-events-none absolute z-10 top-1/2 left-3 size-4 -translate-y-1/2" />
         <input
           type="search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Нэр, и-мэйл эсвэл утсаар хайх"
+          placeholder="Search by name, e-mail or phone"
           className={`${inputClass} pl-9`}
         />
       </label>
 
       {readers && shown.length === 0 ? (
-        <p className="text-muted-foreground text-[14px]">{readers.length ? "Илэрц алга." : "Одоогоор бүртгэлтэй уншигч алга."}</p>
+        <p className="text-muted-foreground text-[14px]">{readers.length ? "No matches." : "No registered readers yet."}</p>
       ) : (
         <ul className="bg-card divide-y rounded-xl border">
           {shown.map((reader) => (

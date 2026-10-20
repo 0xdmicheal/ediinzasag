@@ -15,8 +15,8 @@ export type PosterFormat = "post" | "story"
 export type PosterLang = "mn" | "en"
 
 export const posterFormats: Record<PosterFormat, { width: number; height: number; label: string; hint: string }> = {
-  post: { width: 1080, height: 1350, label: "Пост 4:5", hint: "Facebook, Instagram, X · 2160×2700" },
-  story: { width: 1080, height: 1920, label: "Стори 9:16", hint: "Instagram, Facebook story · 2160×3840" },
+  post: { width: 1080, height: 1350, label: "Post 4:5", hint: "Facebook, Instagram, X · 2160×2700" },
+  story: { width: 1080, height: 1920, label: "Story 9:16", hint: "Instagram, Facebook story · 2160×3840" },
 }
 
 /** What the editor opens the dialog with. */

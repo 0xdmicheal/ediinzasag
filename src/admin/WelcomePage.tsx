@@ -6,7 +6,7 @@ import { useSession } from "@/admin/session"
 import { AuthShell, TwoStepForm } from "@/admin/TwoStepForm"
 import type { Member, TwoStep } from "@/admin/types"
 import { Field, inputClass, Notice } from "@/admin/ui"
-import { ShimmerButton } from "@/components/ui/shimmer-button"
+import { Button } from "@/components/ui/button"
 
 const MIN_PASSWORD = 10
 
@@ -49,8 +49,8 @@ export function WelcomePage() {
   async function save(event: FormEvent) {
     event.preventDefault()
     if (!backend) return
-    if (password.length < MIN_PASSWORD) return setError(`Нууц үг дор хаяж ${MIN_PASSWORD} тэмдэгт байна`)
-    if (password !== repeat) return setError("Хоёр нууц үг таарахгүй байна")
+    if (password.length < MIN_PASSWORD) return setError(`Use at least ${MIN_PASSWORD} characters`)
+    if (password !== repeat) return setError("The two passwords don't match")
     setBusy(true)
     setError("")
     try {
@@ -59,7 +59,7 @@ export function WelcomePage() {
       if (next) setStep(next)
       else navigate("/", { replace: true })
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : "Хадгалж чадсангүй")
+      setError(failure instanceof Error ? failure.message : "Couldn't save the password")
     } finally {
       setBusy(false)
     }
@@ -72,15 +72,15 @@ export function WelcomePage() {
 
   if (linkError || member === null) {
     return (
-      <AuthShell label="Редакц">
+      <AuthShell label="Newsroom">
         <div className="bg-card flex flex-col gap-4 rounded-xl border p-6">
-          <h1 className="font-news text-xl">Холбоос хүчингүй байна</h1>
+          <h1 className="text-xl font-medium">This link no longer works</h1>
           <p className="text-muted-foreground text-[13px] leading-relaxed">
-            Холбоосын хугацаа дууссан эсвэл аль хэдийн ашигласан байна. Урилга бол админаас дахин илгээхийг хүснэ үү. Нууц үг сэргээх
-            бол нэвтрэх хуудаснаас дахин хүснэ.
+            It has expired or was already used. For an invite, ask an admin to send it again. For a password reset, ask for a new
+            link on the sign-in page.
           </p>
           <Link to="/login" className="text-foreground text-[13px] font-medium underline underline-offset-4">
-            Нэвтрэх хуудас руу
+            Go to sign-in
           </Link>
         </div>
       </AuthShell>
@@ -90,29 +90,29 @@ export function WelcomePage() {
   if (member === undefined) {
     return (
       <div className="text-muted-foreground grid min-h-svh place-items-center text-sm" role="status">
-        Холбоосыг шалгаж байна…
+        Checking the link…
       </div>
     )
   }
 
   return (
-    <AuthShell label={reset ? "Нууц үг сэргээх" : "Редакцад тавтай морил"}>
+    <AuthShell label={reset ? "Password reset" : "Welcome to the newsroom"}>
       {step ? (
-        <TwoStepForm step={step} onDone={() => navigate("/", { replace: true })} onBack={leave} backLabel="Дараа үргэлжлүүлэх" />
+        <TwoStepForm step={step} onDone={() => navigate("/", { replace: true })} onBack={leave} backLabel="Finish later" />
       ) : (
         <form onSubmit={save} className="bg-card flex flex-col gap-4 rounded-xl border p-6">
           <div className="flex items-center gap-2">
             <KeyRound className="text-muted-foreground size-4" />
-            <h1 className="font-news text-xl">{reset ? "Шинэ нууц үг" : `Сайн байна уу, ${member.name.split(" ")[0]}`}</h1>
+            <h1 className="text-xl font-medium">{reset ? "Set a new password" : `Hi, ${member.name.split(" ")[0]}`}</h1>
           </div>
           <p className="text-muted-foreground text-[13px] leading-relaxed">
             {reset
-              ? `${member.email} бүртгэлийн шинэ нууц үгээ үүсгэнэ үү.`
-              : `${member.email} хаягаар редакцад нэвтрэх нууц үгээ үүсгэнэ үү. Дараа нь утасныхаа баталгаажуулах аппыг холбоно, нэг минут орчим.`}
+              ? `Choose a new password for ${member.email}.`
+              : `Create the password you'll use with ${member.email}. Then you'll link an authenticator app on your phone; it takes about a minute.`}
           </p>
           {/* Lets password managers save the pair under the right account. */}
           <input type="email" autoComplete="username" value={member.email} readOnly hidden />
-          <Field label="Нууц үг" htmlFor="welcome-password" hint={`Дор хаяж ${MIN_PASSWORD} тэмдэгт`}>
+          <Field label="Password" htmlFor="welcome-password" hint={`At least ${MIN_PASSWORD} characters`}>
             <input
               id="welcome-password"
               type="password"
@@ -124,7 +124,7 @@ export function WelcomePage() {
               className={inputClass}
             />
           </Field>
-          <Field label="Нууц үгээ давтах" htmlFor="welcome-repeat">
+          <Field label="Repeat password" htmlFor="welcome-repeat">
             <input
               id="welcome-repeat"
               type="password"
@@ -136,10 +136,10 @@ export function WelcomePage() {
             />
           </Field>
           {error ? <Notice tone="error">{error}</Notice> : null}
-          <ShimmerButton type="submit" disabled={busy} className="h-11 w-full text-[13px] font-medium">
-            {busy ? "Хадгалж байна…" : "Үргэлжлүүлэх"}
+          <Button type="submit" disabled={busy} className="h-11 w-full gap-1.5 text-[14px]">
+            {busy ? "Saving…" : "Continue"}
             <ArrowRight className="size-4" />
-          </ShimmerButton>
+          </Button>
         </form>
       )}
     </AuthShell>

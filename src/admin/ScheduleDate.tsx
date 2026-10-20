@@ -5,14 +5,14 @@ import { cn } from "cn"
 
 import { Select } from "@/admin/Select"
 
-const WEEKDAYS = ["Да", "Мя", "Лх", "Пү", "Ба", "Бя", "Ня"]
-const MONTHS = ["1-р сар", "2-р сар", "3-р сар", "4-р сар", "5-р сар", "6-р сар", "7-р сар", "8-р сар", "9-р сар", "10-р сар", "11-р сар", "12-р сар"]
+const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
 const PRESETS = [
-  { id: "today", label: "Өнөөдөр", offset: 0 },
-  { id: "tomorrow", label: "Маргааш", offset: 1 },
-  { id: "7d", label: "7 хоног", offset: 7 },
-  { id: "14d", label: "14 хоног", offset: 14 },
-  { id: "30d", label: "30 хоног", offset: 30 },
+  { id: "today", label: "Today", offset: 0 },
+  { id: "tomorrow", label: "Tomorrow", offset: 1 },
+  { id: "7d", label: "In 7 days", offset: 7 },
+  { id: "14d", label: "In 14 days", offset: 14 },
+  { id: "30d", label: "In 30 days", offset: 30 },
 ] as const
 
 const pad2 = (value: number) => String(value).padStart(2, "0")
@@ -110,7 +110,7 @@ export function ScheduleDate({
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
-              aria-label="Өмнөх сар"
+              aria-label="Previous month"
               disabled={!canPrevious}
               onClick={() => canPrevious && setView(previous)}
               className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-lg disabled:opacity-30"
@@ -122,7 +122,7 @@ export function ScheduleDate({
             </span>
             <button
               type="button"
-              aria-label="Дараагийн сар"
+              aria-label="Next month"
               disabled={!canNext}
               onClick={() => canNext && setView(next)}
               className="text-muted-foreground hover:text-foreground grid size-7 place-items-center rounded-lg disabled:opacity-30"
@@ -174,8 +174,8 @@ export function ScheduleDate({
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2 border-t border-border p-3">
-        <Select label="Цаг" value={hour} onChange={onHour} options={hourOptions} />
-        <Select label="Минут" value={minute} onChange={onMinute} options={minuteOptions} />
+        <Select label="Hour" value={hour} onChange={onHour} options={hourOptions} />
+        <Select label="Minute" value={minute} onChange={onMinute} options={minuteOptions} />
       </div>
     </div>
   )

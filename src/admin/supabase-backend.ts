@@ -82,8 +82,8 @@ function toRow(draft: ArticleDraft) {
 
 /** Turns Postgres errors into messages a newsroom member can act on. */
 function fail(error: { message: string; code?: string } | null): never {
-  if (error?.code === "23505") throw new Error("Энэ хаяг (slug) өөр нийтлэлд ашиглагдсан байна")
-  throw new Error(error?.message ?? "Алдаа гарлаа")
+  if (error?.code === "23505") throw new Error("Another story already uses this URL (slug)")
+  throw new Error(error?.message ?? "Something went wrong")
 }
 
 export function createSupabaseBackend(): Backend {
@@ -113,7 +113,7 @@ export function createSupabaseBackend(): Backend {
     for (const factor of factors.all.filter((item) => item.status === "unverified")) {
       await client.auth.mfa.unenroll({ factorId: factor.id })
     }
-    const { data: enrolled, error: enrollError } = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "EZ Редакц" })
+    const { data: enrolled, error: enrollError } = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "EZ Newsroom" })
     if (enrollError) throw new Error(enrollError.message)
     return { factorId: enrolled.id, enroll: { qr: enrolled.totp.qr_code, secret: enrolled.totp.secret } }
   }
@@ -128,27 +128,27 @@ export function createSupabaseBackend(): Backend {
     },
     async signIn(email, password) {
       const { error } = await client.auth.signInWithPassword({ email, password })
-      if (error) throw new Error(error.message === "Invalid login credentials" ? "И-мэйл эсвэл нууц үг буруу" : error.message)
+      if (error) throw new Error(error.message === "Invalid login credentials" ? "Wrong e-mail or password" : error.message)
       if (!(await profileOf())) {
         await client.auth.signOut()
-        throw new Error("Энэ бүртгэл багийн гишүүн биш байна")
+        throw new Error("This account isn't on the newsroom team")
       }
       return twoStep()
     },
     twoStep,
     async verifyTwoStep(factorId, code) {
       const { error } = await client.auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\s/g, "") })
-      if (error) throw new Error(/invalid|expired/i.test(error.message) ? "Код буруу эсвэл хугацаа нь дууссан байна" : error.message)
+      if (error) throw new Error(/invalid|expired/i.test(error.message) ? "Wrong or expired code" : error.message)
     },
     async sendPasswordReset(email) {
       const { error } = await client.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${adminUrl}/welcome` })
-      if (error) throw new Error(error.status === 429 ? "Хэт олон оролдлого. Түр хүлээгээд дахин оролдоно уу" : error.message)
+      if (error) throw new Error(error.status === 429 ? "Too many tries. Wait a moment and try again" : error.message)
     },
     welcomeMember: profileOf,
     async setPassword(password) {
-      if (await isPwnedPassword(password)) throw new Error("Энэ нууц үг өмнө нь алдагдсан нууц үгийн жагсаалтад орсон байна. Өөр нууц үг сонгоно уу")
+      if (await isPwnedPassword(password)) throw new Error("This password appears in a list of leaked passwords. Choose another one")
       const { error } = await client.auth.updateUser({ password })
-      if (error) throw new Error(/different from the old/i.test(error.message) ? "Шинэ нууц үг хуучнаасаа өөр байх ёстой" : /at least/i.test(error.message) ? "Нууц үг хэт богино байна" : error.message)
+      if (error) throw new Error(/different from the old/i.test(error.message) ? "The new password must differ from the old one" : /at least/i.test(error.message) ? "The password is too short" : error.message)
     },
     async signOut() {
       await client.auth.signOut()
@@ -230,7 +230,7 @@ export function createSupabaseBackend(): Backend {
     },
     async createTag(label) {
       const tag = { slug: slugify(label), label: label.trim() }
-      if (!tag.slug) throw new Error("Шошгоны нэр хоосон байна")
+      if (!tag.slug) throw new Error("The tag needs a name")
       const { error } = await client.from("tags").upsert(tag, { onConflict: "slug", ignoreDuplicates: true })
       if (error) fail(error)
       return tag
@@ -258,7 +258,7 @@ export function createSupabaseBackend(): Backend {
       const { data, error } = await client.functions.invoke("team-invite", { body: { name, email, role } })
       if (error) {
         const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
-        throw new Error(detail?.error ?? "Урьж чадсангүй")
+        throw new Error(detail?.error ?? "Couldn't send the invite")
       }
       return (data as { status: "invited" | "resent" | "joined" }).status
     },
@@ -325,7 +325,7 @@ export function createSupabaseBackend(): Backend {
       if (error) {
         // The function answers errors as { error: "..." }; show that rather than the generic HTTP text.
         const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
-        throw new Error(detail?.error ?? "Мэдээ татаж чадсангүй. Edge Function суулгасан эсэхийг шалгана уу (ADMIN.md).")
+        throw new Error(detail?.error ?? "The pull failed. Check that the Edge Function is deployed (ADMIN.md).")
       }
       return data as { created: number; scanned: number; queued?: number; details?: RunDetails }
     },
@@ -343,7 +343,7 @@ export function createSupabaseBackend(): Backend {
       const { data, error } = await client.functions.invoke("news-agent", { body: { action: "file", id: Number(id) } })
       if (error) {
         const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
-        throw new Error(detail?.error ?? "Карт үүсгэж чадсангүй")
+        throw new Error(detail?.error ?? "Couldn't make the card")
       }
       return (data as { article_id: string }).article_id
     },
@@ -351,7 +351,7 @@ export function createSupabaseBackend(): Backend {
       const { error } = await client.functions.invoke("news-agent", { body: { action: "delete", id: Number(id) } })
       if (error) {
         const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
-        throw new Error(detail?.error ?? "Карт устгаж чадсангүй")
+        throw new Error(detail?.error ?? "Couldn't delete the card")
       }
     },
     async setNewsItemDismissed(id, dismissed) {
