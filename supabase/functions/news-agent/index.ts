@@ -421,8 +421,11 @@ const geminiServed = new Set<string>()
  * call began is dropped, so the queue row is saved before Supabase stops the function.
  */
 const DRAFT_DEADLINE_MS = 125_000
-/** The model's ranking gets this long; past it (or on an error) the run ranks by rules instead. */
-const RANK_BUDGET_MS = 60_000
+/**
+ * The model's ranking gets this long; past it (or on an error) the run ranks by rules instead.
+ * Reading the feeds takes ~10 s, so this leaves room inside the 150 s and covers a busy-wait and retry.
+ */
+const RANK_BUDGET_MS = 100_000
 /** A queued story is tried this many times (Gemini busy, too slow), then goes back to the inbox. */
 const QUEUE_ATTEMPTS = 3
 /** A draft call that died without saving (Supabase stopped it) frees its story after this. */

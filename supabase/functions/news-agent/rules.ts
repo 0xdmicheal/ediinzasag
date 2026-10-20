@@ -35,7 +35,7 @@ const TOPICS: { test: RegExp; points: number; why: string; tag?: string; mongoli
   { test: word("oyu tolgoi|оюу толгой"), points: 5, why: "Оюу толгой", tag: "mining", mongolia: true },
   { test: word("copper|зэс|coal|нүүрс|coking|gold|алт|iron ore|төмрийн хүдэр"), points: 4, why: "экспортын түүхий эд", tag: "mining" },
   { test: word("tugrik|tögrög|togrog|төгрөг|mnt"), points: 4, why: "төгрөг", mongolia: true },
-  { test: word("crude|brent|wti|газрын тос|diesel|шатахуун|petroleum"), points: 3, why: "шатахуун", tag: "fuel" },
+  { test: word("crude|brent|wti|oil|opec|опек|газрын тос|diesel|дизель|бензин|шатахуун|petroleum"), points: 3, why: "шатахуун", tag: "fuel" },
   { test: word("inflation|инфляц|interest rate|policy rate|бодлогын хүү|central bank"), points: 3, why: "үнэ ба хүү", tag: "policy" },
   { test: word("imf|world bank|нөөц|foreign reserves|reserves"), points: 3, why: "нөөц" },
   { test: word("china|chinese|хятад|beijing|pboc"), points: 2, why: "Хятад", tag: "china" },
@@ -50,7 +50,15 @@ const TOPICS: { test: RegExp; points: number; why: string; tag?: string; mongoli
 ]
 
 /** Opinion, video and listicles lose to a straight news report. */
-const SKIP = word("opinion|podcast|video|newsletter|quiz|live blog")
+const SKIP = word(
+  "opinion|podcast|video|newsletter|quiz|live blog|sponsored|" +
+    // Mongolian sites' columns, interviews and paid posts («…тэмдэглэл #01», «нийтлэлч»).
+    "тэмдэглэл|нийтлэлч|ярилцлага|байр суурь|сурталчилгаа|ивээн тэтгэ\\p{L}*|PR|подкаст|видео",
+)
+/** A headline shouting a word in capitals («…бол НӨӨЦЛӨХ») is a column, not a report. */
+const SHOUT = /(?<![\p{L}])\p{Lu}{4,}(?![\p{L}])/u
+/** Short all-caps names that aren't shouting. */
+const ACRONYMS = new Set(["IMF", "OPEC", "NASDAQ", "ОУВС", "ОПЕК", "АНУ", "УИХ", "ДНБ", "ҮСХ", "ХБНГУ", "ОХУ", "БНХАУ", "ЕХ", "НҮБ", "МХБ", "ТББ", "ХХААХҮЯ", "ЗГ", "MSCI", "COVID"])
 
 /**
  * Mongolian feeds (iKon, Сонин, Montsame…) carry everything: sport, crime, appointments.
@@ -86,7 +94,8 @@ function sameEvent(a: Set<string>, b: Set<string>) {
 /** The relevance score of one story: 0–10, why, topic tags and desk. */
 export function score(item: RuleItem) {
   const text = `${item.title} ${item.summary}`
-  if (SKIP.test(item.title)) return { priority: 0, why: "тойм, подкаст эсвэл бичлэг", tags: [] as string[], desk: "world" as const }
+  const shouted = [...item.title.matchAll(new RegExp(SHOUT, "gu"))].some((match) => !ACRONYMS.has(match[0]))
+  if (SKIP.test(item.title) || shouted) return { priority: 0, why: "тойм, нийтлэл, ярилцлага эсвэл сурталчилгаа", tags: [] as string[], desk: "world" as const }
   let topic = 0
   const whys: string[] = []
   const tags: string[] = []
