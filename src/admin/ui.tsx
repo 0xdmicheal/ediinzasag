@@ -89,7 +89,7 @@ export function Notice({ tone = "info", children }: { tone?: "info" | "error" | 
 }
 
 /** Every admin page's frame, after the dashboard (Tallie): same gutters and rhythm. */
-export const pageClass = "flex flex-col gap-8 px-6 py-8 lg:px-8 lg:py-10"
+export const pageClass = "mx-auto flex w-full max-w-[1480px] flex-col gap-10 px-8 py-10 lg:px-12 xl:px-16"
 
 /** A page's serif title, one line of context and its main actions. */
 export function PageHeader({ title, description, actions }: { title: string; description?: ReactNode; actions?: ReactNode }) {

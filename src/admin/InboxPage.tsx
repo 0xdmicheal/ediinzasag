@@ -79,12 +79,9 @@ function nextRun(now = new Date()) {
   return next.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
 }
 
-/** 8–10 strong, 5–7 worth a look, below that filler. */
-function scoreClass(priority: number) {
-  if (priority >= 8) return "bg-[color-mix(in_oklch,var(--state-approved)_16%,transparent)] text-[var(--state-approved)]"
-  if (priority >= 5) return "bg-[color-mix(in_oklch,var(--state-review)_14%,transparent)] text-[var(--state-review)]"
-  return "bg-foreground/[0.06] text-muted-foreground"
-}
+/** The score on a photo: a solid chip, so only the number carries the colour. */
+const scoreText = (priority: number) =>
+  priority >= 8 ? "text-[var(--state-approved)]" : priority >= 5 ? "text-[var(--state-review)]" : "text-muted-foreground"
 
 const inStatus = (item: NewsItem, status: StatusFilter) =>
   status === "all" || item.status === status || (status === "queued" && item.status === "drafting")
@@ -252,13 +249,13 @@ export function InboxPage() {
   const statusLabel = statusOptions.find((option) => option.key === status)!.label
 
   return (
-    <div className="flex flex-col gap-4 px-4 py-4 lg:px-6 lg:py-6">
+    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 px-8 py-10 lg:px-12 xl:px-16">
       {showGuide ? <WelcomeGuide member={member} onClose={closeGuide} /> : null}
 
       {/* The agent: what it did last, when it runs next, and «Pull now». */}
-      <section aria-label="News agent" className="bg-card rounded-2xl border px-5 py-4">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
-          <span className="bg-foreground text-background grid size-11 shrink-0 place-items-center rounded-xl">
+      <section aria-label="News agent" className="bg-card rounded-2xl border px-7 py-6">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <span className="bg-foreground text-background grid size-12 shrink-0 place-items-center rounded-xl">
             <Bot className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -269,7 +266,7 @@ export function InboxPage() {
                 {running ? "Reading the feeds…" : drafting ? `Drafting ${drafting} ${drafting === 1 ? "story" : "stories"}` : "Idle"}
               </span>
             </p>
-            <p className="text-muted-foreground truncate text-[13px]">
+            <p className="text-muted-foreground mt-1 truncate text-[13px]">
               {runResult?.text ??
                 (last
                   ? `Last run ${timeAgo(last.startedAt)} (${last.trigger === "cron" ? "scheduled" : "manual"}) · ${last.details?.fresh ?? last.scanned} stories read · ${last.created} ${last.created === 1 ? "card" : "cards"}`
@@ -297,7 +294,7 @@ export function InboxPage() {
           ) : null}
         </div>
         {detailsOpen ? (
-          <div className="mt-4 border-t pt-4">
+          <div className="mt-6 border-t pt-6">
             <RunDetailsView run={last} problem={runResult?.problem ?? ""} />
           </div>
         ) : null}
@@ -305,7 +302,7 @@ export function InboxPage() {
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      <div className="flex items-center justify-end gap-2">
+      <div className="-mb-2 flex items-center justify-end gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="h-9 gap-1.5 px-3.5 shadow-xs">
@@ -332,9 +329,9 @@ export function InboxPage() {
         </DropdownMenu>
       </div>
 
-      <div className="bg-card flex min-h-[calc(100svh-15rem)] gap-3 rounded-2xl border p-3">
+      <div className="bg-card flex min-h-[calc(100svh-17rem)] gap-6 rounded-2xl border p-5">
         {/* Folders, with an arrow from the open one to its list. */}
-        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[124px] shrink-0 flex-col gap-1.5">
+        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[124px] shrink-0 flex-col gap-2 pt-1">
           {FOLDERS.map((entry) => (
             <div key={entry.key} className="relative">
               <Folder
@@ -344,14 +341,14 @@ export function InboxPage() {
                 onClick={() => openFolder(entry.key)}
               />
               {entry.key === folder.key ? (
-                <ArrowRight className="text-muted-foreground absolute top-1/2 -right-3 size-3.5 -translate-y-1/2" aria-hidden />
+                <ArrowRight className="text-muted-foreground absolute top-1/2 -right-5 size-4 -translate-y-1/2" aria-hidden />
               ) : null}
             </div>
           ))}
         </div>
 
         <section aria-label={`${folder.label} news`} className="bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
-          <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+          <header className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b px-6 py-5">
             <h1 className="ez-title text-[1.75rem] leading-none">{folder.label}</h1>
             <span className="text-muted-foreground text-[13px] tabular-nums">
               {items ? `${shown.length} ${shown.length === 1 ? "story" : "stories"} · ${statusLabel.toLowerCase()}` : "Loading…"}
@@ -370,44 +367,58 @@ export function InboxPage() {
           </header>
 
           {!items ? (
-            <p className="text-muted-foreground p-6 text-[14px]">Loading…</p>
+            <p className="text-muted-foreground p-8 text-[14px]">Loading…</p>
           ) : shown.length === 0 ? (
-            <p className="text-muted-foreground p-6 text-[14px]">
+            <p className="text-muted-foreground p-8 text-[14px]">
               {items.length ? `Nothing in ${folder.label} for this filter.` : "No stories yet. They show up here after the agent runs (Pull now)."}
             </p>
           ) : (
-            <ul className="divide-y">
+            <ul className="grid gap-5 p-6 md:grid-cols-2 2xl:grid-cols-3">
               {shown.slice(0, limit).map((item) => {
                 const working = busy.has(item.id)
+                const topics = categories.get(item.id) ?? []
                 return (
-                  <li key={item.id} className={cn("flex gap-4 px-4 py-4", item.status === "dismissed" && "opacity-60")}>
-                    {item.image ? (
-                      <img
-                        src={item.image}
-                        alt=""
-                        loading="lazy"
-                        referrerPolicy="no-referrer"
-                        onError={(event) => (event.currentTarget.style.visibility = "hidden")}
-                        className="bg-muted hidden h-20 w-32 shrink-0 rounded-lg object-cover sm:block"
-                      />
-                    ) : (
-                      <div className="bg-muted hidden h-20 w-32 shrink-0 rounded-lg sm:block" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-                        <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums", scoreClass(item.priority))} title={item.why}>
-                          {item.priority}/10
-                        </span>
-                        <span className="text-foreground font-medium">{item.source}</span>
-                        <span>· {ago(item.publishedAt ?? item.seenAt)}</span>
-                        {item.why ? <span className="truncate">· {item.why}</span> : null}
-                      </div>
-                      <a href={item.link} target="_blank" rel="noreferrer" className="mt-1 line-clamp-2 block text-[15px] leading-snug font-medium hover:underline">
+                  <li
+                    key={item.id}
+                    className={cn("bg-card hover:border-foreground/25 flex flex-col overflow-hidden rounded-xl border transition-colors", item.status === "dismissed" && "opacity-60")}
+                  >
+                    <div className="bg-muted relative aspect-[16/9] overflow-hidden">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt=""
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          onError={(event) => (event.currentTarget.style.visibility = "hidden")}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : null}
+                      <span
+                        className={cn("bg-background/90 absolute top-3 left-3 rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums shadow-xs backdrop-blur", scoreText(item.priority))}
+                        title={item.why}
+                      >
+                        {item.priority}/10
+                      </span>
+                    </div>
+                    <div className="flex flex-1 flex-col p-5">
+                      <p className="text-muted-foreground truncate text-[12px]">
+                        <span className="text-foreground font-medium">{item.source}</span> · {ago(item.publishedAt ?? item.seenAt)}
+                      </p>
+                      <a href={item.link} target="_blank" rel="noreferrer" className="mt-2 line-clamp-3 block text-[15px] leading-snug font-medium hover:underline">
                         {item.title}
                         <ExternalLink className="text-muted-foreground ml-1 inline size-3.5 align-baseline" />
                       </a>
-                      {item.summary ? <p className="text-muted-foreground mt-1 line-clamp-2 text-[13px]">{item.summary}</p> : null}
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {item.summary ? <p className="text-muted-foreground mt-2 line-clamp-2 text-[13px] leading-relaxed">{item.summary}</p> : null}
+                      {topics.length ? (
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {topics.map((key) => (
+                            <span key={key} className="bg-foreground/[0.05] text-muted-foreground rounded-md px-2 py-0.5 text-[11px]">
+                              {categoryLabel.get(key)}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
                         {item.status === "filed" && item.articleId ? (
                           <>
                             <Link to={`/edit/${item.articleId}`} className={buttonClass.ghost}>
@@ -437,21 +448,18 @@ export function InboxPage() {
                               <FilePlus2 className="size-4" />
                               {working ? "Preparing…" : "Make card"}
                             </button>
-                            {working ? <span className="text-muted-foreground text-[12px]">The agent is drafting; this can take up to 2 minutes.</span> : null}
                             <button type="button" disabled={working} onClick={() => dismiss(item, true)} className={buttonClass.ghost}>
                               <X className="size-4" />
                               Close
                             </button>
                           </>
                         )}
-                        {(categories.get(item.id) ?? []).map((key) => (
-                          <span key={key} className="bg-foreground/[0.05] text-muted-foreground rounded-md px-2 py-0.5 text-[11px]">
-                            {categoryLabel.get(key)}
-                          </span>
-                        ))}
                       </div>
+                      {working && item.status === "new" ? (
+                        <p className="text-muted-foreground mt-2 text-[12px]">The agent is drafting; this can take up to 2 minutes.</p>
+                      ) : null}
                       {failed.has(item.id) ? (
-                        <div className="mt-2">
+                        <div className="mt-3">
                           <Notice tone="error">{failed.get(item.id)}</Notice>
                         </div>
                       ) : null}
@@ -463,7 +471,7 @@ export function InboxPage() {
           )}
 
           {shown.length > limit ? (
-            <button type="button" onClick={() => setLimit((value) => value + PAGE)} className={cn(buttonClass.ghost, "my-4 self-center")}>
+            <button type="button" onClick={() => setLimit((value) => value + PAGE)} className={cn(buttonClass.ghost, "mb-6 self-center")}>
               Show more ({shown.length - limit})
             </button>
           ) : null}

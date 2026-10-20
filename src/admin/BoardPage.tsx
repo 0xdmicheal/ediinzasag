@@ -179,7 +179,7 @@ export function BoardPage() {
   const filterLabel = [desk === "mongolia" ? "Mongolia" : desk === "world" ? "World" : null, mineOnly ? "Mine" : null].filter(Boolean).join(" · ")
 
   return (
-    <div className="flex flex-col gap-10 px-6 py-8 lg:px-8 lg:py-10">
+    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-10 px-8 py-10 lg:px-12 xl:px-16">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="ez-title text-[2.5rem] leading-tight">Stories</h1>
