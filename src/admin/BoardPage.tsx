@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useNavigate, useSearchParams } from "react-router-dom"
 import {
   ArrowRight,
@@ -142,6 +142,11 @@ export function BoardPage() {
     setLimit(PAGE)
   }
 
+  const list = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    list.current?.scrollTo({ top: 0 })
+  }, [folder.key])
+
   useEffect(() => {
     Promise.all([backend.listArticles(), backend.listTags()])
       .then(([list, tagList]) => {
@@ -200,7 +205,7 @@ export function BoardPage() {
   ]
 
   return (
-    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 px-8 py-10 lg:px-12 xl:px-16">
+    <div className="mx-auto flex h-full w-full max-w-[1480px] flex-col gap-8 px-8 py-10 lg:px-12 xl:px-16">
       {/* Where the work stands, and «New story». News has the agent here. */}
       <section aria-label="Your work" className="bg-card rounded-2xl border px-7 py-6">
         <div className="flex flex-wrap items-center gap-x-8 gap-y-4">
@@ -257,8 +262,8 @@ export function BoardPage() {
         </DropdownMenu>
       </div>
 
-      <div className="bg-card flex min-h-[calc(100svh-17rem)] gap-6 rounded-2xl border p-5">
-        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[124px] shrink-0 flex-col gap-2 pt-1">
+      <div className="bg-card flex min-h-[420px] flex-1 gap-4 overflow-hidden rounded-2xl border p-5">
+        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[148px] shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain pt-1 pr-6 pb-1 [scrollbar-width:thin]">
           {FOLDERS.map((entry) => (
             <div key={entry.key} className="relative">
               <Folder
@@ -293,6 +298,7 @@ export function BoardPage() {
               />
             </label>
           </header>
+          <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
 
           {articles === null ? (
             <p className="text-muted-foreground p-8 text-[14px]">Loading…</p>
@@ -372,6 +378,7 @@ export function BoardPage() {
               Show more ({shown.length - limit})
             </Button>
           ) : null}
+          </div>
         </section>
       </div>
 

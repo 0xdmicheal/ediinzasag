@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { ArrowRight, Bot, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, SlidersHorizontal, Trash2, Undo2, X } from "lucide-react"
 import { cn } from "cn"
@@ -110,6 +110,11 @@ export function InboxPage() {
 
   const folder = FOLDERS.find((entry) => entry.key === params.get("folder")) ?? FOLDERS[0]
   const showGuide = guideOpen || params.get("guide") === "1"
+
+  const list = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    list.current?.scrollTo({ top: 0 })
+  }, [folder.key])
 
   useEffect(() => {
     backend
@@ -249,7 +254,7 @@ export function InboxPage() {
   const statusLabel = statusOptions.find((option) => option.key === status)!.label
 
   return (
-    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-8 px-8 py-10 lg:px-12 xl:px-16">
+    <div className="mx-auto flex h-full w-full max-w-[1480px] flex-col gap-8 px-8 py-10 lg:px-12 xl:px-16">
       {showGuide ? <WelcomeGuide member={member} onClose={closeGuide} /> : null}
 
       {/* The agent: what it did last, when it runs next, and «Pull now». */}
@@ -329,9 +334,9 @@ export function InboxPage() {
         </DropdownMenu>
       </div>
 
-      <div className="bg-card flex min-h-[calc(100svh-17rem)] gap-6 rounded-2xl border p-5">
+      <div className="bg-card flex min-h-[420px] flex-1 gap-4 overflow-hidden rounded-2xl border p-5">
         {/* Folders, with an arrow from the open one to its list. */}
-        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[124px] shrink-0 flex-col gap-2 pt-1">
+        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[148px] shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain pt-1 pr-6 pb-1 [scrollbar-width:thin]">
           {FOLDERS.map((entry) => (
             <div key={entry.key} className="relative">
               <Folder
@@ -365,6 +370,7 @@ export function InboxPage() {
               />
             </label>
           </header>
+          <div ref={list} className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
 
           {!items ? (
             <p className="text-muted-foreground p-8 text-[14px]">Loading…</p>
@@ -475,6 +481,7 @@ export function InboxPage() {
               Show more ({shown.length - limit})
             </button>
           ) : null}
+          </div>
         </section>
       </div>
     </div>
