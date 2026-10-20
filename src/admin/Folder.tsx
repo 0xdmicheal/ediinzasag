@@ -14,13 +14,17 @@ export function Folder({
   count,
   open,
   onClick,
+  tone,
 }: {
   label: string
   count: number | undefined
   open: boolean
   onClick: () => void
+  /** A colour for the tab and back panel (Stories colours its folders by status); grey without. */
+  tone?: string
 }) {
   const still = useReducedMotion()
+  const back = tone ? { backgroundColor: `color-mix(in oklch, ${tone} ${open ? 70 : 45}%, transparent)` } : undefined
   const papers = count === undefined ? 0 : Math.min(3, count)
   return (
     <button
@@ -36,8 +40,14 @@ export function Folder({
     >
       <span className="relative block h-[60px] w-[76px] [perspective:400px]" aria-hidden>
         {/* Back panel with its tab. */}
-        <span className={cn("absolute inset-x-0 bottom-0 top-[7px] rounded-[7px] transition-colors", open ? "bg-foreground/35" : "bg-foreground/20 group-hover:bg-foreground/25")} />
-        <span className={cn("absolute top-0 left-0 h-[12px] w-[30px] rounded-t-[6px] transition-colors", open ? "bg-foreground/35" : "bg-foreground/20 group-hover:bg-foreground/25")} />
+        <span
+          style={back}
+          className={cn("absolute inset-x-0 bottom-0 top-[7px] rounded-[7px] transition-colors", !tone && (open ? "bg-foreground/35" : "bg-foreground/20 group-hover:bg-foreground/25"))}
+        />
+        <span
+          style={back}
+          className={cn("absolute top-0 left-0 h-[12px] w-[30px] rounded-t-[6px] transition-colors", !tone && (open ? "bg-foreground/35" : "bg-foreground/20 group-hover:bg-foreground/25"))}
+        />
         {/* Sheets inside: one per story, up to three. */}
         {Array.from({ length: papers }, (_, index) => (
           <motion.span
