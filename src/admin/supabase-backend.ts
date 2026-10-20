@@ -87,11 +87,18 @@ function fail(error: { message: string; code?: string } | null): never {
 export function createSupabaseBackend(): Backend {
   const client = supabaseClient()
 
-  async function member(): Promise<Member | null> {
+  /** The signed-in user's own profile; it is readable before the code step, team data is not. */
+  async function profileOf(): Promise<Member | null> {
     const { data } = await client.auth.getUser()
     if (!data.user) return null
     const { data: profile } = await client.from("profiles").select("id, email, name, role").eq("id", data.user.id).single()
     return profile ? (profile as Member) : null
+  }
+
+  /** Team members count as signed in only after the code step (aal2, see current_team_role in schema.sql). */
+  async function member(): Promise<Member | null> {
+    const { data } = await client.auth.mfa.getAuthenticatorAssuranceLevel()
+    return data?.currentLevel === "aal2" ? profileOf() : null
   }
 
   return {
@@ -105,10 +112,25 @@ export function createSupabaseBackend(): Backend {
     async signIn(email, password) {
       const { error } = await client.auth.signInWithPassword({ email, password })
       if (error) throw new Error(error.message === "Invalid login credentials" ? "И-мэйл эсвэл нууц үг буруу" : error.message)
-      if (!(await member())) {
+      if (!(await profileOf())) {
         await client.auth.signOut()
         throw new Error("Энэ бүртгэл багийн гишүүн биш байна")
       }
+      const { data: factors, error: listError } = await client.auth.mfa.listFactors()
+      if (listError) throw new Error(listError.message)
+      const linked = factors.totp.find((factor) => factor.status === "verified")
+      if (linked) return { factorId: linked.id }
+      // First sign-in since two-step became required: drop half-finished setups, then link an app.
+      for (const factor of factors.all.filter((item) => item.status === "unverified")) {
+        await client.auth.mfa.unenroll({ factorId: factor.id })
+      }
+      const { data: enrolled, error: enrollError } = await client.auth.mfa.enroll({ factorType: "totp", friendlyName: "EZ Редакц" })
+      if (enrollError) throw new Error(enrollError.message)
+      return { factorId: enrolled.id, enroll: { qr: enrolled.totp.qr_code, secret: enrolled.totp.secret } }
+    },
+    async verifyTwoStep(factorId, code) {
+      const { error } = await client.auth.mfa.challengeAndVerify({ factorId, code: code.replace(/\s/g, "") })
+      if (error) throw new Error(/invalid|expired/i.test(error.message) ? "Код буруу эсвэл хугацаа нь дууссан байна" : error.message)
     },
     async signOut() {
       await client.auth.signOut()

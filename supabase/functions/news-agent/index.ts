@@ -30,6 +30,7 @@ import { EXEMPLARS, STYLE_CARD, STYLE_PAIRS } from "../_shared/style-card.ts"
 import { lintStyle } from "../_shared/style-lint.ts"
 import { termLine, termsFor } from "../_shared/termbase.ts"
 import { flashBackups, geminiAsk } from "../_shared/gemini.ts"
+import { TWO_STEP_REQUIRED, verifiedTwoStep } from "../_shared/assurance.ts"
 import { BEATS, EVENTS, SKELETONS, drawPlan, planBrief, planNote, recentFrom, type Classification, type Recent } from "../_shared/skeletons.ts"
 
 import Anthropic from "npm:@anthropic-ai/sdk"
@@ -1080,6 +1081,7 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
     const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
     const { data } = await db.auth.getUser(token)
     if (!data.user) return json({ error: "Нэвтэрнэ үү" }, 401)
+    if (!verifiedTwoStep(token)) return json({ error: TWO_STEP_REQUIRED }, 403)
     const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
     if (!profile?.role) return json({ error: "Редакцын гишүүд л ашиглана" }, 403)
     role = profile.role

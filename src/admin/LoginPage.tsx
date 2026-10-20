@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react"
 import { Navigate, useLocation, useNavigate } from "react-router-dom"
-import { ArrowRight, LockKeyhole } from "lucide-react"
+import { ArrowRight, LockKeyhole, ShieldCheck } from "lucide-react"
 
 import { roleLabel } from "@/admin/rules"
 import { useSession } from "@/admin/session"
+import type { TwoStep } from "@/admin/types"
 import { Field, inputClass, Notice } from "@/admin/ui"
 import { ShimmerButton } from "@/components/ui/shimmer-button"
 import { publicUrl } from "@/lib/public-url"
@@ -15,7 +16,7 @@ const demoAccounts = [
 ]
 
 export function LoginPage() {
-  const { backend, member } = useSession()
+  const { backend, member, refresh } = useSession()
   const navigate = useNavigate()
   const location = useLocation()
   const from = (location.state as { from?: string } | null)?.from ?? "/"
@@ -23,6 +24,8 @@ export function LoginPage() {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [busy, setBusy] = useState(false)
+  const [step, setStep] = useState<TwoStep | null>(null)
+  const [code, setCode] = useState("")
 
   if (member) return <Navigate to={from} replace />
 
@@ -31,7 +34,11 @@ export function LoginPage() {
     setBusy(true)
     setError("")
     try {
-      await backend.signIn(address, secret)
+      const next = await backend.signIn(address, secret)
+      if (next) {
+        setStep(next)
+        return
+      }
       navigate(from, { replace: true })
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Нэвтэрч чадсангүй")
@@ -45,6 +52,30 @@ export function LoginPage() {
     signIn(email, password)
   }
 
+  async function verify(event: FormEvent) {
+    event.preventDefault()
+    if (!backend || !step) return
+    setBusy(true)
+    setError("")
+    try {
+      await backend.verifyTwoStep(step.factorId, code)
+      await refresh()
+      navigate(from, { replace: true })
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Баталгаажуулж чадсангүй")
+      setCode("")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function back() {
+    await backend?.signOut()
+    setStep(null)
+    setCode("")
+    setError("")
+  }
+
   return (
     <div className="bg-background text-foreground relative isolate grid min-h-svh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
@@ -54,6 +85,51 @@ export function LoginPage() {
           <p className="text-muted-foreground font-mono text-[11px] uppercase">Редакцын нэвтрэлт</p>
         </div>
 
+        {step ? (
+          <form onSubmit={verify} className="bg-card flex flex-col gap-4 rounded-xl border p-6">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="text-muted-foreground size-4" />
+              <h1 className="font-news text-xl">{step.enroll ? "Апп холбох" : "Баталгаажуулах код"}</h1>
+            </div>
+            {step.enroll ? (
+              <>
+                <p className="text-muted-foreground text-[13px] leading-relaxed">
+                  Редакцад нэвтрэхэд нууц үгээс гадна утасны апп дахь кодыг асууна. Google Authenticator, Microsoft
+                  Authenticator эсвэл 1Password-оор доорх QR кодыг уншуулаад, гарч ирсэн 6 оронтой кодыг бичнэ үү.
+                </p>
+                <img src={step.enroll.qr} alt="Баталгаажуулах аппад уншуулах QR код" className="mx-auto size-44 rounded-lg bg-white p-2" />
+                <p className="text-muted-foreground text-center text-[12px]">
+                  Уншихгүй бол аппад энэ түлхүүрийг гараар оруулна:
+                  <span className="text-foreground mt-1 block font-mono text-[12px] break-all select-all">{step.enroll.secret}</span>
+                </p>
+              </>
+            ) : (
+              <p className="text-muted-foreground text-[13px] leading-relaxed">Утасны апп дахь 6 оронтой кодоо бичнэ үү.</p>
+            )}
+            <Field label="Код" htmlFor="login-code">
+              <input
+                id="login-code"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="[0-9 ]{6,7}"
+                maxLength={7}
+                required
+                autoFocus
+                value={code}
+                onChange={(event) => setCode(event.target.value)}
+                className={`${inputClass} text-center font-mono text-lg tracking-[0.3em]`}
+              />
+            </Field>
+            {error ? <Notice tone="error">{error}</Notice> : null}
+            <ShimmerButton type="submit" disabled={busy} className="h-11 w-full text-[13px] font-medium">
+              {busy ? "Шалгаж байна…" : "Баталгаажуулах"}
+              <ArrowRight className="size-4" />
+            </ShimmerButton>
+            <button type="button" onClick={back} className="text-muted-foreground hover:text-foreground text-center text-[12px]">
+              Өөр бүртгэлээр нэвтрэх
+            </button>
+          </form>
+        ) : (
         <form onSubmit={submit} className="bg-card flex flex-col gap-4 rounded-xl border p-6">
           <div className="flex items-center gap-2">
             <LockKeyhole className="text-muted-foreground size-4" />
@@ -90,6 +166,7 @@ export function LoginPage() {
             Бүртгэлийг зөвхөн админ урина. Нээлттэй бүртгэл байхгүй.
           </p>
         </form>
+        )}
 
         {backend?.mode === "demo" ? (
           <div className="mt-4 flex flex-col gap-2">

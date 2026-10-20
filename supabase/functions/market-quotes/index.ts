@@ -14,6 +14,7 @@
 // QUOTES_DRY_RUN=1 reads the sources and prints what it found, without the database.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
+import { TWO_STEP_REQUIRED, verifiedTwoStep } from "../_shared/assurance.ts"
 
 const DRY = Boolean(Deno.env.get("QUOTES_DRY_RUN"))
 const BROWSER = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36"
@@ -149,6 +150,7 @@ if (DRY) {
       const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
       const { data } = await db.auth.getUser(token)
       if (!data.user) return json({ error: "Нэвтэрнэ үү" }, 401)
+      if (!verifiedTwoStep(token)) return json({ error: TWO_STEP_REQUIRED }, 403)
       const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
       if (profile?.role !== "editor" && profile?.role !== "admin") return json({ error: "Редактор, админ л ажиллуулна" }, 403)
     }

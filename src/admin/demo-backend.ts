@@ -163,7 +163,9 @@ export function createDemoBackend(): Backend {
       if (!member) throw new Error("Ийм гишүүн алга. Демо дээр доорх товчнуудаас сонгоно уу.")
       localStorage.setItem(SESSION, member.id)
       notify()
+      return null
     },
+    async verifyTwoStep() {},
     async signOut() {
       localStorage.removeItem(SESSION)
       notify()

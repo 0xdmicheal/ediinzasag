@@ -178,11 +178,23 @@ export interface Activity {
   at: string
 }
 
+/**
+ * The code step after the password (Supabase: TOTP, authenticator app). With
+ * `enroll`, the member has no app linked yet and first scans the QR code.
+ */
+export interface TwoStep {
+  factorId: string
+  enroll?: { qr: string; secret: string }
+}
+
 export interface Backend {
   mode: "demo" | "supabase"
+  /** A member only once fully signed in (password and, in Supabase, the code). */
   currentMember(): Promise<Member | null>
   onAuthChange(callback: () => void): () => void
-  signIn(email: string, password: string): Promise<void>
+  /** Checks the password; resolves to the code step that must follow, or null when there is none. */
+  signIn(email: string, password: string): Promise<TwoStep | null>
+  verifyTwoStep(factorId: string, code: string): Promise<void>
   signOut(): Promise<void>
 
   listArticles(): Promise<Article[]>

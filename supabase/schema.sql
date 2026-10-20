@@ -259,9 +259,11 @@ select id, nullif(email, ''), case when coalesce(phone, '') = '' then null else 
 from auth.users
 on conflict (id) do nothing;
 
+-- Team rights need a session that passed two-step verification (aal2, the admin's 6-digit
+-- code), so a stolen password alone opens nothing. Every team check goes through here.
 create or replace function public.current_team_role() returns public.team_role
 language sql stable security definer set search_path = public as $$
-  select role from public.profiles where id = auth.uid()
+  select role from public.profiles where id = auth.uid() and coalesce(auth.jwt() ->> 'aal', '') = 'aal2'
 $$;
 
 create or replace function public.is_editor() returns boolean
@@ -332,7 +334,14 @@ create trigger guard_profile_update before update on public.profiles
 alter table public.profiles enable row level security;
 drop policy if exists "team reads profiles" on public.profiles;
 create policy "team reads profiles" on public.profiles for select to authenticated
-  using (public.current_team_role() is not null);
+  using (id = (select auth.uid()) or public.current_team_role() is not null);
+
+-- Comment moderation on the public site, which has no code step: editors and admins
+-- by password alone. Deleting a comment is the most it allows.
+create or replace function public.is_moderator() returns boolean
+language sql stable set search_path = public as $$
+  select coalesce((select role in ('editor', 'admin') from public.profiles where id = auth.uid()), false)
+$$;
 drop policy if exists "self or admin updates profile" on public.profiles;
 create policy "self or admin updates profile" on public.profiles for update to authenticated
   using (id = (select auth.uid()) or public.is_admin()) with check (id = (select auth.uid()) or public.is_admin());
@@ -684,7 +693,7 @@ create policy "author edits comment" on public.article_comments for update to au
   using (reader_id = (select auth.uid())) with check (reader_id = (select auth.uid()));
 drop policy if exists "author or editor deletes comment" on public.article_comments;
 create policy "author or editor deletes comment" on public.article_comments for delete to authenticated
-  using (reader_id = (select auth.uid()) or public.is_editor());
+  using (reader_id = (select auth.uid()) or public.is_moderator());
 -- Who wrote a comment (reader_id) is not readable; readers learn which comments
 -- are their own through my_comment_ids() instead.
 revoke select, insert, update on public.article_comments from anon, authenticated;

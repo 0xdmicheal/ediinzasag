@@ -13,6 +13,7 @@
 // Deploy: supabase functions deploy link-preview
 
 import { createClient } from "npm:@supabase/supabase-js@2"
+import { TWO_STEP_REQUIRED, verifiedTwoStep } from "../_shared/assurance.ts"
 
 const MAX_BYTES = 512 * 1024
 const MAX_REDIRECTS = 3
@@ -150,6 +151,7 @@ Deno.serve(async (request) => {
   const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
   const { data } = await db.auth.getUser(token)
   if (!data.user) return json({ error: "Нэвтэрнэ үү" }, 401)
+  if (!verifiedTwoStep(token)) return json({ error: TWO_STEP_REQUIRED }, 403)
   const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
   if (!profile) return json({ error: "Зөвхөн редакцын гишүүд" }, 403)
 

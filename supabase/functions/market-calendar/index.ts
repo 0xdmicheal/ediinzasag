@@ -19,6 +19,7 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
 
 import { cheapestLite, geminiAsk } from "../_shared/gemini.ts"
 import { CURRENCIES, LARGE_CAPS } from "../_shared/large-caps.ts"
+import { TWO_STEP_REQUIRED, verifiedTwoStep } from "../_shared/assurance.ts"
 import { lintStyle } from "../_shared/style-lint.ts"
 
 const DRY = Boolean(Deno.env.get("CALENDAR_DRY_RUN"))
@@ -300,6 +301,7 @@ if (DRY) {
       const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? ""
       const { data } = await db.auth.getUser(token)
       if (!data.user) return json({ error: "Нэвтэрнэ үү" }, 401)
+      if (!verifiedTwoStep(token)) return json({ error: TWO_STEP_REQUIRED }, 403)
       const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
       if (profile?.role !== "editor" && profile?.role !== "admin") return json({ error: "Редактор, админ л ажиллуулна" }, 403)
     }
