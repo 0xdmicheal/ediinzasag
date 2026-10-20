@@ -21,7 +21,6 @@ import { importBuiltins, pendingBuiltins } from "@/admin/import-builtin"
 import { canClaim, canManageTeam, formatWhen, isEditor, isScheduled, statusMeta, timeAgo, wordCount } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import { Avatar, Notice } from "@/admin/ui"
-import { WelcomeGuide } from "@/admin/WelcomeGuide"
 import type { Article, Member, Tag } from "@/admin/types"
 import { Button } from "@/components/ui/button"
 import {
@@ -70,7 +69,7 @@ const views: { key: View; label: string; icon: typeof ListTodo; caption: (member
     label: "To do",
     icon: ListTodo,
     caption: (member) => (isEditor(member) ? "Your drafts and stories waiting for review" : "Your drafts and stories sent back with notes"),
-    empty: "Nothing waiting on you. Start a new story or pick one from the Inbox.",
+    empty: "Nothing waiting on you. Start a new story or pick one from News.",
   },
   { key: "drafts", label: "Drafts", icon: PenLine, caption: () => "Being written or revised", empty: "No drafts." },
   {
@@ -106,11 +105,6 @@ function StatusCell({ article }: { article: Article }) {
   )
 }
 
-function greeting() {
-  const hour = new Date().getHours()
-  return hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"
-}
-
 const today = () => new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
 
 export function BoardPage() {
@@ -124,12 +118,10 @@ export function BoardPage() {
   const isAdmin = canManageTeam(member)
   const [importing, setImporting] = useState<{ done: number; total: number } | null>(null)
   const [importResult, setImportResult] = useState<{ tone: "success" | "error"; text: string } | null>(null)
-  const [guideOpen, setGuideOpen] = useState(() => WelcomeGuide.initiallyOpen(member))
 
   const view = (["todo", "drafts", "review", "published"].includes(params.get("view") ?? "") ? params.get("view") : "todo") as View
   const desk = (["mongolia", "world"].includes(params.get("desk") ?? "") ? params.get("desk") : "all") as Desk
   const mineOnly = params.get("mine") === "1"
-  const showGuide = guideOpen || params.get("guide") === "1"
 
   function setParam(key: string, value: string | null) {
     const next = new URLSearchParams(params)
@@ -182,11 +174,6 @@ export function BoardPage() {
     }
   }
 
-  function closeGuide() {
-    setGuideOpen(false)
-    if (params.get("guide")) setParam("guide", null)
-  }
-
   const current = views.find((item) => item.key === view)!
   const filtered = desk !== "all" || mineOnly
   const filterLabel = [desk === "mongolia" ? "Mongolia" : desk === "world" ? "World" : null, mineOnly ? "Mine" : null].filter(Boolean).join(" · ")
@@ -195,7 +182,7 @@ export function BoardPage() {
     <div className="flex flex-col gap-10 px-6 py-8 lg:px-8 lg:py-10">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="ez-title text-[2.5rem] leading-tight">{greeting()}</h1>
+          <h1 className="ez-title text-[2.5rem] leading-tight">Stories</h1>
           <p className="text-muted-foreground text-[15px]">
             {today()} ·{" "}
             {articles === null
@@ -213,7 +200,6 @@ export function BoardPage() {
         </Button>
       </div>
 
-      {showGuide ? <WelcomeGuide member={member} onClose={closeGuide} /> : null}
       {error ? <Notice tone="error">{error}</Notice> : null}
 
       <section className="flex flex-col gap-3" aria-label="Overview">

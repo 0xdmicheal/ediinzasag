@@ -1,4 +1,4 @@
-import { Route, Routes } from "react-router-dom"
+import { Navigate, Route, Routes } from "react-router-dom"
 
 import { AdminGuard } from "@/admin/AdminGuard"
 import { AdminLayout } from "@/admin/AdminLayout"
@@ -31,8 +31,10 @@ export default function AdminApp() {
             <Route path="new" element={<EditorPage key="editor" />} />
             <Route path="edit/:id" element={<EditorPage key="editor" />} />
             <Route element={<AdminLayout />}>
-              <Route index element={<BoardPage />} />
-              <Route path="inbox" element={<InboxPage />} />
+              {/* The front page is the agent's news in folders; the team's own stories have their page. */}
+              <Route index element={<InboxPage />} />
+              <Route path="stories" element={<BoardPage />} />
+              <Route path="inbox" element={<Navigate to="/" replace />} />
               <Route path="tags" element={<TagsPage />} />
               <Route path="team" element={<TeamPage />} />
               <Route path="readers" element={<ReadersPage />} />

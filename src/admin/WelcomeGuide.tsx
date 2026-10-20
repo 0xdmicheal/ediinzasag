@@ -23,8 +23,8 @@ const steps = [
     title: "Write",
     body: (
       <>
-        Start a <Link to="/new" className={link}>New story</Link>, or pick one the agent prepared in the{" "}
-        <Link to="/inbox" className={link}>Inbox</Link>. Everything saves as you type.
+        Start a <Link to="/new" className={link}>New story</Link>, or pick one the agent found in{" "}
+        <Link to="/" className={link}>News</Link>. Everything saves as you type.
       </>
     ),
   },

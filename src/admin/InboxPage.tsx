@@ -1,28 +1,39 @@
 import { useEffect, useMemo, useState } from "react"
-import { Link } from "react-router-dom"
-import { ArrowRight, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, Trash2, Undo2, X } from "lucide-react"
+import { Link, useSearchParams } from "react-router-dom"
+import { ArrowRight, Bot, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, SlidersHorizontal, Trash2, Undo2, X } from "lucide-react"
 import { cn } from "cn"
 
 import { RunDetailsView } from "@/admin/AgentRunDetails"
 import { useConfirm } from "@/admin/ConfirmDialog"
+import { Folder } from "@/admin/Folder"
 import { categoriesOf, NEWS_CATEGORIES } from "@/admin/news-categories"
-import { isEditor } from "@/admin/rules"
-
+import { isEditor, timeAgo } from "@/admin/rules"
 import { useTeam } from "@/admin/session"
 import type { NewsItem, NewsRun } from "@/admin/types"
-import { buttonClass, inputClass, Notice, PageHeader, pageClass } from "@/admin/ui"
+import { buttonClass, Notice } from "@/admin/ui"
+import { WelcomeGuide } from "@/admin/WelcomeGuide"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 /*
- * "Мэдээний урсгал": every story the news agent read in the last two weeks.
- * The agent files the best few as cards itself each morning; here anyone on
- * the team turns any other story into a card ("Карт болгох") or clears it.
- * Editors can delete a card again ("Устгах"); the story then moves to «Хаасан».
+ * The newsroom's front page (the owner's sketch, 20 Oct): the news agent across the top,
+ * then every story it read in the last two weeks sorted into folders (Asia, America,
+ * Economy, Mongolia, …) with the open folder's list beside them. The agent cards the best
+ * few itself three times a day; here anyone on the team cards another («Make card») or
+ * closes it. Editors can delete a card again; the story then moves to Closed.
  */
 
-type StatusFilter = NewsItem["status"] | "all"
-type DeskFilter = NewsItem["desk"] | "all"
+type StatusFilter = "new" | "queued" | "filed" | "dismissed" | "all"
 
-const statusTabs: { key: StatusFilter; label: string }[] = [
+const statusOptions: { key: StatusFilter; label: string }[] = [
   { key: "new", label: "New" },
   { key: "queued", label: "Drafting" },
   { key: "filed", label: "Carded" },
@@ -30,10 +41,20 @@ const statusTabs: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
 ]
 
-const deskTabs: { key: DeskFilter; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "mongolia", label: "Mongolia" },
-  { key: "world", label: "World" },
+/** The folders, in the sketch's order first. A story can sit in several. */
+const FOLDERS: { key: string; label: string; holds: (item: NewsItem, topics: string[]) => boolean }[] = [
+  { key: "asia", label: "Asia", holds: (_, topics) => topics.includes("asia") || topics.includes("china") },
+  { key: "america", label: "America", holds: (_, topics) => topics.includes("us") },
+  { key: "economy", label: "Economy", holds: (_, topics) => topics.includes("economy") },
+  { key: "mongolia", label: "Mongolia", holds: (item) => item.desk === "mongolia" || item.mongolia },
+  { key: "markets", label: "Markets", holds: (_, topics) => topics.includes("markets") },
+  { key: "mining", label: "Mining", holds: (_, topics) => topics.includes("mining") },
+  { key: "energy", label: "Energy", holds: (_, topics) => topics.includes("energy") },
+  { key: "geopolitics", label: "Geopolitics", holds: (_, topics) => topics.includes("geopolitics") },
+  { key: "europe", label: "Europe", holds: (_, topics) => topics.includes("europe") },
+  { key: "tech", label: "Tech & AI", holds: (_, topics) => topics.includes("tech") || topics.includes("ai") },
+  { key: "crypto", label: "Crypto", holds: (_, topics) => topics.includes("crypto") },
+  { key: "all", label: "All news", holds: () => true },
 ]
 
 const PAGE = 60
@@ -48,36 +69,30 @@ function ago(iso: string | null) {
   return `${Math.round(minutes / 1440)} d`
 }
 
+/** The agent runs at 00:00, 06:00 and 12:00 UTC (08:00, 14:00, 20:00 in Ulaanbaatar). */
+function nextRun(now = new Date()) {
+  const next = new Date(now)
+  next.setUTCMinutes(0, 0, 0)
+  const hour = [0, 6, 12].find((value) => value > now.getUTCHours())
+  if (hour === undefined) next.setUTCDate(next.getUTCDate() + 1)
+  next.setUTCHours(hour ?? 0)
+  return next.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+}
+
 /** 8–10 strong, 5–7 worth a look, below that filler. */
 function scoreClass(priority: number) {
-  if (priority >= 8) return "bg-[color-mix(in_oklch,var(--up)_16%,transparent)] text-[var(--up)]"
-  if (priority >= 5) return "bg-brand-soft text-brand-strong"
+  if (priority >= 8) return "bg-[color-mix(in_oklch,var(--state-approved)_16%,transparent)] text-[var(--state-approved)]"
+  if (priority >= 5) return "bg-[color-mix(in_oklch,var(--state-review)_14%,transparent)] text-[var(--state-review)]"
   return "bg-foreground/[0.06] text-muted-foreground"
 }
 
-function Tabs<T extends string>({ value, options, onChange, label }: { value: T; options: { key: T; label: string; count?: number }[]; onChange: (key: T) => void; label: string }) {
-  return (
-    <div role="tablist" aria-label={label} className="bg-muted inline-flex gap-1 rounded-full p-1">
-      {options.map((option) => (
-        <button
-          key={option.key}
-          type="button"
-          role="tab"
-          aria-selected={value === option.key}
-          onClick={() => onChange(option.key)}
-          className={`h-8 rounded-full px-3 text-[13px] font-medium whitespace-nowrap transition-colors ${value === option.key ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-        >
-          {option.label}
-          {option.count !== undefined ? <span className="ml-1.5 font-mono text-[11px] opacity-70">{option.count}</span> : null}
-        </button>
-      ))}
-    </div>
-  )
-}
+const inStatus = (item: NewsItem, status: StatusFilter) =>
+  status === "all" || item.status === status || (status === "queued" && item.status === "drafting")
 
 export function InboxPage() {
   const { backend, member } = useTeam()
   const confirm = useConfirm()
+  const [params, setParams] = useSearchParams()
   const [runs, setRuns] = useState<NewsRun[]>([])
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState<{ text: string; problem: string } | null>(null)
@@ -85,64 +100,55 @@ export function InboxPage() {
   const [items, setItems] = useState<NewsItem[] | null>(null)
   const [error, setError] = useState("")
   const [status, setStatus] = useState<StatusFilter>("new")
-  const [desk, setDesk] = useState<DeskFilter>("all")
-  const [category, setCategory] = useState("all")
   const [byScore, setByScore] = useState(true)
   const [query, setQuery] = useState("")
   const [limit, setLimit] = useState(PAGE)
+  const [guideOpen, setGuideOpen] = useState(() => WelcomeGuide.initiallyOpen(member))
   /** Ids with a request in flight. */
   const [busy, setBusy] = useState<Set<string>>(new Set())
   /** The last failure per story, shown under its own buttons rather than at the top of a long list. */
   const [failed, setFailed] = useState<Map<string, string>>(new Map())
-  /** Stories acted on since the filters last changed: they stay in view, so "Карт нээх" / "Буцаах" are right there. */
+  /** Stories acted on since the filters last changed: they stay in view, so «Open card» / «Restore» are right there. */
   const [touched, setTouched] = useState<Set<string>>(new Set())
+
+  const folder = FOLDERS.find((entry) => entry.key === params.get("folder")) ?? FOLDERS[0]
+  const showGuide = guideOpen || params.get("guide") === "1"
 
   useEffect(() => {
     backend
       .listNewsItems()
       .then(setItems)
-      .catch((failure) => setError(failure instanceof Error ? failure.message : "Couldn't load the inbox"))
+      .catch((failure) => setError(failure instanceof Error ? failure.message : "Couldn't load the news"))
     backend.listNewsRuns().then(setRuns, () => setRuns([]))
   }, [backend])
 
   /** Topic categories per story, worked out once per load. */
   const categories = useMemo(() => new Map((items ?? []).map((item) => [item.id, categoriesOf(item)])), [items])
 
-  const counts = useMemo(() => {
-    const result: Record<StatusFilter, number> = { new: 0, queued: 0, drafting: 0, filed: 0, dismissed: 0, all: 0 }
+  /** Stories per folder under the current status, for the folders' counters. */
+  const folderCounts = useMemo(() => {
+    const result = new Map<string, number>()
     for (const item of items ?? []) {
-      if ((desk !== "all" && item.desk !== desk) || (category !== "all" && !categories.get(item.id)?.includes(category))) continue
-      // "Бичиж байна" covers both waiting and being written.
-      result[item.status === "drafting" ? "queued" : item.status] += 1
-      result.all += 1
+      if (!inStatus(item, status)) continue
+      const topics = categories.get(item.id) ?? []
+      for (const entry of FOLDERS) if (entry.holds(item, topics)) result.set(entry.key, (result.get(entry.key) ?? 0) + 1)
     }
     return result
-  }, [items, desk, category, categories])
+  }, [items, status, categories])
 
-  /** Stories per category under the current status and region, for the topic chips. */
-  const categoryCounts = useMemo(() => {
-    const result = new Map<string, number>()
-    let all = 0
-    for (const item of items ?? []) {
-      if ((status !== "all" && item.status !== status) || (desk !== "all" && item.desk !== desk)) continue
-      all += 1
-      for (const key of categories.get(item.id) ?? []) result.set(key, (result.get(key) ?? 0) + 1)
-    }
-    return { all, byKey: result }
-  }, [items, status, desk, categories])
+  const drafting = useMemo(() => (items ?? []).filter((item) => item.status === "queued" || item.status === "drafting").length, [items])
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()
     const list = (items ?? []).filter(
       (item) =>
-        (status === "all" || item.status === status || (status === "queued" && item.status === "drafting") || touched.has(item.id)) &&
-        (desk === "all" || item.desk === desk) &&
-        (category === "all" || Boolean(categories.get(item.id)?.includes(category))) &&
+        (inStatus(item, status) || touched.has(item.id)) &&
+        folder.holds(item, categories.get(item.id) ?? []) &&
         (!needle || item.title.toLowerCase().includes(needle) || item.source.toLowerCase().includes(needle) || item.summary.toLowerCase().includes(needle)),
     )
     const time = (item: NewsItem) => Date.parse(item.publishedAt ?? item.seenAt)
     return list.sort((a, b) => (byScore ? b.priority - a.priority : 0) || time(b) - time(a))
-  }, [items, status, desk, category, categories, query, byScore, touched])
+  }, [items, status, folder, categories, query, byScore, touched])
 
   async function runAgent() {
     setRunning(true)
@@ -154,7 +160,7 @@ export function InboxPage() {
       setRuns(nextRuns)
       setRunResult({
         text: result.queued
-          ? `Picked ${result.queued} ${result.queued === 1 ? "story" : "stories"}. The agent drafts them one by one; cards appear within a few minutes (see Drafting).`
+          ? `Picked ${result.queued} ${result.queued === 1 ? "story" : "stories"}. The agent drafts them one by one; cards appear within a few minutes.`
           : "No new stories picked.",
         problem: "",
       })
@@ -171,11 +177,29 @@ export function InboxPage() {
     setTouched((set) => new Set(set).add(id))
   }
 
-  /** A new filter or search starts a fresh view. */
+  /** A new folder, filter or search starts a fresh view. */
   function refilter(change: () => void) {
     change()
     setLimit(PAGE)
     setTouched(new Set())
+  }
+
+  function openFolder(key: string) {
+    refilter(() => {
+      const next = new URLSearchParams(params)
+      if (key === FOLDERS[0].key) next.delete("folder")
+      else next.set("folder", key)
+      setParams(next, { replace: true })
+    })
+  }
+
+  function closeGuide() {
+    setGuideOpen(false)
+    if (params.get("guide")) {
+      const next = new URLSearchParams(params)
+      next.delete("guide")
+      setParams(next, { replace: true })
+    }
   }
 
   async function act(id: string, task: () => Promise<void>) {
@@ -224,200 +248,227 @@ export function InboxPage() {
     })
   }
 
+  const last = runs[0]
+  const statusLabel = statusOptions.find((option) => option.key === status)!.label
+
   return (
-    <div className={pageClass}>
-      <PageHeader
-        title="Inbox"
-        description={
-          <>
-            Every story the agent read in the last 14 days. It cards the best ones at 08:00, 14:00 and 20:00. Use{" "}
-            <strong className="text-foreground font-medium">Make card</strong> to add another to the board, or close what you don't need.
-          </>
-        }
-        actions={
-          isEditor(member) ? (
+    <div className="flex flex-col gap-4 px-4 py-4 lg:px-6 lg:py-6">
+      {showGuide ? <WelcomeGuide member={member} onClose={closeGuide} /> : null}
+
+      {/* The agent: what it did last, when it runs next, and «Pull now». */}
+      <section aria-label="News agent" className="bg-card rounded-2xl border px-5 py-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <span className="bg-foreground text-background grid size-11 shrink-0 place-items-center rounded-xl">
+            <Bot className="size-5" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="flex items-center gap-2 text-[15px] font-medium">
+              News agent
+              <span className={cn("size-2 rounded-full", running || drafting ? "animate-pulse bg-[var(--state-review)]" : "bg-[var(--state-approved)]")} aria-hidden />
+              <span className="text-muted-foreground text-[13px] font-normal">
+                {running ? "Reading the feeds…" : drafting ? `Drafting ${drafting} ${drafting === 1 ? "story" : "stories"}` : "Idle"}
+              </span>
+            </p>
+            <p className="text-muted-foreground truncate text-[13px]">
+              {runResult?.text ??
+                (last
+                  ? `Last run ${timeAgo(last.startedAt)} (${last.trigger === "cron" ? "scheduled" : "manual"}) · ${last.details?.fresh ?? last.scanned} stories read · ${last.created} ${last.created === 1 ? "card" : "cards"}`
+                  : "Hasn't run yet.")}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-muted-foreground text-[12px]">Next run</p>
+            <p className="text-[15px] font-medium tabular-nums">{nextRun()}</p>
+          </div>
+          <button
+            type="button"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((open) => !open)}
+            className={cn(buttonClass.ghost, "gap-1")}
+          >
+            Details
+            <ChevronDown className={cn("size-4 transition-transform", detailsOpen && "rotate-180")} />
+          </button>
+          {isEditor(member) ? (
             <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
               <RefreshCw className={cn("size-4", running && "animate-spin")} />
               {running ? "Pulling…" : "Pull now"}
             </button>
-          ) : null
-        }
-      />
-
-      <div className="bg-card rounded-xl border px-4 py-3 text-[13px]">
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="text-muted-foreground">
-            {runResult?.text ??
-              (runs[0]
-                ? `Last run: ${runs[0].trigger === "cron" ? "scheduled" : "manual"} · ${runs[0].details?.fresh ?? runs[0].scanned} stories read · ${runs[0].created} ${runs[0].created === 1 ? "card" : "cards"}`
-                : "The agent hasn't run yet. It runs at 08:00, 14:00 and 20:00.")}
-          </span>
-          <button type="button" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)} className="text-muted-foreground hover:text-foreground ml-auto inline-flex items-center gap-1 text-[12px]">
-            <ChevronDown className={cn("size-3.5 transition-transform", detailsOpen && "rotate-180")} />
-            Details
-          </button>
+          ) : null}
         </div>
         {detailsOpen ? (
-          <div className="mt-3 border-t pt-3">
-            <RunDetailsView run={runs[0]} problem={runResult?.problem ?? ""} />
+          <div className="mt-4 border-t pt-4">
+            <RunDetailsView run={last} problem={runResult?.problem ?? ""} />
           </div>
         ) : null}
-      </div>
+      </section>
 
       {error ? <Notice tone="error">{error}</Notice> : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Tabs label="Status" value={status} onChange={(key) => refilter(() => setStatus(key))} options={statusTabs.map((tab) => ({ ...tab, count: items ? counts[tab.key] : undefined }))} />
-        <Tabs label="Desk" value={desk} onChange={(key) => refilter(() => setDesk(key))} options={deskTabs} />
-        <Tabs
-          label="Sort"
-          value={byScore ? "score" : "time"}
-          onChange={(key) => setByScore(key === "score")}
-          options={[
-            { key: "score", label: "Most important" },
-            { key: "time", label: "Newest" },
-          ]}
-        />
+      <div className="flex items-center justify-end gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="h-9 gap-1.5 px-3.5 shadow-xs">
+              {status === "new" && byScore ? "Filter" : `${statusLabel} · ${byScore ? "Most important" : "Newest"}`}
+              <SlidersHorizontal />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel>Status</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={status} onValueChange={(value) => refilter(() => setStatus(value as StatusFilter))}>
+              {statusOptions.map((option) => (
+                <DropdownMenuRadioItem key={option.key} value={option.key}>
+                  {option.label}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Sort</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={byScore ? "score" : "time"} onValueChange={(value) => setByScore(value === "score")}>
+              <DropdownMenuRadioItem value="score">Most important</DropdownMenuRadioItem>
+              <DropdownMenuRadioItem value="time">Newest</DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
-      {items ? (
-        <div role="tablist" aria-label="Topic" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-          {[{ key: "all", label: "All topics", count: categoryCounts.all }, ...NEWS_CATEGORIES.map((entry) => ({ key: entry.key, label: entry.label, count: categoryCounts.byKey.get(entry.key) ?? 0 }))]
-            .filter((entry) => entry.key === "all" || entry.count > 0 || entry.key === category)
-            .map((entry) => (
-              <button
-                key={entry.key}
-                type="button"
-                role="tab"
-                aria-selected={category === entry.key}
-                onClick={() => refilter(() => setCategory(entry.key))}
-                className={cn(
-                  "h-8 shrink-0 rounded-full border px-3 text-[13px] font-medium whitespace-nowrap transition-colors",
-                  category === entry.key ? "bg-foreground text-background border-foreground" : "text-muted-foreground hover:text-foreground bg-card",
-                )}
-              >
-                {entry.label}
-                <span className="ml-1.5 font-mono text-[11px] opacity-70">{entry.count}</span>
-              </button>
-            ))}
+      <div className="bg-card flex min-h-[calc(100svh-15rem)] gap-3 rounded-2xl border p-3">
+        {/* Folders, with an arrow from the open one to its list. */}
+        <div role="tablist" aria-label="Folders" aria-orientation="vertical" className="flex w-[124px] shrink-0 flex-col gap-1.5">
+          {FOLDERS.map((entry) => (
+            <div key={entry.key} className="relative">
+              <Folder
+                label={entry.label}
+                count={items ? (folderCounts.get(entry.key) ?? 0) : undefined}
+                open={entry.key === folder.key}
+                onClick={() => openFolder(entry.key)}
+              />
+              {entry.key === folder.key ? (
+                <ArrowRight className="text-muted-foreground absolute top-1/2 -right-3 size-3.5 -translate-y-1/2" aria-hidden />
+              ) : null}
+            </div>
+          ))}
         </div>
-      ) : null}
 
-      <label className="relative block">
-        <span className="sr-only">Search</span>
-        <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 z-10 size-4 -translate-y-1/2" />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => refilter(() => setQuery(event.target.value))}
-          placeholder="Search by headline or source"
-          className={`${inputClass} pl-9`}
-        />
-      </label>
+        <section aria-label={`${folder.label} news`} className="bg-background flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border">
+          <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
+            <h1 className="ez-title text-[1.75rem] leading-none">{folder.label}</h1>
+            <span className="text-muted-foreground text-[13px] tabular-nums">
+              {items ? `${shown.length} ${shown.length === 1 ? "story" : "stories"} · ${statusLabel.toLowerCase()}` : "Loading…"}
+            </span>
+            <label className="bg-secondary ml-auto flex h-9 w-64 max-w-full items-center gap-2 rounded-lg px-3">
+              <Search className="text-muted-foreground size-4 shrink-0" />
+              <span className="sr-only">Search this folder</span>
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => refilter(() => setQuery(event.target.value))}
+                placeholder={`Search ${folder.label}`}
+                className="placeholder:text-muted-foreground h-full min-w-0 flex-1 bg-transparent text-[13px] outline-none"
+              />
+            </label>
+          </header>
 
-      {!items ? (
-        <p className="text-muted-foreground text-[14px]">Loading…</p>
-      ) : shown.length === 0 ? (
-        <p className="text-muted-foreground text-[14px]">
-          {items.length ? "No matches." : "No stories yet. They show up here after the agent runs (Pull now)."}
-        </p>
-      ) : (
-        <ul className="bg-card divide-y rounded-xl border">
-          {shown.slice(0, limit).map((item) => {
-            const working = busy.has(item.id)
-            return (
-              <li key={item.id} className={`flex gap-4 px-4 py-4 ${item.status === "dismissed" ? "opacity-60" : ""}`}>
-                {item.image ? (
-                  <img
-                    src={item.image}
-                    alt=""
-                    loading="lazy"
-                    referrerPolicy="no-referrer"
-                    onError={(event) => (event.currentTarget.style.visibility = "hidden")}
-                    className="bg-muted hidden h-20 w-32 shrink-0 rounded-lg object-cover sm:block"
-                  />
-                ) : (
-                  <div className="bg-muted hidden h-20 w-32 shrink-0 rounded-lg sm:block" />
-                )}
-                <div className="min-w-0 flex-1">
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
-                    <span className={`rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold ${scoreClass(item.priority)}`} title={item.why}>
-                      {item.priority}/10
-                    </span>
-                    <span className="text-foreground font-medium">{item.source}</span>
-                    <span>· {ago(item.publishedAt ?? item.seenAt)}</span>
-                    {item.why ? <span className="truncate">· {item.why}</span> : null}
-                  </div>
-                  <a href={item.link} target="_blank" rel="noreferrer" className="font-news mt-1 line-clamp-2 block text-[16px] leading-snug hover:underline">
-                    {item.title}
-                    <ExternalLink className="text-muted-foreground ml-1 inline size-3.5 align-baseline" />
-                  </a>
-                  {item.summary ? <p className="text-muted-foreground mt-1 line-clamp-2 text-[13px]">{item.summary}</p> : null}
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    {item.status === "filed" && item.articleId ? (
-                      <>
-                        <Link to={`/edit/${item.articleId}`} className={buttonClass.ghost}>
-                          Open card
-                          <ArrowRight className="size-4" />
-                        </Link>
-                        {isEditor(member) ? (
-                          <button type="button" disabled={working} onClick={() => removeCard(item)} className={buttonClass.danger}>
-                            <Trash2 className="size-4" />
-                            {working ? "Deleting…" : "Delete"}
-                          </button>
-                        ) : null}
-                      </>
-                    ) : item.status === "queued" || item.status === "drafting" ? (
-                      <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[12px]">
-                        <RefreshCw className={cn("size-3.5", item.status === "drafting" && "animate-spin")} />
-                        {item.status === "drafting" ? "The agent is drafting this…" : "Queued, the agent drafts it shortly"}
-                      </span>
-                    ) : item.status === "dismissed" ? (
-                      <button type="button" disabled={working} onClick={() => dismiss(item, false)} className={buttonClass.ghost}>
-                        <Undo2 className="size-4" />
-                        Restore
-                      </button>
+          {!items ? (
+            <p className="text-muted-foreground p-6 text-[14px]">Loading…</p>
+          ) : shown.length === 0 ? (
+            <p className="text-muted-foreground p-6 text-[14px]">
+              {items.length ? `Nothing in ${folder.label} for this filter.` : "No stories yet. They show up here after the agent runs (Pull now)."}
+            </p>
+          ) : (
+            <ul className="divide-y">
+              {shown.slice(0, limit).map((item) => {
+                const working = busy.has(item.id)
+                return (
+                  <li key={item.id} className={cn("flex gap-4 px-4 py-4", item.status === "dismissed" && "opacity-60")}>
+                    {item.image ? (
+                      <img
+                        src={item.image}
+                        alt=""
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        onError={(event) => (event.currentTarget.style.visibility = "hidden")}
+                        className="bg-muted hidden h-20 w-32 shrink-0 rounded-lg object-cover sm:block"
+                      />
                     ) : (
-                      <>
-                        <button type="button" disabled={working} onClick={() => file(item)} className={buttonClass.primary}>
-                          <FilePlus2 className="size-4" />
-                          {working ? "Preparing…" : "Make card"}
-                        </button>
-                        {working ? <span className="text-muted-foreground text-[12px]">The agent is drafting; this can take up to 2 minutes.</span> : null}
-                        <button type="button" disabled={working} onClick={() => dismiss(item, true)} className={buttonClass.ghost}>
-                          <X className="size-4" />
-                          Close
-                        </button>
-                      </>
+                      <div className="bg-muted hidden h-20 w-32 shrink-0 rounded-lg sm:block" />
                     )}
-                    {(categories.get(item.id) ?? []).map((key) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => refilter(() => setCategory(key))}
-                        className="bg-foreground/[0.05] text-muted-foreground hover:text-foreground rounded-full px-2 py-0.5 text-[11px]"
-                      >
-                        {categoryLabel.get(key)}
-                      </button>
-                    ))}
-                  </div>
-                  {failed.has(item.id) ? (
-                    <div className="mt-2">
-                      <Notice tone="error">{failed.get(item.id)}</Notice>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px]">
+                        <span className={cn("rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums", scoreClass(item.priority))} title={item.why}>
+                          {item.priority}/10
+                        </span>
+                        <span className="text-foreground font-medium">{item.source}</span>
+                        <span>· {ago(item.publishedAt ?? item.seenAt)}</span>
+                        {item.why ? <span className="truncate">· {item.why}</span> : null}
+                      </div>
+                      <a href={item.link} target="_blank" rel="noreferrer" className="mt-1 line-clamp-2 block text-[15px] leading-snug font-medium hover:underline">
+                        {item.title}
+                        <ExternalLink className="text-muted-foreground ml-1 inline size-3.5 align-baseline" />
+                      </a>
+                      {item.summary ? <p className="text-muted-foreground mt-1 line-clamp-2 text-[13px]">{item.summary}</p> : null}
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {item.status === "filed" && item.articleId ? (
+                          <>
+                            <Link to={`/edit/${item.articleId}`} className={buttonClass.ghost}>
+                              Open card
+                              <ArrowRight className="size-4" />
+                            </Link>
+                            {isEditor(member) ? (
+                              <button type="button" disabled={working} onClick={() => removeCard(item)} className={buttonClass.danger}>
+                                <Trash2 className="size-4" />
+                                {working ? "Deleting…" : "Delete"}
+                              </button>
+                            ) : null}
+                          </>
+                        ) : item.status === "queued" || item.status === "drafting" ? (
+                          <span className="text-muted-foreground inline-flex items-center gap-1.5 text-[12px]">
+                            <RefreshCw className={cn("size-3.5", item.status === "drafting" && "animate-spin")} />
+                            {item.status === "drafting" ? "The agent is drafting this…" : "Queued, the agent drafts it shortly"}
+                          </span>
+                        ) : item.status === "dismissed" ? (
+                          <button type="button" disabled={working} onClick={() => dismiss(item, false)} className={buttonClass.ghost}>
+                            <Undo2 className="size-4" />
+                            Restore
+                          </button>
+                        ) : (
+                          <>
+                            <button type="button" disabled={working} onClick={() => file(item)} className={buttonClass.primary}>
+                              <FilePlus2 className="size-4" />
+                              {working ? "Preparing…" : "Make card"}
+                            </button>
+                            {working ? <span className="text-muted-foreground text-[12px]">The agent is drafting; this can take up to 2 minutes.</span> : null}
+                            <button type="button" disabled={working} onClick={() => dismiss(item, true)} className={buttonClass.ghost}>
+                              <X className="size-4" />
+                              Close
+                            </button>
+                          </>
+                        )}
+                        {(categories.get(item.id) ?? []).map((key) => (
+                          <span key={key} className="bg-foreground/[0.05] text-muted-foreground rounded-md px-2 py-0.5 text-[11px]">
+                            {categoryLabel.get(key)}
+                          </span>
+                        ))}
+                      </div>
+                      {failed.has(item.id) ? (
+                        <div className="mt-2">
+                          <Notice tone="error">{failed.get(item.id)}</Notice>
+                        </div>
+                      ) : null}
                     </div>
-                  ) : null}
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
 
-      {shown.length > limit ? (
-        <button type="button" onClick={() => setLimit((value) => value + PAGE)} className={`${buttonClass.ghost} self-center`}>
-          Show more ({shown.length - limit})
-        </button>
-      ) : null}
+          {shown.length > limit ? (
+            <button type="button" onClick={() => setLimit((value) => value + PAGE)} className={cn(buttonClass.ghost, "my-4 self-center")}>
+              Show more ({shown.length - limit})
+            </button>
+          ) : null}
+        </section>
+      </div>
     </div>
   )
 }

@@ -379,7 +379,7 @@ export function EditorPage() {
     if (!ok) return
     try {
       await backend.deleteArticle(article.id)
-      navigate("/")
+      navigate("/stories")
     } catch (failure) {
       setMessage({ tone: "error", text: failure instanceof Error ? failure.message : "Couldn't delete" })
     }
@@ -449,7 +449,7 @@ export function EditorPage() {
       {/* Top bar */}
       <header className="bg-background/90 sticky top-0 z-30 border-b backdrop-blur-xl">
         <div className={cn("mx-auto flex h-14 items-center gap-3 px-4 sm:px-6", split ? "max-w-none" : "max-w-[1200px]")}>
-          <Link to="/" aria-label="Back to the dashboard" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
+          <Link to="/stories" aria-label="Back to stories" className="hover:bg-foreground/5 grid size-9 place-items-center rounded-md">
             <ArrowLeft className="size-4" />
           </Link>
           <img src={publicUrl("brand/logo-black.png")} alt="" className="hidden h-5 w-auto sm:block dark:hidden" />

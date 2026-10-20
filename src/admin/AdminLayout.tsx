@@ -7,7 +7,7 @@ import {
   ExternalLink,
   FilePlus2,
   Inbox,
-  LayoutDashboard,
+  Newspaper,
   LogOut,
   Mail,
   Moon,
@@ -48,7 +48,11 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { publicUrl } from "@/lib/public-url"
 
-/* The admin shell: Watermelon UI's Tallie layout (sidebar, top bar with search). See admin.css. */
+/*
+ * The admin shell (the owner's sketch, 20 Oct): a floating sidebar card with search, the
+ * pages and the account; the page fills the rest. Colours and type from Watermelon UI's
+ * Tallie (admin.css).
+ */
 
 const THEME_KEY = "ediinzasag-theme"
 
@@ -60,8 +64,10 @@ const menuButtonClass = cn(
 
 function NavItem({ to, label, icon: Icon, end = false }: { to: string; label: string; icon: typeof Inbox; end?: boolean }) {
   const { pathname, search } = useLocation()
-  const here = `${pathname}${search}`
-  const active = end ? here === to : pathname === to || pathname.startsWith(`${to}/`)
+  // "/?guide=1" is the Guide, not News: a link with a query matches only that query.
+  const [path, query] = to.split("?")
+  const guide = new URLSearchParams(search).has("guide")
+  const active = query ? pathname === path && guide : end ? pathname === path && !guide : pathname === path || pathname.startsWith(`${path}/`)
   return (
     <SidebarMenuItem>
       <SidebarMenuButton asChild tooltip={label} className={menuButtonClass}>
@@ -102,7 +108,7 @@ function AdminSidebar() {
   const { toggleSidebar } = useSidebar()
   if (!backend || !member) return null
   return (
-    <Sidebar collapsible="icon" className="border-sidebar-border">
+    <Sidebar variant="floating" collapsible="icon">
       <SidebarHeader className="h-16 flex-row items-center justify-between px-4 group-data-[collapsible=icon]:px-2">
         <Link to="/" className="flex items-center gap-2 group-data-[collapsible=icon]:hidden" aria-label="Dashboard">
           <img src={publicUrl("brand/logo-black.png")} alt="" className="h-6 w-auto dark:hidden" />
@@ -119,14 +125,17 @@ function AdminSidebar() {
           <PanelLeft className="size-4" />
         </button>
       </SidebarHeader>
+      <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
+        <StorySearch />
+      </div>
       <SidebarContent className="px-2">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[13px]">Newsroom</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu className="gap-1">
-              <NavItem to="/" label="Dashboard" icon={LayoutDashboard} end />
+              <NavItem to="/" label="News" icon={Newspaper} end />
+              <NavItem to="/stories" label="Stories" icon={Inbox} />
               <NavItem to="/new" label="New story" icon={FilePlus2} />
-              <NavItem to="/inbox" label="Inbox" icon={Inbox} />
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -161,6 +170,7 @@ function AdminSidebar() {
           </SidebarMenuItem>
           <ThemeItem />
         </SidebarMenu>
+        <AccountMenu />
       </SidebarFooter>
     </Sidebar>
   )
@@ -209,8 +219,8 @@ function StorySearch() {
   }
 
   return (
-    <div className="relative w-full max-w-md">
-      <label className="bg-secondary flex h-10 items-center gap-2 rounded-lg px-3">
+    <div className="relative w-full">
+      <label className="bg-background flex h-9 items-center gap-2 rounded-lg px-3">
         <Search className="text-muted-foreground size-4 shrink-0" />
         <span className="sr-only">Search stories</span>
         <input
@@ -234,11 +244,11 @@ function StorySearch() {
           className="placeholder:text-muted-foreground h-full min-w-0 flex-1 bg-transparent text-[14px] outline-none"
         />
         {query ? null : (
-          <kbd className="bg-background text-muted-foreground hidden rounded-md px-1.5 py-0.5 font-sans text-[12px] sm:block">Ctrl K</kbd>
+          <kbd className="bg-secondary text-muted-foreground rounded-md px-1.5 py-0.5 font-sans text-[11px]">Ctrl K</kbd>
         )}
       </label>
       {open && query.trim() ? (
-        <div className="bg-popover absolute inset-x-0 top-12 z-50 overflow-hidden rounded-xl border shadow-lg">
+        <div className="bg-popover absolute top-11 left-0 z-50 w-[26rem] overflow-hidden rounded-xl border shadow-lg">
           {articles === null ? (
             <p className="text-muted-foreground px-4 py-3 text-[13px]">Loading…</p>
           ) : results.length === 0 ? (
@@ -270,41 +280,38 @@ function StorySearch() {
   )
 }
 
-function Topbar() {
+/** Who is signed in, and «Sign out». The demo badge sits here too. */
+function AccountMenu() {
   const { backend, member } = useSession()
   if (!backend || !member) return null
   return (
-    <header className="bg-background/90 sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between gap-4 border-b px-6 backdrop-blur lg:px-8">
-      <StorySearch />
-      <div className="flex shrink-0 items-center gap-3">
-        {backend.mode === "demo" ? (
-          <span className="bg-secondary text-muted-foreground rounded-md px-2 py-1 text-[12px]" title="Data stays in this browser. Connect Supabase to work as a team (ADMIN.md).">
-            Demo
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="hover:bg-sidebar-accent mt-1 flex w-full items-center gap-2 rounded-lg p-1.5 text-left outline-none group-data-[collapsible=icon]:justify-center"
+        aria-label="Account"
+      >
+        <Avatar name={member.name} />
+        <span className="min-w-0 flex-1 leading-tight group-data-[collapsible=icon]:hidden">
+          <span className="block truncate text-[13px] font-medium">{member.name}</span>
+          <span className="text-muted-foreground block text-[12px] capitalize">
+            {member.role}
+            {backend.mode === "demo" ? " · demo" : ""}
           </span>
-        ) : null}
-        <DropdownMenu>
-          <DropdownMenuTrigger className="hover:bg-muted flex items-center gap-2 rounded-lg py-1 pr-2 pl-1 outline-none" aria-label="Account">
-            <Avatar name={member.name} />
-            <span className="hidden text-left leading-tight md:block">
-              <span className="block text-[13px] font-medium">{member.name}</span>
-              <span className="text-muted-foreground block text-[12px] capitalize">{member.role}</span>
-            </span>
-            <ChevronsUpDown className="text-muted-foreground size-3.5" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
-            <DropdownMenuLabel className="font-normal">
-              <p className="text-foreground text-[13px] font-medium">{member.name}</p>
-              <p className="text-muted-foreground truncate text-[12px]">{member.email}</p>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => backend.signOut()} variant="destructive">
-              <LogOut />
-              Sign out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    </header>
+        </span>
+        <ChevronsUpDown className="text-muted-foreground size-3.5 group-data-[collapsible=icon]:hidden" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="top" align="start" className="w-60">
+        <DropdownMenuLabel className="font-normal">
+          <p className="text-foreground text-[13px] font-medium">{member.name}</p>
+          <p className="text-muted-foreground truncate text-[12px]">{member.email}</p>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => backend.signOut()} variant="destructive">
+          <LogOut />
+          Sign out
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -329,12 +336,9 @@ export function AdminLayout() {
         style={{ "--sidebar-width": "16rem", "--sidebar-width-icon": "3.75rem" } as CSSProperties}
       >
         <AdminSidebar />
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <Topbar />
-          <main className="flex-1 overflow-y-auto">
-            <Outlet />
-          </main>
-        </div>
+        <main className="min-w-0 flex-1 overflow-y-auto">
+          <Outlet />
+        </main>
       </SidebarProvider>
     </TooltipProvider>
   )
