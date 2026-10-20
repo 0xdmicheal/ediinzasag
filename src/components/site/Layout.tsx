@@ -25,6 +25,7 @@ const footerColumns = [
       { label: "Монгол", href: "/mongolia" },
       { label: "Дэлхий", href: "/world" },
       { label: "Ханш", href: "/markets" },
+      { label: "Сэдвүүд", href: "/topic" },
     ],
   },
   {

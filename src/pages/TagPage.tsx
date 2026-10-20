@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router-dom"
 
 import { sortByDate, useStories, useTagLabels } from "@/content/live"
 import { deskLabel, formatStoryDate, storyArt, tagsOf } from "@/content/stories"
+import { usePageTitle } from "@/lib/use-page-title"
 
 /** Every story with one tag, plus the tags that most often appear beside it. */
 export function TagPage() {
@@ -9,6 +10,7 @@ export function TagPage() {
   const { stories, ready } = useStories()
   const labels = useTagLabels()
   const label = labels.get(slug) ?? slug
+  usePageTitle(`#${label}`)
   const tagged = sortByDate(stories.filter((story) => tagsOf(story).includes(slug)))
 
   const nearby = new Map<string, number>()

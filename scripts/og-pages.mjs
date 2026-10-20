@@ -55,7 +55,8 @@ async function siteContent() {
   try {
     const { stories, storyArt, tagsOf, topicLabel, deskLabel } = await vite.ssrLoadModule("/src/content/stories.ts")
     const { substackPosts } = await vite.ssrLoadModule("/src/content/substack.posts.ts")
-    return { stories, storyArt, tagsOf, labels: { ...topicLabel, ...deskLabel }, letters: substackPosts }
+    const topicHubs = await vite.ssrLoadModule("/src/content/topics.ts")
+    return { stories, storyArt, tagsOf, labels: { ...topicLabel, ...deskLabel }, letters: substackPosts, topicHubs }
   } finally {
     await vite.close()
   }
@@ -65,17 +66,19 @@ async function siteContent() {
 async function supabaseContent() {
   const url = process.env.VITE_SUPABASE_URL
   const key = process.env.VITE_SUPABASE_ANON_KEY
-  if (!url || !key) return { articles: [], tags: [] }
+  if (!url || !key) return { articles: [], tags: [], quotes: [] }
   const get = async (path) => {
     const response = await fetch(`${url}/rest/v1/${path}`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(20_000) })
     if (!response.ok) throw new Error(`Supabase ${path}: HTTP ${response.status}`)
     return response.json()
   }
-  const [articles, tags] = await Promise.all([
+  const [articles, tags, quotes] = await Promise.all([
     get("articles?select=slug,title,dek,body,desk,cover_url,cover_alt,published_at,updated_at,tags&status=eq.published"),
     get("tags?select=slug,label"),
+    // The topic pages' numbers; a failed read only leaves them without one.
+    get("market_quotes?select=id,price,pct,as_of,source,updated_at").catch(() => []),
   ])
-  return { articles, tags }
+  return { articles, tags, quotes }
 }
 
 function jsonLd(page) {
@@ -217,11 +220,37 @@ for (const letter of site.letters) {
 }
 const letters = site.letters.map((letter) => ({ path: `letter/${letter.slug}`, title: letter.title }))
 
+// Topic pages: the number (live from market_quotes, or the dated figure), the explanation and the stories on the topic.
+const { topics, storyOnTopic, topicValue, topicUnit, closeFigure } = site.topicHubs
+const quotes = new Map(remote.quotes.map((row) => [row.id, { ...row, price: Number(row.price), pct: Number(row.pct) }]))
+const topicLinks = topics.map((topic) => ({ path: `topic/${topic.slug}`, title: topic.title }))
+for (const topic of topics) {
+  const live = topic.quote ? quotes.get(topic.quote) : null
+  // Before the quotes job has run, the hand-written close stands in, as on the page.
+  const figure = topic.figure ?? closeFigure(topic)
+  const value = live ? `${topicValue(topic, live)}${topicUnit(topic) ? ` ${topicUnit(topic)}` : ""}` : figure?.value
+  const when = live ? `${new Date(live.as_of).toISOString().slice(0, 10)}, ${live.source}` : figure ? `${figure.label}, ${figure.source}` : ""
+  add({
+    path: `topic/${topic.slug}`,
+    title: value ? `${topic.title}: ${value}` : topic.title,
+    dek: value ? `${value} (${when}). ${topic.dek}` : topic.dek,
+    ...SITE_IMAGE,
+    modified: live?.updated_at,
+    date: undefined,
+    html: [
+      value ? `<p><strong>${escape(value)}</strong> · ${escape(when)}</p>` : "",
+      ...topic.sections.map((section) => `<h2>${escape(section.heading)}</h2><p>${escape(section.text)}</p>`),
+    ].join(""),
+    links: linksTo(articles.filter((page) => storyOnTopic(topic, page))),
+  })
+}
+add({ path: "topic", title: "Сэдвүүд", dek: "Ханш, үнэ, макро үзүүлэлт, томоохон төслүүд: өнөөдрийн тоо, энгийн тайлбар, холбогдох мэдээ.", ...SITE_IMAGE, links: topicLinks })
+
 // Fixed sections. Login/account answer 200 for shared links but stay out of search.
 for (const [path, title, dek, extra] of [
   ["mongolia", "Монгол", "Монголын эдийн засгийн мэдээ, тойм.", { links: linksTo(articles.filter((page) => page.desk === "mongolia")) }],
   ["world", "Дэлхий", "Дэлхийн эдийн засаг, зах зээлийн мэдээ.", { links: linksTo(articles.filter((page) => page.desk === "world")) }],
-  ["markets", "Ханш, зах зээл", "Валютын ханш, түүхий эд, хувьцаа, эдийн засгийн болон ашгийн тайлангийн календарь."],
+  ["markets", "Ханш, зах зээл", "Валютын ханш, түүхий эд, хувьцаа, эдийн засгийн болон ашгийн тайлангийн календарь.", { links: topicLinks }],
   ["ez-talk", "EZ Talk", "Nio, Ulemj нарын видео подкаст."],
   ["ez-edu", "EZ Edu", "Эдийн засгийн хичээл."],
   ["newsletter", "Нийтлэл", "Долоо хоногийн захидал.", { links: letters }],
@@ -248,7 +277,7 @@ for (const page of pages.values()) {
 }
 
 // Home: dist/index.html itself (404.html was copied from it before this runs and stays as it was).
-const home = { path: "", title: NAME, dek: SITE_DEK, ...SITE_IMAGE, home: true, links: linksTo(articles) }
+const home = { path: "", title: NAME, dek: SITE_DEK, ...SITE_IMAGE, home: true, links: [...topicLinks, ...linksTo(articles)] }
 await writeFile(new URL("index.html", DIST), pageFor(shell, home))
 
 // sitemap.xml: every indexable page; news-sitemap.xml: articles from the last 48 hours (Google News).
@@ -292,4 +321,4 @@ await writeFile(new URL("news-sitemap.xml", DIST), newsSitemap)
 await writeFile(new URL("feed.xml", DIST), feed)
 
 const count = (prefix) => [...pages.keys()].filter((path) => path.startsWith(prefix)).length
-console.log(`og-pages: ${pages.size} pages (${count("story/")} articles, ${remote.articles.length} from the admin; ${count("letter/")} letters; ${count("tag/")} tags); sitemap ${indexable.length} URLs, news ${recent.length}`)
+console.log(`og-pages: ${pages.size} pages (${count("story/")} articles, ${remote.articles.length} from the admin; ${count("letter/")} letters; ${count("tag/")} tags; ${count("topic/")} topics, ${remote.quotes.length} live quotes); sitemap ${indexable.length} URLs, news ${recent.length}`)

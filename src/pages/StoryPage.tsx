@@ -6,6 +6,8 @@ import { sortByDate, useStories, useTagLabels } from "@/content/live"
 import { storyOutlines } from "@/content/story-outlines"
 import { prepareArticle } from "@/lib/article-html"
 import { deskLabel, formatStoryDate, storyArt, tagsOf } from "@/content/stories"
+import { storyOnTopic, topics } from "@/content/topics"
+import { usePageTitle } from "@/lib/use-page-title"
 import { Comments } from "@/reader/Comments"
 import { ArticleActions, useFire } from "@/reader/ArticleActions"
 import { useMarkReadAtEnd } from "@/reader/useMarkRead"
@@ -38,6 +40,7 @@ export function StoryPage() {
   const story = stories.find((item) => item.slug === slug)
   useMarkReadAtEnd(story?.slug, "sources", story ? { desk: story.desk, topic: story.topic } : undefined)
   const fire = useFire(slug)
+  usePageTitle(story?.title)
 
   if (!story && !ready) {
     return <p className="text-muted-foreground mx-auto max-w-3xl px-4 py-20 text-sm sm:px-6">Ачаалж байна…</p>
@@ -81,6 +84,7 @@ export function StoryPage() {
       back={{ to: story.desk === "mongolia" ? "/mongolia" : "/world", label: `${deskLabel[story.desk]} руу буцах` }}
       tags={[
         ...storyTags.map((tag) => ({ label: `#${labels.get(tag) ?? tag}`, to: `/tag/${tag}` })),
+        ...topics.filter((topic) => storyOnTopic(topic, story)).map((topic) => ({ label: topic.short, to: `/topic/${topic.slug}` })),
         `${story.readMinutes} мин`,
       ]}
       date={formatStoryDate(story.date)}

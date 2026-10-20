@@ -9,6 +9,7 @@ import { Comments } from "@/reader/Comments"
 import { letterKey } from "@/reader/library-items"
 import { ArticleActions, useFire } from "@/reader/ArticleActions"
 import { useMarkReadAtEnd } from "@/reader/useMarkRead"
+import { usePageTitle } from "@/lib/use-page-title"
 
 /**
  * Gives the letter's headings ids for "on this page". Letters with fewer than
@@ -38,6 +39,7 @@ function prepareLetter(html: string): { html: string; toc: TocItem[] } {
 export function LetterPage() {
   const { slug = "" } = useParams()
   const post = substackPosts.find((item) => item.slug === slug)
+  usePageTitle(post?.title)
   const prepared = useMemo(() => (post?.html ? prepareLetter(post.html) : { html: "", toc: [] }), [post])
   useMarkReadAtEnd(post ? letterKey(post.slug) : undefined, "letter-end")
   const fire = useFire(letterKey(slug))

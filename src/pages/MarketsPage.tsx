@@ -1,14 +1,16 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { Globe2, Landmark } from "lucide-react"
 import { cn } from "cn"
 
 import { MarketDesk, WATCHLIST } from "@/components/site/MarketDesk"
 import { signedPct } from "@/components/site/market-marks"
+import { Sparkline } from "@/components/site/Sparkline"
 import { parseNumber, YieldCurve } from "@/components/site/market-charts"
 import { formatMove, formatValue, money } from "@/components/site/money"
 import { loadLiveQuotes, type LiveQuote } from "@/content/live-quotes"
 import { friendlyName, glossary, plain, regions, unitHint } from "@/content/market-guide"
+import { topics } from "@/content/topics"
 import {
   commodities,
   exportMix,
@@ -236,28 +238,6 @@ function useLiveQuotes() {
   return { quotes, now }
 }
 
-function Sparkline({ points, tone, className = "h-10 w-full" }: { points: number[]; tone: string; className?: string }) {
-  const id = useId().replace(/:/g, "")
-  if (points.length < 2) return <div className={className} aria-hidden />
-  const low = Math.min(...points)
-  const high = Math.max(...points)
-  const span = high - low || 1
-  const xy = points.map((value, index) => [(index / (points.length - 1)) * 100, 30 - ((value - low) / span) * 26 - 2] as const)
-  const line = xy.map(([x, y], index) => `${index ? "L" : "M"}${x.toFixed(2)},${y.toFixed(2)}`).join(" ")
-  return (
-    <svg viewBox="0 0 100 32" preserveAspectRatio="none" className={cn("overflow-visible", className, tone)} aria-hidden>
-      <defs>
-        <linearGradient id={`spark${id}`} x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0" stopColor="currentColor" stopOpacity="0.22" />
-          <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <path d={`${line} L100,32 L0,32 Z`} fill={`url(#spark${id})`} />
-      <path d={line} fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-    </svg>
-  )
-}
-
 function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
   const { quotes, now } = useLiveQuotes()
   const byId = new Map(quotes.map((item) => [item.id, item]))
@@ -326,6 +306,14 @@ function Pulse({ onOpen }: { onOpen: (id: string, room: Room) => void }) {
             )
           })}
         </div>
+
+        <nav aria-label="Сэдвүүд" className="text-muted-foreground mt-4 flex flex-wrap gap-x-4 gap-y-1 text-[12.5px]">
+          {topics.map((topic) => (
+            <Link key={topic.slug} to={`/topic/${topic.slug}`} className="hover:text-foreground underline-offset-2 hover:underline">
+              {topic.short}
+            </Link>
+          ))}
+        </nav>
       </div>
     </section>
   )

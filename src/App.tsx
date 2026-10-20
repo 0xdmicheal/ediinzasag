@@ -15,6 +15,7 @@ import { NewsletterPage } from "@/pages/NewsletterPage"
 import { StoryPage } from "@/pages/StoryPage"
 import { TagPage } from "@/pages/TagPage"
 import { TalkPage } from "@/pages/TalkPage"
+import { TopicPage, TopicsPage } from "@/pages/TopicPage"
 import { adminUrl } from "@/lib/admin-url"
 
 const basename = import.meta.env.BASE_URL.replace(/\/$/, "") || undefined
@@ -32,6 +33,8 @@ export default function App() {
           <Route path="markets" element={<MarketsPage />} />
           <Route path="story/:slug" element={<StoryPage />} />
           <Route path="tag/:slug" element={<TagPage />} />
+          <Route path="topic" element={<TopicsPage />} />
+          <Route path="topic/:slug" element={<TopicPage />} />
           <Route path="ez-talk" element={<TalkPage />} />
           <Route path="ez-edu" element={<EduPage />} />
           <Route path="newsletter" element={<NewsletterPage />} />
