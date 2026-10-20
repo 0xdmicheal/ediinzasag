@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react"
 import { Link, Navigate, Outlet, useLocation, useNavigate } from "react-router-dom"
 import {
   BookOpen,
+  PanelLeftOpen,
   ChartNoAxesColumn,
   ChevronsUpDown,
   ExternalLink,
@@ -60,6 +61,7 @@ const menuButtonClass = cn(
   "h-10 gap-2.5 rounded-lg px-3 text-[14px] text-sidebar-foreground/70 transition-colors",
   "aria-[current=page]:bg-background aria-[current=page]:font-medium aria-[current=page]:text-sidebar-accent-foreground aria-[current=page]:shadow-xs",
   "[&_svg]:size-[18px]!",
+  "group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:[&>span]:hidden",
 )
 
 function NavItem({ to, label, icon: Icon, end = false }: { to: string; label: string; icon: typeof Inbox; end?: boolean }) {
@@ -105,11 +107,12 @@ function ThemeItem() {
 
 function AdminSidebar() {
   const { backend, member } = useSession()
-  const { toggleSidebar } = useSidebar()
+  const { toggleSidebar, state } = useSidebar()
+  const collapsed = state === "collapsed"
   if (!backend || !member) return null
   return (
     <Sidebar variant="floating" collapsible="icon">
-      <SidebarHeader className="h-16 flex-row items-center justify-between px-4 group-data-[collapsible=icon]:px-2">
+      <SidebarHeader className="h-16 flex-row items-center justify-between px-4 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
         <Link to="/" className="flex items-center gap-2 group-data-[collapsible=icon]:hidden" aria-label="Dashboard">
           <img src={publicUrl("brand/logo-black.png")} alt="" className="h-6 w-auto dark:hidden" />
           <img src={publicUrl("brand/logo-white.png")} alt="" className="hidden h-6 w-auto dark:block" />
@@ -118,21 +121,21 @@ function AdminSidebar() {
         <button
           type="button"
           onClick={toggleSidebar}
-          aria-label="Collapse sidebar (Ctrl+B)"
-          title="Collapse sidebar (Ctrl+B)"
-          className="bg-background text-muted-foreground hover:text-foreground grid size-8 shrink-0 place-items-center rounded-lg"
+          aria-label={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+          title={collapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
+          className="bg-background text-muted-foreground hover:text-foreground grid size-9 shrink-0 place-items-center rounded-lg"
         >
-          <PanelLeft className="size-4" />
+          {collapsed ? <PanelLeftOpen className="size-4" /> : <PanelLeft className="size-4" />}
         </button>
       </SidebarHeader>
       <div className="px-3 pb-1 group-data-[collapsible=icon]:hidden">
         <StorySearch />
       </div>
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2 group-data-[collapsible=icon]:px-0">
         <SidebarGroup>
           <SidebarGroupLabel className="text-[13px]">Newsroom</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="gap-1">
+            <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
               <NavItem to="/" label="News" icon={Newspaper} end />
               <NavItem to="/stories" label="Stories" icon={Inbox} />
               <NavItem to="/new" label="New story" icon={FilePlus2} />
@@ -143,7 +146,7 @@ function AdminSidebar() {
           <SidebarGroup>
             <SidebarGroupLabel className="text-[13px]">Manage</SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-1">
+              <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
                 <NavItem to="/tags" label="Tags" icon={Tags} />
                 {canManageTeam(member) ? (
                   <>
@@ -157,8 +160,8 @@ function AdminSidebar() {
           </SidebarGroup>
         ) : null}
       </SidebarContent>
-      <SidebarFooter className="px-2 pb-3">
-        <SidebarMenu className="gap-1">
+      <SidebarFooter className="px-2 pb-3 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
+        <SidebarMenu className="gap-1 group-data-[collapsible=icon]:items-center">
           <NavItem to="/?guide=1" label="Guide" icon={BookOpen} end />
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="View site" className={menuButtonClass}>
@@ -287,7 +290,7 @@ function AccountMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        className="hover:bg-sidebar-accent mt-1 flex w-full items-center gap-2 rounded-lg p-1.5 text-left outline-none group-data-[collapsible=icon]:justify-center"
+        className="hover:bg-sidebar-accent mt-1 flex w-full items-center gap-2 rounded-lg p-1.5 text-left outline-none group-data-[collapsible=icon]:size-10 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
         aria-label="Account"
       >
         <Avatar name={member.name} />
@@ -333,7 +336,7 @@ export function AdminLayout() {
       <SidebarProvider
         defaultOpen
         className="h-svh overflow-hidden"
-        style={{ "--sidebar-width": "16rem", "--sidebar-width-icon": "3.75rem" } as CSSProperties}
+        style={{ "--sidebar-width": "16rem", "--sidebar-width-icon": "3.5rem" } as CSSProperties}
       >
         <AdminSidebar />
         <main className="min-w-0 flex-1 overflow-y-auto">
