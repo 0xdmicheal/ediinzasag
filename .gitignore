@@ -25,3 +25,8 @@ supabase/.temp/
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets
+.env
+.env.*
+!.env.example

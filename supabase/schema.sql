@@ -300,6 +300,11 @@ revoke insert, update, delete on public.newsletter_signups from anon, authentica
 create or replace function public.subscribe_newsletter(address text, origin text default 'newsletter') returns void
 language plpgsql security definer set search_path = public as $$
 begin
+  -- Anyone can call this without signing in, so a script could fill the list with junk:
+  -- past 30 new addresses in a minute, the form asks people to wait.
+  if (select count(*) from public.newsletter_signups where created_at > now() - interval '1 minute') >= 30 then
+    raise exception 'Түр хүлээгээд дахин оролдоно уу';
+  end if;
   insert into public.newsletter_signups (email, source)
   values (lower(trim(address)), left(coalesce(nullif(trim(origin), ''), 'newsletter'), 40))
   on conflict (email) do nothing;
@@ -1119,6 +1124,10 @@ grant execute on function public.admin_insights() to authenticated;
 -- ---------------------------------------------------------------- cover images
 insert into storage.buckets (id, name, public) values ('covers', 'covers', true)
 on conflict (id) do nothing;
+-- Pictures only (no SVG, which can carry scripts), at most 10 MB each.
+update storage.buckets set file_size_limit = 10 * 1024 * 1024,
+  allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif']
+where id = 'covers';
 
 drop policy if exists "anyone reads covers" on storage.objects;
 -- No SELECT policy: a public bucket serves files by URL without one, and leaving it out stops anyone listing the bucket.
@@ -1167,6 +1176,11 @@ begin
     execute format('revoke execute on function public.%I() from public, anon, authenticated', fn);
   end loop;
 end $$;
+
+-- Browsers reach tables only through the API, which never truncates; RLS does not cover
+-- TRUNCATE, so nobody outside the server gets it (nor TRIGGER or REFERENCES), now or later.
+revoke truncate, trigger, references on all tables in schema public from anon, authenticated;
+alter default privileges in schema public revoke truncate, trigger, references on tables from anon, authenticated;
 
 -- pg_net belongs in the extensions schema (it cannot be moved, only reinstalled;
 -- cron jobs call net.http_post by name and keep working):

@@ -75,10 +75,34 @@ function adminEntry() {
   }
 }
 
+/**
+ * `--mode admin`: Cloudflare Pages headers for admin.ediinzasag.mn. Only the admin itself may
+ * frame it (its own article preview; stops clickjacking), plugins and <base> tricks are off, and browsers stay on HTTPS.
+ */
+function adminHeaders() {
+  const headers = [
+    "/*",
+    "  X-Frame-Options: SAMEORIGIN",
+    "  Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'",
+    "  Strict-Transport-Security: max-age=31536000; includeSubDomains",
+    "  Referrer-Policy: strict-origin-when-cross-origin",
+    "  X-Content-Type-Options: nosniff",
+    "  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()",
+    "",
+  ].join("\n")
+  return {
+    name: "admin-headers",
+    apply: "build" as const,
+    generateBundle(this: { emitFile: (file: { type: "asset"; fileName: string; source: string }) => void }) {
+      this.emitFile({ type: "asset", fileName: "_headers", source: headers })
+    },
+  }
+}
+
 export default defineConfig(({ mode }) => ({
   base: process.env.VITE_BASE || "/",
   // The Substack pull only feeds the public site.
-  plugins: [mode === "admin" ? adminEntry() : substackRss(), linkPreviewDev(), react(), tailwindcss()],
+  plugins: [...(mode === "admin" ? [adminEntry(), adminHeaders()] : [substackRss()]), linkPreviewDev(), react(), tailwindcss()],
   resolve: {
     alias: {
       "@": path.resolve(root, "./src"),
