@@ -1,10 +1,12 @@
-import { Fragment, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react"
+import { Fragment, lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from "react"
 import { Link } from "react-router-dom"
 import { ArrowLeft, ArrowUpRight, Expand } from "lucide-react"
 
-import { Lightbox, useLightbox, zoomableImages } from "@/components/site/Lightbox"
+import { useLightbox, zoomableImages } from "@/components/site/use-lightbox"
 import type { AdSlot } from "@/content/ads"
 import { publicUrl } from "@/lib/public-url"
+
+const Lightbox = lazy(() => import("@/components/site/Lightbox").then((module) => ({ default: module.Lightbox })))
 
 /*
  * Shared article layout for stories and letters: a header over a faint dot
@@ -347,6 +349,7 @@ export function ArticleLayout({
                   <img
                     src={image.src}
                     alt={image.alt}
+                    fetchPriority="high"
                     referrerPolicy={image.referrer ? "no-referrer" : undefined}
                     className="aspect-[16/9] w-full object-cover transition-transform duration-500 group-hover:scale-[1.015]"
                   />
@@ -387,7 +390,11 @@ export function ArticleLayout({
           </aside>
         </div>
       </div>
-      <Lightbox image={lightbox.image} onClose={lightbox.close} />
+      {lightbox.opened ? (
+        <Suspense fallback={null}>
+          <Lightbox image={lightbox.image} onClose={lightbox.close} />
+        </Suspense>
+      ) : null}
     </article>
   )
 }

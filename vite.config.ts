@@ -114,8 +114,9 @@ function publicHead() {
         ...(supabase ? [`<link rel="preconnect" href="${new URL(supabase).origin}" crossorigin />`] : []),
         ...(ga && /^G-[A-Z0-9]+$/.test(ga)
           ? [
-              `<script async src="https://www.googletagmanager.com/gtag/js?id=${ga}"></script>`,
-              `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${ga}")</script>`,
+              // The tag (about 170 kB) loads after the page's own load so it doesn't hold up the first paint;
+              // the queued config still sends the page view once it arrives.
+              `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${ga}");addEventListener("load",function(){var s=document.createElement("script");s.async=true;s.src="https://www.googletagmanager.com/gtag/js?id=${ga}";document.head.appendChild(s)})</script>`,
             ]
           : []),
       ]

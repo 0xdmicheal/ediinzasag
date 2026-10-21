@@ -21,8 +21,12 @@ export function LoginModal() {
     if (reader && loginOpen) closeLogin()
   }, [reader, loginOpen, closeLogin])
 
-  // Navigating away closes it too.
+  // Navigating away closes it too. The modal mounts at the moment it opens (Layout loads it lazily),
+  // so only a change from the path it opened on counts.
+  const openedOn = useRef(location.pathname)
   useEffect(() => {
+    if (location.pathname === openedOn.current) return
+    openedOn.current = location.pathname
     closeLogin()
   }, [location.pathname, closeLogin])
 

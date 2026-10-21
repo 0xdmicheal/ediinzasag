@@ -50,20 +50,34 @@ export function TradingViewChart({
   const dark = theme === "dark" || siteDark
   const phone = useSyncExternalStore(subscribePhone, isPhone, () => false)
 
+  // The embed is about 2 MB, so it also waits for the page's own load and an idle moment:
+  // the chart sits near the top of /markets and would otherwise compete with the first paint.
   useEffect(() => {
     const node = host.current
     if (!node) return
+    // Safari has no requestIdleCallback, so it gets a short timeout instead.
+    const idleApi = typeof window.requestIdleCallback === "function"
+    let idle = 0
+    const start = () => {
+      idle = idleApi ? window.requestIdleCallback(() => setNear(true), { timeout: 2000 }) : setTimeout(() => setNear(true), 200)
+    }
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
-          setNear(true)
           observer.disconnect()
+          if (document.readyState === "complete") start()
+          else window.addEventListener("load", start, { once: true })
         }
       },
-      { rootMargin: "400px 0px" },
+      { rootMargin: "200px 0px" },
     )
     observer.observe(node)
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+      window.removeEventListener("load", start)
+      if (idleApi) window.cancelIdleCallback(idle)
+      else clearTimeout(idle)
+    }
   }, [])
 
   useEffect(() => {

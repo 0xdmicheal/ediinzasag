@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useLayoutEffect, useState } from "react"
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from "react"
 import { Outlet, useLocation } from "react-router-dom"
 import {
   FaFacebookF,
@@ -13,9 +13,26 @@ import { sessionLabel } from "@/content/markets"
 import { AmbientBackground } from "@/components/site/AmbientBackground"
 import { Footer12 } from "@/components/ui/footer-12"
 import { Navigation1 } from "@/components/ui/navigation-1"
-import { CompleteProfile } from "@/reader/CompleteProfile"
-import { LoginModal } from "@/reader/LoginModal"
-import { ReaderProvider } from "@/reader/session"
+import { ReaderProvider, useReader } from "@/reader/session"
+
+// Both popups (and the animation library they use) load only once a reader needs them.
+const LoginModal = lazy(() => import("@/reader/LoginModal").then((module) => ({ default: module.LoginModal })))
+const CompleteProfile = lazy(() => import("@/reader/CompleteProfile").then((module) => ({ default: module.CompleteProfile })))
+
+function ReaderPopups() {
+  const { reader, loginOpen } = useReader()
+  const [login, setLogin] = useState(false)
+  const [profile, setProfile] = useState(false)
+  // Once mounted they stay mounted, so their closing animations still play.
+  if (loginOpen && !login) setLogin(true)
+  if (reader && (!reader.birthDate || !reader.gender) && !profile) setProfile(true)
+  return (
+    <Suspense fallback={null}>
+      {login ? <LoginModal /> : null}
+      {profile ? <CompleteProfile /> : null}
+    </Suspense>
+  )
+}
 
 const footerColumns = [
   {
@@ -149,8 +166,7 @@ export function Layout() {
           ]}
         />
       </div>
-      <LoginModal />
-      <CompleteProfile />
+      <ReaderPopups />
     </ReaderProvider>
   )
 }

@@ -297,6 +297,16 @@ function SlideVisual({
   const [failed, setFailed] = useState(false)
   const settled = usePageSettled()
   const showImage = src && !failed
+  // A hidden slide's <img> still counts as the page's largest paint, so it stays empty until its turn;
+  // once the page has settled, its photo is fetched into the cache so the slide appears at once.
+  const [shown, setShown] = useState(active)
+  if (active && !shown) setShown(true)
+  useEffect(() => {
+    if (!settled || shown || !src) return
+    const warm = new Image()
+    warm.referrerPolicy = "no-referrer"
+    warm.src = src
+  }, [settled, shown, src])
 
   return (
     <div
@@ -308,8 +318,8 @@ function SlideVisual({
       ) : (
         <>
           <img
-            // Only the first photo competes with the page for bandwidth; the rest load once it has settled (slides turn every 7 s).
-            src={active || settled ? src : undefined}
+            // Only the first photo competes with the page for bandwidth; the rest are warmed once it has settled (slides turn every 7 s).
+            src={shown ? src : undefined}
             fetchPriority={active ? "high" : "low"}
             alt={slide.imageAlt ?? ""}
             referrerPolicy="no-referrer"

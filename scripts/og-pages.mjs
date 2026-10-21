@@ -134,6 +134,9 @@ function pageFor(shell, page) {
   const tags = [
     `<meta name="description" content="${dek}" />`,
     ...(page.noindex ? [`<meta name="robots" content="noindex, follow" />`] : [`<link rel="canonical" href="${url}" />`]),
+    // The cover is the page's largest paint; without this it is found only once the app has run.
+    // Normal priority: a high one takes bandwidth from the app script, which has to run before the cover can show.
+    ...(page.cover ? [`<link rel="preload" as="image" href="${escape(page.cover)}" />`] : []),
     `<link rel="alternate" type="application/rss+xml" title="${NAME}" href="${SITE}/feed.xml" />`,
     `<meta property="og:type" content="${page.article ? "article" : "website"}" />`,
     `<meta property="og:site_name" content="${NAME}" />`,
@@ -176,6 +179,7 @@ for (const story of site.stories) {
     title: story.title,
     dek: story.dek,
     image: absolute(art.src),
+    cover: art.src,
     alt: art.alt,
     size: [1280, 720],
     date: story.date,
@@ -192,6 +196,7 @@ for (const row of remote.articles) {
     title: row.title,
     dek: row.dek,
     image: row.cover_url ? absolute(row.cover_url) : SITE_IMAGE.image,
+    cover: row.cover_url || undefined,
     alt: row.cover_alt || row.title,
     size: row.cover_url ? null : SITE_IMAGE.size,
     date: row.published_at,

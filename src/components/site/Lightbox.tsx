@@ -1,20 +1,15 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react"
+import { useEffect, useRef, type MouseEvent } from "react"
 import { createPortal } from "react-dom"
 import { AnimatePresence, motion, MotionConfig } from "motion/react"
 import { X } from "lucide-react"
+
+import type { LightboxImage } from "@/components/site/use-lightbox"
 
 /*
  * Full-size image viewer for articles: the whole picture (object-contain, no
  * crop) on a blurred copy of itself, with rounded corners like the rest of the
  * design system. Esc, the close button or a click outside the image closes it.
  */
-
-export interface LightboxImage {
-  src: string
-  alt: string
-  caption?: string
-  referrer?: boolean
-}
 
 export function Lightbox({ image, onClose }: { image: LightboxImage | null; onClose: () => void }) {
   const closeButton = useRef<HTMLButtonElement>(null)
@@ -97,23 +92,3 @@ export function Lightbox({ image, onClose }: { image: LightboxImage | null; onCl
     document.body,
   )
 }
-
-/**
- * Lightbox state plus a click handler for a block of article HTML: any <img>
- * inside it opens full size (its alt, or a following <figcaption>, becomes the caption).
- */
-export function useLightbox() {
-  const [image, setImage] = useState<LightboxImage | null>(null)
-  const close = useCallback(() => setImage(null), [])
-  const onContentClick = useCallback((event: MouseEvent<HTMLElement>) => {
-    const target = event.target as HTMLElement
-    if (target.tagName !== "IMG" || target.closest("a")) return
-    const img = target as HTMLImageElement
-    const caption = img.closest("figure")?.querySelector("figcaption")?.textContent?.trim()
-    setImage({ src: img.currentSrc || img.src, alt: img.alt, caption: caption || undefined })
-  }, [])
-  return { image, open: setImage, close, onContentClick }
-}
-
-/** Tailwind classes for article HTML whose images open in the lightbox. */
-export const zoomableImages = "[&_img]:cursor-zoom-in [&_img]:transition-opacity [&_img:hover]:opacity-90"
