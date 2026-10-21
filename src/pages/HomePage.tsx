@@ -21,7 +21,7 @@ const MORE_LIMIT = 6
 
 export function HomePage() {
   // Published articles plus the built-in stories they have not replaced; the hero leads with the newest three.
-  const { stories } = useStories()
+  const { stories, ready } = useStories()
   const episodes = useEpisodes()
   const all = sortByDate(stories)
   const heroSlugs = new Set(all.slice(0, 3).map((story) => story.slug)) // the hero's three stories
@@ -47,7 +47,7 @@ export function HomePage() {
   return (
     <>
       <div className={`${container} pt-5`}>
-        <HeroShowcase slides={heroSlides(all, episodes[0])} />
+        <HeroShowcase slides={heroSlides(all, episodes[0])} ready={ready} />
       </div>
       {/* The ticker sits with equal space above and below: hero → 40px → ticker → 40px → Нийтлэл. */}
       <div className="mt-8 sm:mt-10">

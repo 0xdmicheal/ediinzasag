@@ -17,12 +17,29 @@ function inkTone(pct: number) {
   return "text-ink-foreground/65"
 }
 
-export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
+export function HeroShowcase({ slides, ready = true }: { slides: HeroSlide[]; ready?: boolean }) {
   const [index, setIndex] = useState(0)
+  // The built-in stories render first and the published ones replace them a moment later. Showing
+  // the first set made the hero flick between stories on every load, so it holds an empty stage
+  // until the live list is in (or 2.5 s have passed, so a slow network still gets stories).
+  const [waited, setWaited] = useState(false)
+  useEffect(() => {
+    if (ready) return
+    const id = window.setTimeout(() => setWaited(true), 2500)
+    return () => window.clearTimeout(id)
+  }, [ready])
+  const live = ready || waited
+  // A new set of slides starts again from the first one instead of whatever number was showing.
+  const lead = slides.map((item) => item.id).join(" ")
+  const [shownLead, setShownLead] = useState(lead)
+  if (lead !== shownLead) {
+    setShownLead(lead)
+    setIndex(0)
+  }
   // Hover and focus pause for a moment; the Pause button stops autoplay until pressed again.
   const [hovering, setHovering] = useState(false)
   const [stopped, setStopped] = useState(false)
-  const paused = hovering || stopped
+  const paused = hovering || stopped || !live
   const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches
   const startX = useRef<number | null>(null)
   const dragged = useRef(false)
@@ -79,7 +96,7 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
 
       {/* Stage */}
       <div
-        className="bg-studio relative isolate h-[34rem] touch-pan-y overflow-hidden rounded-xl [clip-path:inset(0_round_var(--radius-xl))] select-none sm:h-[40rem] lg:h-full"
+        className={`bg-studio relative isolate h-[34rem] touch-pan-y overflow-hidden rounded-xl [clip-path:inset(0_round_var(--radius-xl))] select-none sm:h-[40rem] lg:h-full ${live ? "" : "[&>*]:invisible"}`}
         onPointerDown={(event) => {
           startX.current = event.clientX
           dragged.current = false
@@ -94,9 +111,11 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
         }}
       >
         {/* Visual layers, cross-faded */}
-        {slides.map((item, itemIndex) => (
-          <SlideVisual key={item.id} slide={item} active={itemIndex === index} playState={playState} />
-        ))}
+        {live
+          ? slides.map((item, itemIndex) => (
+              <SlideVisual key={item.id} slide={item} active={itemIndex === index} playState={playState} />
+            ))
+          : null}
 
         {/* Progress segments */}
         <div className="absolute inset-x-5 top-5 z-10 flex gap-1.5 sm:inset-x-8 sm:top-6 lg:inset-x-12 lg:top-8">
@@ -229,7 +248,9 @@ export function HeroShowcase({ slides }: { slides: HeroSlide[] }) {
       {/* Side rail */}
       <aside className="flex min-h-0 flex-col gap-3">
         <MarketPulse />
-        <ol className="bg-card hidden min-h-0 flex-1 flex-col overflow-hidden rounded-xl border [clip-path:inset(0_round_var(--radius-xl))] lg:flex">
+        <ol
+          className={`bg-card hidden min-h-0 flex-1 flex-col overflow-hidden rounded-xl border [clip-path:inset(0_round_var(--radius-xl))] lg:flex ${live ? "" : "[&>*]:invisible"}`}
+        >
           {slides.map((item, itemIndex) => {
             const active = itemIndex === index
             return (
