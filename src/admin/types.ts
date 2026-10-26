@@ -63,6 +63,16 @@ export interface NewsRun {
   details: RunDetails
 }
 
+/** A team member's notes on a paywalled story: facts in their own words, never the pasted article. */
+export interface NewsBrief {
+  outlet: string
+  url: string
+  title: string
+  facts: string
+  /** Up to two short quotes, one per line. */
+  quotes: string
+}
+
 /** One story the agent read: the "Мэдээний урсгал" inbox (news_items), kept two weeks. */
 export interface NewsItem {
   id: string
@@ -250,6 +260,11 @@ export interface Backend {
   listNewsItems(): Promise<NewsItem[]>
   /** Any team member: turns an inbox story into an unclaimed article card. Resolves with the article id. */
   fileNewsItem(id: string): Promise<string>
+  /**
+   * Any team member: a brief on a paywalled story (WSJ, Bloomberg, Barron's) they read on their own
+   * subscription, in their own notes. The agent adds other coverage and drafts a card. Resolves with the article id.
+   */
+  fileNewsBrief(brief: NewsBrief): Promise<string>
   setNewsItemDismissed(id: string, dismissed: boolean): Promise<void>
   /** Deletes the card an inbox story became; the story goes to «Хаасан» so the agent doesn't file it again. */
   deleteNewsCard(id: string): Promise<void>

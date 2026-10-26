@@ -73,8 +73,6 @@ export const FEEDS: Feed[] = [
   { name: "Google News", url: googleNews('Mongolia (mining OR copper OR coal OR "Oyu Tolgoi" OR tugrik) when:3d'), mongolia: true, maxAgeHours: 72 },
   { name: "The Guardian", url: "https://www.theguardian.com/world/mongolia/rss", mongolia: true, maxAgeHours: 96 },
   { name: "The Diplomat", url: "https://thediplomat.com/regions/central-asia/feed/", mongolia: true, maxAgeHours: 72 },
-  { name: "iKon.mn", url: "https://ikon.mn/rss", mongolia: true },
-  { name: "Сонин.мн", url: "https://sonin.mn/rss", mongolia: true },
   { name: "Itoim.mn", url: "https://itoim.mn/rss.xml", mongolia: true, maxAgeHours: 72 },
   // Montsame's Mongolian site turns away server requests; its English edition comes through Google News.
   { name: "Google News", url: googleNews("site:montsame.mn when:2d"), mongolia: true, maxAgeHours: 72 },
@@ -114,6 +112,26 @@ export const FEEDS: Feed[] = [
   { name: "Google News", url: googleNews(`(tariff OR "trade war" OR sanctions OR "export controls") ${TRUSTED} when:1d`) },
   { name: "Google News", url: googleNews(`(semiconductor OR "AI chips" OR Nvidia OR TSMC) ${TRUSTED} when:1d`) },
 ]
+
+/**
+ * Outlets the desk no longer uses (publishing problems, 26 Oct): dropped even when
+ * Google News or the inbox search brings them in. Matched on the link's host and the source name.
+ */
+const BLOCKED = ["ikon.mn", "sonin.mn", "сонин.мн"]
+
+/** Paywalled outlets: never fetched by the agent. Their stories come in as an editor's brief. */
+const PAYWALLED = ["wsj.com", "barrons.com", "bloomberg.com"]
+
+const hostOf = (link: string) => {
+  try {
+    return new URL(link).hostname.toLowerCase()
+  } catch {
+    return ""
+  }
+}
+const onList = (list: string[], host: string) => list.some((domain) => host === domain || host.endsWith(`.${domain}`))
+const isBlocked = (item: { source: string; link: string }) =>
+  onList(BLOCKED, hostOf(item.link)) || BLOCKED.includes(item.source.trim().toLowerCase())
 
 /** How many of a section page's newest articles to open per run. */
 const SECTION_LIMIT = 6
@@ -279,7 +297,7 @@ export async function readFeeds() {
     for (const item of result.value) {
       // Unicode-aware, so Cyrillic headlines are compared too.
       const titleKey = item.title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()
-      if (!titleKey || !/^https?:\/\//.test(item.link)) continue
+      if (!titleKey || !/^https?:\/\//.test(item.link) || isBlocked(item)) continue
       if (item.published !== null && item.published < cutoff) continue
       if (seenLinks.has(item.link) || seenTitles.has(titleKey)) continue
       seenLinks.add(item.link)
@@ -600,7 +618,7 @@ interface Pick {
  * then the best of the rest, so the desk gets its daily briefings.
  */
 export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
-  // Cap each source so busy feeds (iKon.mn, Nikkei) don't crowd out the rest.
+  // Cap each source so busy feeds (Itoim.mn, Nikkei) don't crowd out the rest.
   const capped = (list: FeedItem[], perSource: number) => {
     const counts = new Map<string, number>()
     return list.filter((item) => {
@@ -679,7 +697,7 @@ function classify(item: FeedItem, text: string) {
  * against the last drafts so pieces in a row differ (guide v2.1, Parts 5 and 6),
  * then writes it to that plan. `recent` comes from recentFrom(), newest first.
  */
-export async function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[], recent: Recent[] = []): Promise<Briefing | null> {
+export async function write(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[], recent: Recent[] = [], notes = ""): Promise<Briefing | null> {
   const routed = await classify(item, text).catch((error) => {
     console.warn("classify skipped:", error instanceof Error ? error.message : error)
     return null
@@ -690,12 +708,12 @@ export async function write(item: FeedItem, text: string, why: string, tags: { s
     has_household_figure: false, has_dated_precedent: false, has_named_quote: false, has_contrast: false, has_forecast: false,
   } satisfies Classification & { mongolia_reason: string }
   const plan = drawPlan(story, recent)
-  const draft = await writeToPlan(item, text, why, tags, story, planBrief(plan, story.mongolia_level))
+  const draft = await writeToPlan(item, text, why, tags, story, planBrief(plan, story.mongolia_level), notes)
   if (!draft) return null
   return { ...draft, format: plan.format, mongolia_level: story.mongolia_level, mongolia_reason: story.mongolia_reason, structure: planNote(plan, story) }
 }
 
-function writeToPlan(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[], story: Classification, brief: string) {
+function writeToPlan(item: FeedItem, text: string, why: string, tags: { slug: string; label: string }[], story: Classification, brief: string, notes = "") {
   const formatLine =
     story.format === "medee"
       ? `Format: Мэдээ, 200-350 words, no subheads. Meet the range; never pad.`
@@ -717,6 +735,7 @@ function writeToPlan(item: FeedItem, text: string, why: string, tags: { slug: st
       `Feed summary: ${item.summary}\n\nSource text:\n${text || "(Only the feed summary is available. Write a short Мэдээ and say in verify_notes that the full text must be read.)"}\n\n` +
       (termbase ? `${termbase}\n\n` : "") +
       `Why it was picked: ${why}\n\n` +
+      (notes ? `${notes}\n\n` : "") +
       `Based on the source above, write one ediinzasag.mn article in Mongolian. The source text is the only source of facts; it overrides anything you remember, including dates, office holders and prices. Combine, compare and explain its facts freely.\n` +
       `The planning editor has set the format, the Mongolia level and the structure. Follow them; do not choose your own.\n${formatLine}\n${mongoliaLine}\n${brief}\n\n` +
       `1. Lede: the news in one or two sentences with who, what, how much and an absolute date, in the lede type above.\n` +
@@ -838,19 +857,20 @@ async function recentStructures(db: SupabaseClient): Promise<Recent[]> {
  */
 async function fileStory(
   db: SupabaseClient,
-  pick: { item: FeedItem; why: string; priority: number; tags?: string[]; desk?: "mongolia" | "world" },
+  pick: { item: FeedItem; why: string; priority: number; tags?: string[]; desk?: "mongolia" | "world"; brief?: PreparedBrief },
   tags: Tags,
   deadline: number,
   cardIfNoDraft = false,
 ): Promise<string | null> {
-  const { item, why, priority } = pick
-  const page = await readArticle(item.link)
+  const { item, why, priority, brief } = pick
+  // A brief's story sits behind a paywall: the agent works from the editor's notes and never opens the page.
+  const page = brief ? { image: "", text: brief.text } : await readArticle(item.link)
   let missed = ""
   const draftStart = Date.now()
   const drafted =
     PROVIDER === "rules"
       ? null
-      : await beforeDeadline(recentStructures(db).then((recent) => write(item, page.text, why, tags, recent)), deadline).catch((error) => {
+      : await beforeDeadline(recentStructures(db).then((recent) => write(item, page.text, why, tags, recent, brief?.notes)), deadline).catch((error) => {
           if (!cardIfNoDraft) throw error
           missed = error instanceof Error ? error.message : String(error)
           console.warn("draft skipped, filing the source card:", missed)
@@ -858,7 +878,12 @@ async function fileStory(
         })
   const briefing = drafted ? polish(drafted, `${item.title} ${item.summary} ${page.text}`) : null
   if (!briefing && PROVIDER !== "rules" && !cardIfNoDraft) return null
-  const card = briefing ? null : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published, link: item.link })
+  const card = briefing
+    ? null
+    : brief
+      ? sourceCard({ title: item.title, source: item.source, summary: "", excerpt: brief.facts, published: item.published, link: item.link, fromBrief: true })
+      : sourceCard({ title: item.title, source: item.source, summary: item.summary, excerpt: page.text, published: item.published, link: item.link })
+  const briefNotes = brief ? [`Редакцын товчлол: ${item.source}. Агент хуудсыг нь нээгээгүй, товчлол болон бусад эх сурвалжаас бичсэн.`, ...(briefing ? briefChecks(briefing.body_html, item, brief) : [])] : []
   const tagSlugs = new Set(tags.map((tag) => tag.slug))
   const slug = `${slugify(briefing?.slug || item.title) || "medee"}-${Date.now().toString(36).slice(-4)}`
   const coverUrl = await copyImage(db, page.image || item.image, slug)
@@ -874,10 +899,11 @@ async function fileStory(
       cover_url: coverUrl,
       cover_alt: coverUrl ? (card ? "Эх сурвалжийн зураг" : briefing!.cover_alt) : "",
       cover_credit: coverUrl ? `Зураг: ${item.source}` : "",
-      sources: [{ label: `${item.source}: ${item.title}`, href: item.link }],
+      sources: [{ label: `${item.source}: ${item.title}`, href: item.link }, ...(brief?.sources ?? [])],
       source_url: item.link,
       bot_notes: [
         `${card ? "Дүрмээр сонгосон" : "Агентын үнэлгээ"}: ${priority}/10 · ${why}`,
+        ...briefNotes,
         ...(card
           ? [
               ...(PROVIDER === "rules" ? [] : [`Агент ноорог бичээгүй (${missed.slice(0, 160) || "загвар татгалзсан"}). Эх сурвалжийн картаас бичнэ.`]),
@@ -939,6 +965,159 @@ async function deleteCard(db: SupabaseClient, id: number, role: string) {
   }
   await db.from("news_items").update({ status: "dismissed", article_id: null }).eq("id", id)
   return { deleted: true }
+}
+
+/* ------------------------------------------------------------------ */
+/* Editor's brief (WSJ, Bloomberg, Barron's…)                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * What a team member sends from a story they read on their own subscription: the facts in
+ * their own notes, not the article. The agent never logs in to or opens a paywalled page;
+ * it adds other coverage of the same story and writes EZ's own piece that credits the outlet.
+ */
+interface BriefInput {
+  outlet: string
+  url: string
+  title: string
+  facts: string
+  /** Up to two short quotes, one per line, for the writer to use attributed in «». */
+  quotes: string
+}
+
+/** The brief made ready for fileStory(): the text the writer sees, its extra rules and the extra sources. */
+interface PreparedBrief {
+  facts: string
+  quotes: string[]
+  text: string
+  notes: string
+  sources: { label: string; href: string }[]
+}
+
+/** Notes, not a pasted article: past this the brief is refused. */
+const BRIEF_FACTS_MAX = 6000
+const BRIEF_QUOTES_MAX = 2
+const BRIEF_QUOTE_CHARS = 300
+/** A quote in the draft longer than this many words is flagged for the editor. */
+const QUOTE_WORDS_MAX = 25
+
+function checkBrief(raw: Partial<BriefInput> | undefined): BriefInput {
+  const outlet = String(raw?.outlet ?? "").trim()
+  const url = String(raw?.url ?? "").trim()
+  const title = String(raw?.title ?? "").trim()
+  const facts = String(raw?.facts ?? "").trim()
+  const quotes = String(raw?.quotes ?? "").trim()
+  if (!outlet || outlet.length > 80) throw new Error("Хэвлэлийн нэрээ бичнэ үү")
+  if (!/^https?:\/\//.test(url)) throw new Error("Нийтлэлийн холбоос http(s)-ээр эхэлнэ")
+  if (!title || title.length > 300) throw new Error("Гарчгаа бичнэ үү (300 тэмдэгт хүртэл)")
+  if (facts.length < 40) throw new Error("Гол баримтаа бичнэ үү: тоо, хэн юу хэлсэн, юу болсон")
+  if (facts.length > BRIEF_FACTS_MAX) throw new Error(`Товчлол ${BRIEF_FACTS_MAX} тэмдэгтээс урт байна. Нийтлэлийг хуулахгүй, гол баримтыг өөрийн үгээр бичнэ`)
+  const lines = quotes.split("\n").map((line) => line.trim()).filter(Boolean)
+  if (lines.length > BRIEF_QUOTES_MAX) throw new Error(`Ишлэл ${BRIEF_QUOTES_MAX}-оос ихгүй`)
+  if (lines.some((line) => line.length > BRIEF_QUOTE_CHARS)) throw new Error(`Ишлэл бүр ${BRIEF_QUOTE_CHARS} тэмдэгтээс богино`)
+  return { outlet, url, title, facts, quotes: lines.join("\n") }
+}
+
+/** Significant words of a headline or note, for matching coverage of the same story. */
+const keywords = (text: string) =>
+  new Set(text.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((part) => part.length > 3))
+
+/**
+ * Other coverage of the brief's story: matching stories from the inbox (free outlets the agent
+ * already reads, so their pages open) and Google News headlines. Paywalled and blocked outlets are left out.
+ */
+async function relatedCoverage(db: SupabaseClient, brief: BriefInput) {
+  const wanted = keywords(`${brief.title} ${brief.facts.slice(0, 400)}`)
+  const usable = (item: { source: string; link: string }) => !isBlocked(item) && !onList(PAYWALLED, hostOf(item.link)) && item.link !== brief.url
+  const { data } = await db
+    .from("news_items")
+    .select("source, title, link, summary")
+    .gte("seen_at", new Date(Date.now() - 4 * 86_400_000).toISOString())
+    .limit(2000)
+  const inbox = ((data ?? []) as { source: string; title: string; link: string; summary: string }[])
+    .filter(usable)
+    .map((row) => ({ row, shared: [...keywords(row.title)].filter((part) => wanted.has(part)).length }))
+    .filter((match) => match.shared >= 3)
+    .sort((a, b) => b.shared - a.shared)
+    .slice(0, 3)
+    .map((match) => match.row)
+  const news = await fetchText(googleNews(`${brief.title} when:3d`), 8_000)
+    .then((xml) => parseFeed(xml, { name: "Google News", url: "" }))
+    .catch(() => [] as FeedItem[])
+  const headlines = news.filter(usable).slice(0, 3)
+  // Two inbox pages at most: each read takes up to 12 s of the call's time.
+  const pages = await Promise.all(inbox.slice(0, 2).map((row) => readArticle(row.link)))
+  return { inbox, pages, headlines }
+}
+
+/** The writer's source text and extra rules for a brief. */
+async function prepareBrief(db: SupabaseClient, brief: BriefInput): Promise<PreparedBrief> {
+  const quotes = brief.quotes ? brief.quotes.split("\n") : []
+  const { inbox, pages, headlines } = await relatedCoverage(db, brief)
+  const coverage = [
+    ...inbox.map((row, index) => `[${row.source}] ${row.title} (${row.link})\n${(pages[index]?.text || row.summary).slice(0, 3000)}`),
+    ...headlines.map((item) => `[${item.source}] ${item.title} (headline only)`),
+  ]
+  const text =
+    `EDITOR'S BRIEF: notes a team member took from ${brief.outlet}. These are facts, not ${brief.outlet}'s wording.\n${brief.facts}\n\n` +
+    (quotes.length ? `Quotes cleared for use (only these, each attributed to its speaker):\n${quotes.map((quote) => `- ${quote}`).join("\n")}\n\n` : "") +
+    (coverage.length ? `OTHER COVERAGE OF THE SAME STORY:\n${coverage.join("\n\n")}` : "OTHER COVERAGE: none found.")
+  const notes =
+    `This story comes from an editor's brief on a ${brief.outlet} article, plus other coverage. Write ediinzasag's own article, not a version of ${brief.outlet}'s: ` +
+    `choose your own angle, lede and order for Mongolian readers, and never mirror ${brief.outlet}'s headline or structure. ` +
+    `Attribute ${brief.outlet}'s facts to ${brief.outlet} in the sentence that uses them. ` +
+    `Quote only the cleared quotes, each under ${QUOTE_WORDS_MAX} words, in «» with the speaker named. ` +
+    `Link ${brief.outlet} once inline as step 7 says; link each other outlet you draw on once, on its name, with the URL given in the coverage. ` +
+    `Name in verify_notes the primary document (release, filing, data table) the editor should find and link.`
+  const sources = inbox.map((row) => ({ label: `${row.source}: ${row.title}`, href: row.link }))
+  return { facts: brief.facts, quotes, text, notes, sources }
+}
+
+/** What the editor checks on a brief draft: the outlet's link, long quotes, and whether it leans on one outlet. */
+function briefChecks(body: string, item: FeedItem, brief: PreparedBrief) {
+  const notes: string[] = []
+  if (!body.includes(`href="${item.link}"`)) notes.push(`${item.source}-ийн холбоос нийтлэлд алга. Нэр дээр нь нэг удаа холбоно.`)
+  for (const match of body.matchAll(/«([^»]+)»/g)) {
+    const words = match[1].trim().split(/\s+/).length
+    if (words > QUOTE_WORDS_MAX) notes.push(`Урт ишлэл (${words} үг): «${match[1].slice(0, 60)}…». ${QUOTE_WORDS_MAX} үгээс богиносгох эсвэл өөрийн үгээр.`)
+  }
+  const others = new Set([...body.matchAll(/href="(https?:\/\/[^"]+)"/g)].map((match) => hostOf(match[1])).filter((host) => host && host !== hostOf(item.link)))
+  if (others.size === 0) {
+    notes.push(
+      brief.sources.length
+        ? "Зөвхөн нэг хэвлэлд тулгуурласан байна. Бусад эх сурвалжийн баримтыг нэмж, холбооно."
+        : "Өөр хэвлэлд энэ мэдээ олдсонгүй. Нийтлэхээс өмнө анхны баримт бичиг (мэдэгдэл, тайлан, хүснэгт) олж холбоно.",
+    )
+  }
+  return notes
+}
+
+/** «Товчлол» in the inbox: an editor's brief becomes a card, drafted by the agent or as a source card. */
+async function fileBrief(db: SupabaseClient, raw: Partial<BriefInput> | undefined, deadline: number) {
+  const brief = checkBrief(raw)
+  const { data: existing } = await db.from("articles").select("id").eq("source_url", brief.url).maybeSingle()
+  if (existing) return { article_id: existing.id as string }
+  const { data: tagRows } = await db.from("tags").select("slug, label")
+  const prepared = await prepareBrief(db, brief)
+  const item: FeedItem = {
+    source: brief.outlet,
+    title: brief.title,
+    link: brief.url,
+    summary: brief.facts.slice(0, 500),
+    published: Date.now(),
+    image: "",
+    mongolia: false,
+  }
+  const ruled = score(item)
+  const articleId = await fileStory(
+    db,
+    { item, why: `Редакцын товчлол (${brief.outlet})`, priority: ruled.priority, tags: ruled.tags, desk: ruled.desk, brief: prepared },
+    (tagRows ?? []) as Tags,
+    deadline,
+    true,
+  )
+  if (!articleId) throw new Error("Карт үүсгэж чадсангүй")
+  return { article_id: articleId }
 }
 
 /** "Карт болгох" in the inbox: one stored story becomes an article card. */
@@ -1164,8 +1343,10 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
 
   // { action: "file", id } turns one inbox story into a card, { action: "delete", id } removes
   // that card again, { action: "next" } (cron only) drafts one queued story; anything else is a run.
-  const body = await request.json().catch(() => ({})) as { action?: string; id?: number }
-  const filing = body.action === "file"
+  // { action: "brief", brief } files an editor's brief on a paywalled story (any team member).
+  const body = await request.json().catch(() => ({})) as { action?: string; id?: number; brief?: Partial<BriefInput> }
+  const briefing = body.action === "brief"
+  const filing = body.action === "file" || briefing
   const deleting = body.action === "delete"
   const drafting = body.action === "next"
 
@@ -1205,6 +1386,7 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
   }
 
   try {
+    if (briefing) return json(await fileBrief(db, body.brief, received + DRAFT_DEADLINE_MS))
     if (filing) {
       if (!Number.isInteger(body.id)) return json({ error: "id хэрэгтэй" }, 400)
       return json(await fileFromInbox(db, body.id!, received + DRAFT_DEADLINE_MS))

@@ -61,7 +61,7 @@ const SHOUT = /(?<![\p{L}])\p{Lu}{4,}(?![\p{L}])/u
 const ACRONYMS = new Set(["IMF", "OPEC", "NASDAQ", "ОУВС", "ОПЕК", "АНУ", "УИХ", "ДНБ", "ҮСХ", "ХБНГУ", "ОХУ", "БНХАУ", "ЕХ", "НҮБ", "МХБ", "ТББ", "ХХААХҮЯ", "ЗГ", "MSCI", "COVID"])
 
 /**
- * Mongolian feeds (iKon, Сонин, Montsame…) carry everything: sport, crime, appointments.
+ * Mongolian feeds (Itoim, Montsame…) carry everything: sport, crime, appointments.
  * Being about Mongolia only counts when the story is also about money; this is that test.
  */
 const ECONOMY = word(
@@ -192,13 +192,16 @@ function clip(text: string, max: number) {
  * v2.1, for the editor to replace with the article. No label headings: the
  * guide retired them, and a subhead must state its section's point.
  */
-export function sourceCard(input: { title: string; source: string; summary: string; excerpt: string; published: number | null; link?: string }) {
+export function sourceCard(input: { title: string; source: string; summary: string; excerpt: string; published: number | null; link?: string; fromBrief?: boolean }) {
   const when = input.published ? new Date(input.published).toISOString().slice(0, 10).replace(/-/g, ".") : "огноо тодорхойгүй"
-  const quoted = clip(input.excerpt || input.summary, 700)
+  const quoted = clip(input.excerpt || input.summary, input.fromBrief ? 2000 : 700)
   const source = input.link ? `<a href="${escapeHtml(input.link)}">${escapeHtml(input.source)}</a>` : `<strong>${escapeHtml(input.source)}</strong>`
-  const quote = quoted
-    ? `<blockquote>${escapeHtml(quoted)}</blockquote><p>Дээрх хэсэг ${escapeHtml(input.source)}-ийн өөрийн үг. Орчуулж, тоог эхтэй тулгаад эндээс дахин бичнэ.</p>`
-    : `<p>Эх сурвалж дээрээс ишлэл ирсэнгүй. Холбоосыг нээгээд эхээс нь бичнэ.</p>`
+  // A brief holds a team member's notes on a paywalled story, not the outlet's words.
+  const quote = input.fromBrief
+    ? `<blockquote>${escapeHtml(quoted)}</blockquote><p>Дээрх нь редакцын товчлол. Бусад эх сурвалж, анхны баримт бичигтэй тулгаад өөрийн өнцгөөр бичнэ.</p>`
+    : quoted
+      ? `<blockquote>${escapeHtml(quoted)}</blockquote><p>Дээрх хэсэг ${escapeHtml(input.source)}-ийн өөрийн үг. Орчуулж, тоог эхтэй тулгаад эндээс дахин бичнэ.</p>`
+      : `<p>Эх сурвалж дээрээс ишлэл ирсэнгүй. Холбоосыг нээгээд эхээс нь бичнэ.</p>`
   return {
     title: clip(input.title, 120),
     dek: clip(input.summary || `${input.source}, ${when}`, 200),

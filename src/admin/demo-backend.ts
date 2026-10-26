@@ -453,6 +453,25 @@ export function createDemoBackend(): Backend {
       save(store)
       return article.id
     },
+    async fileNewsBrief(brief) {
+      const store = load()
+      const member = requireMember(store)
+      // The real function drafts from the brief and other coverage; the demo files a sample card under the brief's headline.
+      const [card] = demoBriefings(1)
+      const article: Article = {
+        ...card,
+        title: brief.title,
+        dek: brief.facts.slice(0, 200),
+        coverUrl: "",
+        coverCredit: "",
+        sources: [{ label: `${brief.outlet}: ${brief.title}`, href: brief.url }],
+        sourceUrl: brief.url,
+      }
+      store.articles.push(article)
+      log(store, article.id, member, "filed")
+      save(store)
+      return article.id
+    },
     async deleteNewsCard(id) {
       const store = load()
       const member = requireMember(store)

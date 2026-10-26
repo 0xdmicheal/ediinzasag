@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { Link, useSearchParams } from "react-router-dom"
-import { ArrowRight, Bot, ChevronDown, ExternalLink, FilePlus2, RefreshCw, Search, SlidersHorizontal, Trash2, Undo2, X } from "lucide-react"
+import { ArrowRight, Bot, ChevronDown, ExternalLink, FilePlus2, NotebookPen, RefreshCw, Search, SlidersHorizontal, Trash2, Undo2, X } from "lucide-react"
 import { cn } from "cn"
 
 import { RunDetailsView } from "@/admin/AgentRunDetails"
+import { BriefForm } from "@/admin/BriefForm"
 import { useConfirm } from "@/admin/ConfirmDialog"
 import { Folder } from "@/admin/Folder"
 import { categoriesOf, NEWS_CATEGORIES } from "@/admin/news-categories"
@@ -94,6 +95,7 @@ export function InboxPage() {
   const [running, setRunning] = useState(false)
   const [runResult, setRunResult] = useState<{ text: string; problem: string } | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [briefOpen, setBriefOpen] = useState(false)
   const [items, setItems] = useState<NewsItem[] | null>(null)
   const [error, setError] = useState("")
   const [status, setStatus] = useState<StatusFilter>("new")
@@ -285,11 +287,26 @@ export function InboxPage() {
           <button
             type="button"
             aria-expanded={detailsOpen}
-            onClick={() => setDetailsOpen((open) => !open)}
+            onClick={() => {
+              setDetailsOpen((open) => !open)
+              setBriefOpen(false)
+            }}
             className={cn(buttonClass.ghost, "gap-1")}
           >
             Details
             <ChevronDown className={cn("size-4 transition-transform", detailsOpen && "rotate-180")} />
+          </button>
+          <button
+            type="button"
+            aria-expanded={briefOpen}
+            onClick={() => {
+              setBriefOpen((open) => !open)
+              setDetailsOpen(false)
+            }}
+            className={buttonClass.ghost}
+          >
+            <NotebookPen className="size-4" />
+            Brief
           </button>
           {isEditor(member) ? (
             <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
@@ -301,6 +318,11 @@ export function InboxPage() {
         {detailsOpen ? (
           <div className="mt-6 border-t pt-6">
             <RunDetailsView run={last} problem={runResult?.problem ?? ""} />
+          </div>
+        ) : null}
+        {briefOpen ? (
+          <div className="mt-6 border-t pt-6">
+            <BriefForm />
           </div>
         ) : null}
       </section>

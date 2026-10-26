@@ -349,6 +349,14 @@ export function createSupabaseBackend(): Backend {
       }
       return (data as { article_id: string }).article_id
     },
+    async fileNewsBrief(brief) {
+      const { data, error } = await client.functions.invoke("news-agent", { body: { action: "brief", brief } })
+      if (error) {
+        const detail = await (error as { context?: Response }).context?.json?.().catch(() => null)
+        throw new Error(detail?.error ?? "Couldn't make the card")
+      }
+      return (data as { article_id: string }).article_id
+    },
     async deleteNewsCard(id) {
       const { error } = await client.functions.invoke("news-agent", { body: { action: "delete", id: Number(id) } })
       if (error) {

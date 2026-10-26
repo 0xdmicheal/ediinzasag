@@ -127,7 +127,7 @@ MINING.COM, OilPrice г.м., жагсаалт `supabase/functions/news-agent/ind
 3 мэдээг Claude-аар сонгуулж, монголоор орчуулж, нүүр зургийг нь эх сурвалжийн нэрээр хадгалаад **"Хянагдаж буй"** төлөвт оруулна.
 Агент хэзээ ч өөрөө нийтэлдэггүй.
 
-Эх сурвалж (39): **Монгол** — iKon.mn, Сонин.мн, Itoim.mn (RSS); Өнөөдөр, Medee.mn, Mongolian Mining Journal, Polit.mn
+Эх сурвалж (37): **Монгол** — Itoim.mn (RSS); Өнөөдөр, Medee.mn, Mongolian Mining Journal, Polit.mn
 (RSS-гүй тул эдийн засгийн хуудаснаас нь хамгийн шинэ 6 мэдээг уншина); Монцамэ (англи хувилбар), Google News (Монголын эдийн засаг,
 уул уурхай, Хятад/Орос–Монгол), The Guardian Mongolia, The Diplomat; **дэлхий** — BBC, Bloomberg, FT, The Economist, CNBC,
 Nikkei Asia, SCMP, DW, MarketWatch, Investing.com, Al Jazeera; **түүхий эд** — MINING.COM, Mining Technology, OilPrice;
