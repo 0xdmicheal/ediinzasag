@@ -27,9 +27,9 @@ import {
 /*
  * The newsroom's front page (the owner's sketch, 20 Oct): the news agent across the top,
  * then every story it read in the last two weeks sorted into folders (Asia, America,
- * Economy, Mongolia, …) with the open folder's list beside them. The agent cards the best
- * few itself three times a day; here anyone on the team cards another («Make card») or
- * closes it. Editors can delete a card again; the story then moves to Closed.
+ * Economy, Mongolia, …) with the open folder's list beside them. Nothing runs on a schedule
+ * (26 Oct): anyone on the team presses «Pull now» and the agent cards the best 30 at that
+ * moment; here they can card another («Make card») or close it. Editors can delete a card again; the story then moves to Closed.
  */
 
 type StatusFilter = "new" | "queued" | "filed" | "dismissed" | "all"
@@ -68,16 +68,6 @@ function ago(iso: string | null) {
   if (minutes < 60) return `${minutes} min`
   if (minutes < 48 * 60) return `${Math.round(minutes / 60)} h`
   return `${Math.round(minutes / 1440)} d`
-}
-
-/** The agent runs at 00:00, 06:00 and 12:00 UTC (08:00, 14:00, 20:00 in Ulaanbaatar). */
-function nextRun(now = new Date()) {
-  const next = new Date(now)
-  next.setUTCMinutes(0, 0, 0)
-  const hour = [0, 6, 12].find((value) => value > now.getUTCHours())
-  if (hour === undefined) next.setUTCDate(next.getUTCDate() + 1)
-  next.setUTCHours(hour ?? 0)
-  return next.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
 }
 
 /** The score on a photo: a solid chip, so only the number carries the colour. */
@@ -164,7 +154,7 @@ export function InboxPage() {
       setRuns(nextRuns)
       setRunResult({
         text: result.queued
-          ? `Picked ${result.queued} ${result.queued === 1 ? "story" : "stories"}. The agent drafts them one by one; cards appear within a few minutes.`
+          ? `Picked ${result.queued} ${result.queued === 1 ? "story" : "stories"}. The agent drafts one every 2 minutes or so; cards appear as they're done.`
           : "No new stories picked.",
         problem: "",
       })
@@ -259,7 +249,7 @@ export function InboxPage() {
     <div className="mx-auto flex h-full w-full max-w-[1480px] flex-col gap-8 px-8 py-10 lg:px-12 xl:px-16">
       {showGuide ? <WelcomeGuide member={member} onClose={closeGuide} /> : null}
 
-      {/* The agent: what it did last, when it runs next, and «Pull now». */}
+      {/* The agent: what it did last, and «Pull now». */}
       <section aria-label="News agent" className="bg-card rounded-2xl border px-7 py-6">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
           <span className="bg-foreground text-background grid size-12 shrink-0 place-items-center rounded-xl">
@@ -276,13 +266,9 @@ export function InboxPage() {
             <p className="text-muted-foreground mt-1 truncate text-[13px]">
               {runResult?.text ??
                 (last
-                  ? `Last run ${timeAgo(last.startedAt)} (${last.trigger === "cron" ? "scheduled" : "manual"}) · ${last.details?.fresh ?? last.scanned} stories read · ${last.created} ${last.created === 1 ? "card" : "cards"}`
+                  ? `Last pull ${timeAgo(last.startedAt)} · ${last.details?.fresh ?? last.scanned} stories read · ${last.created} ${last.created === 1 ? "card" : "cards"}`
                   : "Hasn't run yet.")}
             </p>
-          </div>
-          <div className="text-right">
-            <p className="text-muted-foreground text-[12px]">Next run</p>
-            <p className="text-[15px] font-medium tabular-nums">{nextRun()}</p>
           </div>
           <button
             type="button"
@@ -308,12 +294,10 @@ export function InboxPage() {
             <NotebookPen className="size-4" />
             Brief
           </button>
-          {isEditor(member) ? (
-            <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
-              <RefreshCw className={cn("size-4", running && "animate-spin")} />
-              {running ? "Pulling…" : "Pull now"}
-            </button>
-          ) : null}
+          <button type="button" disabled={running} onClick={runAgent} className={buttonClass.primary}>
+            <RefreshCw className={cn("size-4", running && "animate-spin")} />
+            {running ? "Pulling…" : "Pull now"}
+          </button>
         </div>
         {detailsOpen ? (
           <div className="mt-6 border-t pt-6">
@@ -398,7 +382,7 @@ export function InboxPage() {
             <p className="text-muted-foreground p-8 text-[14px]">Loading…</p>
           ) : shown.length === 0 ? (
             <p className="text-muted-foreground p-8 text-[14px]">
-              {items.length ? `Nothing in ${folder.label} for this filter.` : "No stories yet. They show up here after the agent runs (Pull now)."}
+              {items.length ? `Nothing in ${folder.label} for this filter.` : "No stories yet. They show up here after a pull (Pull now)."}
             </p>
           ) : (
             <ul className="grid gap-5 p-6 md:grid-cols-2 2xl:grid-cols-3">

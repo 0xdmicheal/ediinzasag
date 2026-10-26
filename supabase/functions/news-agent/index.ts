@@ -1,7 +1,6 @@
 // EZ news agent: a Supabase Edge Function (Deno).
 //
-// Once a day (pg_cron, see the end of schema.sql) or when an editor presses
-// "Одоо татах" on /admin, it:
+// Only when a team member presses "Pull now" on /admin (scheduled runs stopped 26 Oct), it:
 //   1. reads world economy, markets, tech and Mongolian RSS feeds (and the
 //      section pages of Mongolian sites that have no RSS),
 //   2. picks a few stories that matter to Mongolian readers,
@@ -19,7 +18,7 @@
 //   ANTHROPIC_BASE_URL=https://agentrouter.org (no /v1), AI_PROVIDER=claude, CLAUDE_MODEL=claude-opus-5.
 // Optional: AI_PROVIDER ("rules" | "gemini" | "claude"), CLAUDE_MODEL, GEMINI_MODEL, GEMINI_FALLBACK_MODEL
 // (used when GEMINI_MODEL is overloaded or out of quota: a model name, "auto" (default: other Flash models
-// the key can use, asked from Google) or "none"), NEWS_PER_RUN (default 3),
+// the key can use, asked from Google) or "none"), NEWS_PER_RUN (default 30),
 // NEWS_MIN_PRIORITY (default 5). Runs rank and queue; { action: "next" } (cron, every two minutes) drafts one queued story.
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by Supabase. NEWS_CRON_SECRET
 // is a password for the morning call, not an AI key. Deploy with --no-verify-jwt:
@@ -40,7 +39,8 @@ import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2"
 const ANTHROPIC_BASE = (Deno.env.get("ANTHROPIC_BASE_URL") || "").replace(/\/$/, "")
 const ROUTER = /agentrouter\.org/i.test(ANTHROPIC_BASE)
 const MODEL = Deno.env.get("CLAUDE_MODEL") || (ROUTER ? "claude-opus-5" : "claude-opus-5-5")
-export const PER_RUN = Math.max(1, Math.min(8, Number(Deno.env.get("NEWS_PER_RUN") ?? "3") || 3))
+/** Stories one "Pull now" picks and queues for drafting (the best 30 at that moment). */
+export const PER_RUN = Math.max(1, Math.min(30, Number(Deno.env.get("NEWS_PER_RUN") ?? "30") || 30))
 const MAX_AGE_HOURS = 36
 const USER_AGENT = "Mozilla/5.0 (compatible; EZNewsAgent/1.0; +https://ediinzasag.mn)"
 /** Stories rated below this are only used to fill the daily quota when nothing better exists. */
@@ -637,7 +637,7 @@ export async function rank(items: FeedItem[], count: number): Promise<Pick[]> {
   const result = await ask<{ picks: { index: number; priority: number; why: string }[] }>(
     NEWSROOM,
     `Here are today's headlines (economy, markets, commodities, Asia, and items marked [MN] that are about Mongolia; some [MN] items are in Mongolian). ` +
-      `Rank the ${count * 2} stories that matter most to Mongolian readers, best first: direct Mongolia news, ` +
+      `Rank the ${count + 10} stories that matter most to Mongolian readers, best first: direct Mongolia news, ` +
       `effects on Mongolia's exports (copper, coal, gold), fuel, prices, the tögrög, China's demand, investment, or major global economic turning points. ` +
       `Prefer hard news with clear facts over opinion, live blogs, videos, podcasts or listicles. Never pick two stories about the same event. ` +
       `This is an economics desk: never pick sport, crime, culture, courtesy visits or personnel appointments, even about Mongolia, unless the story itself is about money (a budget, prices, a deal, a loan). ` +
@@ -1350,8 +1350,8 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
   const deleting = body.action === "delete"
   const drafting = body.action === "next"
 
-  // The cron jobs send the shared secret. People must be signed in: any team member
-  // may file an inbox story, only editors and admins start a run.
+  // The draft cron sends the shared secret. People must be signed in: any team member
+  // (writer, editor, admin) may pull or file a story; only editors and admins delete cards.
   const cronSecret = Deno.env.get("NEWS_CRON_SECRET")
   let trigger: "cron" | "manual" = "manual"
   let role = ""
@@ -1367,7 +1367,7 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
     const { data: profile } = await db.from("profiles").select("role").eq("id", data.user.id).maybeSingle()
     if (!profile?.role) return json({ error: "Редакцын гишүүд л ашиглана" }, 403)
     role = profile.role
-    if (!filing && role !== "editor" && role !== "admin") return json({ error: deleting ? "Редактор, админ л устгана" : "Редактор, админ л ажиллуулна" }, 403)
+    if (deleting && role !== "editor" && role !== "admin") return json({ error: "Редактор, админ л устгана" }, 403)
   }
 
   if (deleting) {
@@ -1392,6 +1392,8 @@ if (!Deno.env.get("NEWS_DRY_RUN")) Deno.serve(async (request) => {
       return json(await fileFromInbox(db, body.id!, received + DRAFT_DEADLINE_MS))
     }
     if (drafting) return json(await draftNext(db, received + DRAFT_DEADLINE_MS))
+    // Pulls are manual only (26 Oct): a leftover scheduled run call reads nothing.
+    if (trigger === "cron") return json({ skipped: "Мэдээ зөвхөн «Pull now» дарахад татагдана" })
     return json(await run(db, trigger))
   } catch (error) {
     console.error(error)

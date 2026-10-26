@@ -253,7 +253,7 @@ export interface Backend {
 
   /** Takes an unclaimed agent briefing: you become its author and it returns to draft. */
   claimArticle(id: string): Promise<Article>
-  /** Editors and admins: run the news agent now. Resolves with how many stories it queued for drafting. */
+  /** Any team member: pull the news now (the best 30 are queued). Resolves with how many stories it queued for drafting. */
   runNewsAgent(): Promise<{ created: number; scanned: number; queued?: number; details?: RunDetails }>
   listNewsRuns(): Promise<NewsRun[]>
   /** Every story the agent read in the last two weeks, newest first. */

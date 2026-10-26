@@ -1160,6 +1160,9 @@ create policy "team uploads covers" on storage.objects for insert to authenticat
 --   insert into public.team_invites (email, role) values ('you@example.com', 'admin');
 
 -- ---------------------------------------------------------------- news agent
+-- Pulls are manual only since 2026-10-26 ("Pull now"): do not schedule ez-news-agent
+-- (the function ignores a scheduled run call). Only ez-news-drafts is needed. If the first job
+-- exists, remove it with: select cron.unschedule('ez-news-agent');
 -- After deploying supabase/functions/news-agent (see ADMIN.md), schedule it once.
 -- Database → Extensions: enable pg_cron and pg_net, then run (fill in the two values):
 --   select cron.schedule('ez-news-agent', '0 0,6,12 * * *', $cron$
