@@ -91,7 +91,7 @@ export function LoginShowcase() {
       </div>
 
       <div>
-        <p className="font-news text-[1.75rem] leading-[1.15] text-balance text-white">Уншаад зогсохгүй. Хадгал, гал өг, ярилц.</p>
+        <p className="font-news text-[1.75rem] leading-[1.15] text-balance text-white">Сонирхсон бүхэн тань нэг дор.</p>
         <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-white/60">
           <li className="flex items-center gap-1.5">
             <Bookmark className="size-3.5" /> Хадгалах
