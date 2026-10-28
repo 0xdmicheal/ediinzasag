@@ -106,16 +106,65 @@ async function watchPage(id: string): Promise<Video | null> {
   }
 }
 
-async function fromChannelPage(): Promise<Video[]> {
+const UNIT_DAYS: Record<string, number> = { second: 0, minute: 0, hour: 0, day: 1, week: 7, month: 30, year: 365 }
+
+/** "3 days ago" -> "YYYY.MM.DD", counted back from today (UTC). Approximate past a few weeks. */
+function dateFromAgo(ago: string) {
+  const match = ago.match(/(\d+)\s+(second|minute|hour|day|week|month|year)/)
+  if (!match) return undefined
+  const days = Number(match[1]) * UNIT_DAYS[match[2]]
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10).replace(/-/g, ".")
+}
+
+/** "22:00" or "1:02:03" -> seconds. */
+function secondsFromBadge(badge: string) {
+  return badge.split(":").reduce((total, part) => total * 60 + Number(part), 0)
+}
+
+/**
+ * Videos straight from the channel page's lockup cards: title, length badge and
+ * relative upload time. Used when a watch page is blocked (YouTube serves a bot
+ * check to watch pages from Supabase's datacenter IPs, seen 2026-10-28).
+ */
+function channelCards(html: string): Map<string, Video> {
+  const cards = new Map<string, Video>()
+  for (const chunk of html.split('"richItemRenderer":{"content":{"lockupViewModel"').slice(1)) {
+    const id = chunk.match(/i\.ytimg\.com\/vi\/([\w-]{11})\//)?.[1]
+    const meta = chunk.slice(chunk.indexOf('"lockupMetadataViewModel"'))
+    const title = field(meta, "content")
+    const date = [...meta.matchAll(/"accessibilityLabel":"([^"]*ago)"/g)].map((m) => dateFromAgo(m[1])).find(Boolean)
+    if (!id || !title || !date || cards.has(id)) continue
+    const badge = chunk.match(/"thumbnailBadgeViewModel":\{"text":"(\d+(?::\d+)+)"/)?.[1]
+    cards.set(id, {
+      id,
+      title: title.trim(),
+      href: `https://www.youtube.com/watch?v=${id}`,
+      date,
+      thumb: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+      seconds: badge ? secondsFromBadge(badge) : undefined,
+    })
+  }
+  return cards
+}
+
+/** The channel's own upload total ("30 videos" in the page header), Shorts included. */
+function channelCount(html: string) {
+  const count = html.match(/"content":"([\d,]+) videos?"/)?.[1]
+  return count ? Number(count.replace(/,/g, "")) : undefined
+}
+
+async function fromChannelPage(): Promise<{ videos: Video[]; count?: number }> {
   const res = await get(VIDEOS_URL, BROWSER_HEADERS)
   if (!res.ok) throw new Error(`YouTube channel page ${res.status}`)
   const html = await res.text()
+  const cards = channelCards(html)
   const ids = [...new Set([...html.matchAll(/"videoId":"([\w-]{11})"/g)].map((match) => match[1]))].slice(0, SCRAPE_LIMIT)
-  const videos = (await Promise.all(ids.map((id) => watchPage(id).catch(() => null)))).filter(
-    (video): video is Video => video !== null,
-  )
+  // Watch pages give the exact publish date; the channel card is the fallback when one is blocked.
+  const videos = (await Promise.all(ids.map((id) => watchPage(id).catch(() => null)))).map(
+    (video, i) => video ?? cards.get(ids[i]) ?? null,
+  ).filter((video): video is Video => video !== null)
   if (videos.length === 0) throw new Error("YouTube channel page had no readable videos")
-  return videos.sort((a, b) => b.date.localeCompare(a.date))
+  return { videos: videos.sort((a, b) => b.date.localeCompare(a.date)), count: channelCount(html) }
 }
 
 function parse(xml: string): Video[] {
@@ -143,15 +192,16 @@ Deno.serve(async (req) => {
 
   try {
     let videos: Video[]
+    let count: number | undefined
     let source = "rss"
     try {
       videos = await fromRss()
     } catch {
-      videos = await fromChannelPage()
+      ;({ videos, count } = await fromChannelPage())
       source = "channel-page"
     }
     return json(
-      { videos, source, fetchedAt: new Date().toISOString() },
+      { videos, count, source, fetchedAt: new Date().toISOString() },
       200,
       { "cache-control": `public, max-age=${CACHE_SECONDS}, s-maxage=${CACHE_SECONDS}` },
     )

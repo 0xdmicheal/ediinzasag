@@ -6,7 +6,7 @@ import { FaTelegram, FaYoutube } from "react-icons/fa6"
 import { SectionHeader } from "@/components/site/home-sections"
 import { YoutubeFrame, youtubeId } from "@/components/site/YoutubeFrame"
 import { channels, type Episode } from "@/content/channels"
-import { useEpisodes } from "@/content/useEpisodes"
+import { useEpisodes, useVideoCount } from "@/content/useEpisodes"
 
 const wide = "mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
 const narrow = "mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8"
@@ -44,6 +44,7 @@ function thumb(href: string, quality: "hq" | "mq" = "hq") {
 
 export function TalkPage() {
   const episodes = useEpisodes()
+  const videoCount = useVideoCount()
   // null until the reader picks one, so the player follows the newest video when live uploads arrive.
   const [href, setHref] = useState<string | null>(null)
   const [picked, setPicked] = useState(false)
@@ -51,7 +52,8 @@ export function TalkPage() {
   const player = useRef<HTMLDivElement>(null)
 
   const series = useMemo(() => episodes.filter((episode) => episode.n != null).sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [episodes])
-  const totalHours = useMemo(() => Math.round(episodes.reduce((sum, episode) => sum + episode.seconds, 0) / 3600), [episodes])
+  // Rounded down so "N+" never overstates (19.7 h reads 19+, not 20+).
+  const totalHours = useMemo(() => Math.floor(episodes.reduce((sum, episode) => sum + episode.seconds, 0) / 3600), [episodes])
   const firstYear = useMemo(() => episodes.reduce((year, episode) => (episode.date < year ? episode.date : year), "9999").slice(0, 4), [episodes])
 
   const latest = episodes[0]
@@ -85,7 +87,7 @@ export function TalkPage() {
           <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
             <dl className="flex flex-wrap items-center gap-x-6 gap-y-2">
               {[
-                [String(episodes.length), "бичлэг"],
+                [String(videoCount ?? episodes.length), "бичлэг"],
                 [String(series.length), "дугаар"],
                 [`${totalHours}+`, "цаг"],
                 [firstYear, "оноос"],

@@ -191,7 +191,7 @@ export const episodes: Episode[] = [
 
 /*
  * Live feed. The list above is the curated archive; new uploads come from the
- * youtube-feed Edge Function (YouTube's public RSS). fetchLatestEpisodes pulls
+ * youtube-feed Edge Function (YouTube's public RSS). fetchChannelFeed pulls
  * them and mergeEpisodes layers them on top, so new videos appear instantly
  * without a redeploy. Durations aren't in the RSS feed, so live items get
  * seconds: 0 and the UI hides the duration for those. See useEpisodes.ts.
@@ -200,26 +200,45 @@ export const youtubeChannelId = "UCAwrfICkC-LbV51GU0zMgXg"
 
 type FeedVideo = { id: string; title: string; href: string; date: string; thumb: string; seconds?: number }
 
-/** Latest uploads from the youtube-feed Edge Function. Returns [] on any failure. */
-export async function fetchLatestEpisodes(): Promise<Episode[]> {
+export type ChannelFeed = {
+  episodes: Episode[]
+  /** The channel's own upload total as YouTube shows it (Shorts included); absent when the feed didn't report it. */
+  videoCount?: number
+}
+
+let feed: Promise<ChannelFeed> | undefined
+
+/**
+ * Latest uploads (and the channel's video total) from the youtube-feed Edge
+ * Function. One request per page load, shared by every caller. Empty on any failure.
+ */
+export function fetchChannelFeed(): Promise<ChannelFeed> {
+  feed ??= loadChannelFeed()
+  return feed
+}
+
+async function loadChannelFeed(): Promise<ChannelFeed> {
   const base = import.meta.env.VITE_SUPABASE_URL as string | undefined
   const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
-  if (!base || !key) return [] // demo mode: no backend, keep the curated list only.
+  if (!base || !key) return { episodes: [] } // demo mode: no backend, keep the curated list only.
   try {
     const res = await fetch(`${base}/functions/v1/youtube-feed`, {
       headers: { apikey: key, authorization: `Bearer ${key}` },
     })
-    if (!res.ok) return []
-    const data = (await res.json()) as { videos?: FeedVideo[] }
-    return (data.videos ?? []).map((video) => ({
-      n: null,
-      title: video.title,
-      date: video.date,
-      seconds: video.seconds ?? 0, // RSS omits duration (the UI hides 0); the channel-page fallback has it.
-      href: video.href,
-    }))
+    if (!res.ok) return { episodes: [] }
+    const data = (await res.json()) as { videos?: FeedVideo[]; count?: number }
+    return {
+      episodes: (data.videos ?? []).map((video) => ({
+        n: null,
+        title: video.title,
+        date: video.date,
+        seconds: video.seconds ?? 0, // RSS omits duration (the UI hides 0); the channel-page fallback has it.
+        href: video.href,
+      })),
+      videoCount: typeof data.count === "number" && data.count > 0 ? data.count : undefined,
+    }
   } catch {
-    return []
+    return { episodes: [] }
   }
 }
 
